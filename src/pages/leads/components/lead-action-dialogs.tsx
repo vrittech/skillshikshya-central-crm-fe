@@ -240,7 +240,7 @@ export function LeadActionDialogs({ action, lead, onClose }: Props) {
                 </Select>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 items-start gap-4">
               <div className="grid gap-2">
                 <Label htmlFor="call-duration">Duration</Label>
                 <Input
