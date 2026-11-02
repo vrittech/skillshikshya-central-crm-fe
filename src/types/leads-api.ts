@@ -197,16 +197,20 @@ export interface ApiLeadCall {
   lead: number;
   call_timestamp: string;
   direction: "inbound" | "outbound";
-  /** User FK id of who made the call (backend requires it). */
+  /** User FK id or caller display name. */
   caller: number | string | null;
   caller_name?: string;
   phone_number: string | null;
   duration_seconds: number | null;
+  duration_formatted?: string;
+  duration_input?: string;
   outcome: string | null;
   notes: string | null;
   recording_url: string | null;
   next_followup_at: string | null;
   next_action: string | null;
+  branch?: number | null;
+  branch_name?: string;
   created_by?: number | null;
   created_by_name?: string;
   created_at: string;
@@ -449,6 +453,54 @@ export interface ApiPaymentListRow {
   received_by_name?: string;
   branch?: number | null;
   branch_name?: string;
+}
+
+export interface ApiCallListRow {
+  id: number;
+  lead: number;
+  lead_name: string;
+  lead_reference_number?: string;
+  call_timestamp: string;
+  direction: "inbound" | "outbound";
+  caller: string | null;
+  phone_number: string | null;
+  duration_seconds: number;
+  duration_formatted?: string;
+  outcome: string | null;
+  notes: string | null;
+  recording_url: string | null;
+  next_followup_at: string | null;
+  next_action: string | null;
+  branch?: number | null;
+  branch_name?: string;
+  created_by?: number | null;
+  created_at: string;
+}
+
+export interface ApiCallsPerDay {
+  date: string;
+  count: number;
+}
+
+export interface ApiTopCaller {
+  caller: string;
+  calls: number;
+  seconds: number;
+  duration_formatted?: string;
+}
+
+export interface ApiCallSummary {
+  total_calls: number;
+  inbound_calls: number;
+  outbound_calls: number;
+  total_seconds: number;
+  talk_time_formatted: string;
+  avg_duration_seconds: number;
+  avg_duration_formatted: string;
+  connected_calls: number;
+  connect_rate: number;
+  calls_per_day: ApiCallsPerDay[];
+  top_callers: ApiTopCaller[];
 }
 
 /* ---------------------------------------------------------------- branches */

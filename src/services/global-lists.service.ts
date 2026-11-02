@@ -1,6 +1,7 @@
 import { api } from "@/lib/api";
 import type { Paginated } from "@/types";
 import type {
+  ApiCallListRow,
   ApiEnrollmentListRow,
   ApiFollowupListRow,
   ApiPaymentListRow,
@@ -18,6 +19,10 @@ export const globalListsService = {
   },
   async payments(params: Record<string, unknown> = {}) {
     const { data } = await api.get<Paginated<ApiPaymentListRow>>("/payments/", { params });
+    return data;
+  },
+  async calls(params: Record<string, unknown> = {}) {
+    const { data } = await api.get<Paginated<ApiCallListRow>>("/calls/", { params });
     return data;
   },
 };

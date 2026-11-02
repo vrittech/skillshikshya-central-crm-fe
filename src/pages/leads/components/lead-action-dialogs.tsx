@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -25,6 +25,84 @@ import { CALL_OUTCOMES, COUNSELORS, counselorName } from "@/data/lead-lookups";
 import { formatDateToNepalIso, toNepalIso } from "@/lib/leads-format";
 import { useAddCall, useAddFollowup, useAssignLead } from "@/hooks/use-leads";
 import { useCounselors } from "@/hooks/use-users";
+import { cn } from "@/lib/utils";
+
+function parseDurationLivePreview(str: string): { seconds: number; preview: string; error?: string } {
+  if (!str || !str.trim()) return { seconds: 0, preview: "" };
+  const s = str.trim().toLowerCase();
+
+  // Colon format: H:M:S or M:S (e.g. 4:19, 7:89, 1:02:30, 1:99:99)
+  if (s.includes(":")) {
+    const parts = s.split(":");
+    if (parts.length === 2 && /^\d+$/.test(parts[0]) && /^\d+$/.test(parts[1])) {
+      const mins = parseInt(parts[0], 10);
+      const secs = parseInt(parts[1], 10);
+      const total = mins * 60 + secs;
+      const m = Math.floor(total / 60);
+      const remS = total % 60;
+      return { seconds: total, preview: `= ${m} min ${String(remS).padStart(2, "0")} sec` };
+    }
+    if (parts.length === 3 && /^\d+$/.test(parts[0]) && /^\d+$/.test(parts[1]) && /^\d+$/.test(parts[2])) {
+      const h = parseInt(parts[0], 10);
+      const mins = parseInt(parts[1], 10);
+      const secs = parseInt(parts[2], 10);
+      const total = h * 3600 + mins * 60 + secs;
+      const m = Math.floor(total / 60);
+      const remS = total % 60;
+      return { seconds: total, preview: `= ${m} min ${String(remS).padStart(2, "0")} sec` };
+    }
+    return { seconds: 0, preview: "", error: "Invalid duration format. Use MM:SS, e.g. 4:19" };
+  }
+
+  // Dot format: M.SS (e.g. 4.19, 7.89, 4.5)
+  if (s.includes(".")) {
+    const parts = s.split(".");
+    if (parts.length === 2 && /^\d+$/.test(parts[0]) && /^\d+$/.test(parts[1])) {
+      const mins = parseInt(parts[0], 10);
+      const secs = parseInt(parts[1], 10);
+      const total = mins * 60 + secs;
+      const m = Math.floor(total / 60);
+      const remS = total % 60;
+      return { seconds: total, preview: `= ${m} min ${String(remS).padStart(2, "0")} sec` };
+    }
+    return { seconds: 0, preview: "", error: "Invalid duration format. Use MM:SS, e.g. 4:19" };
+  }
+
+  // MmSs (e.g. 4m19s)
+  const msMatch = s.match(/^(\d+)\s*(?:m|min|mins|minute|minutes)\s*(\d+)\s*(?:s|sec|secs|second|seconds)?$/);
+  if (msMatch) {
+    const total = parseInt(msMatch[1], 10) * 60 + parseInt(msMatch[2], 10);
+    const m = Math.floor(total / 60);
+    const remS = total % 60;
+    return { seconds: total, preview: `= ${m} min ${String(remS).padStart(2, "0")} sec` };
+  }
+
+  // M only (e.g. 4m, 4min, 4 mins)
+  const mMatch = s.match(/^(\d+)\s*(?:m|min|mins|minute|minutes)$/);
+  if (mMatch) {
+    const total = parseInt(mMatch[1], 10) * 60;
+    const m = Math.floor(total / 60);
+    return { seconds: total, preview: `= ${m} min 00 sec` };
+  }
+
+  // S only (e.g. 45s, 45sec)
+  const sMatch = s.match(/^(\d+)\s*(?:s|sec|secs|second|seconds)$/);
+  if (sMatch) {
+    const total = parseInt(sMatch[1], 10);
+    return { seconds: total, preview: `= ${total} sec` };
+  }
+
+  // Raw digits / seconds (e.g. 259)
+  if (/^\d+$/.test(s)) {
+    const total = parseInt(s, 10);
+    const m = Math.floor(total / 60);
+    const remS = total % 60;
+    if (m === 0) return { seconds: total, preview: `= ${remS} sec` };
+    return { seconds: total, preview: `= ${m} min ${String(remS).padStart(2, "0")} sec` };
+  }
+
+  return { seconds: 0, preview: "", error: "Invalid duration format. Use MM:SS, e.g. 4:19" };
+}
 
 export type LeadAction = "log_call" | "follow_up" | "assign" | null;
 
@@ -95,6 +173,8 @@ export function LeadActionDialogs({ action, lead, onClose }: Props) {
   const [call, setCall] = useState<CallForm>(EMPTY_CALL);
   const [fu, setFu] = useState<FollowUpForm>(EMPTY_FU);
   const [assignTo, setAssignTo] = useState("");
+  const [durationError, setDurationError] = useState<string | null>(null);
+  const durationPreview = useMemo(() => parseDurationLivePreview(call.duration), [call.duration]);
 
   // Pre-select the current owner when the Assign dialog opens.
   useEffect(() => {
@@ -124,13 +204,22 @@ export function LeadActionDialogs({ action, lead, onClose }: Props) {
       setCall(EMPTY_CALL);
       return;
     }
+    if (call.duration.trim()) {
+      const parsed = parseDurationLivePreview(call.duration);
+      if (parsed.error) {
+        setDurationError(parsed.error);
+        return;
+      }
+    }
+    setDurationError(null);
+
     addCall.mutate(
       {
         call_timestamp: new Date().toISOString(),
-        caller: user?.id ?? null,
+        caller: user?.name || user?.email || "Counselor",
         direction: call.direction,
         outcome: call.outcome || null,
-        duration_seconds: call.duration ? Math.round(Number(call.duration) * 60) : null,
+        duration_input: call.duration.trim() || undefined,
         recording_url: call.recording.trim() || null,
         notes: call.notes.trim() || null,
         next_followup_at: call.nextFollowUp ? toNepalIso(call.nextFollowUp) : null,
@@ -139,8 +228,20 @@ export function LeadActionDialogs({ action, lead, onClose }: Props) {
       },
       {
         onSuccess: () => {
+          setDurationError(null);
           setCall(EMPTY_CALL);
           onClose();
+        },
+        onError: (err: unknown) => {
+          const apiErr = err as { response?: { data?: { detail?: string; duration_input?: string[] } } };
+          const data = apiErr?.response?.data;
+          if (data?.detail && /insufficient/i.test(data.detail)) {
+            setDurationError(data.detail);
+          } else if (data?.duration_input?.[0]) {
+            setDurationError(data.duration_input[0]);
+          } else if (data?.detail) {
+            setDurationError(data.detail);
+          }
         },
       },
     );
@@ -215,14 +316,28 @@ export function LeadActionDialogs({ action, lead, onClose }: Props) {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
-                <Label>Duration (minutes)</Label>
+                <Label htmlFor="call-duration">Duration (MM:SS, e.g. 4:19)</Label>
                 <Input
-                  type="number"
-                  min={0}
-                  placeholder="e.g. 4"
+                  id="call-duration"
+                  type="text"
+                  placeholder="MM:SS, e.g. 4:19"
                   value={call.duration}
-                  onChange={(e) => setC("duration", e.target.value)}
+                  className={cn(durationError && "border-destructive focus-visible:ring-destructive")}
+                  onChange={(e) => {
+                    setC("duration", e.target.value);
+                    setDurationError(null);
+                  }}
                 />
+                {durationPreview.preview && !durationError && (
+                  <p className="text-muted-foreground font-mono text-xs">
+                    {durationPreview.preview}
+                  </p>
+                )}
+                {durationError && (
+                  <p className="text-destructive text-xs font-medium">
+                    {durationError}
+                  </p>
+                )}
               </div>
               <div className="grid gap-2">
                 <Label>Recording link</Label>
