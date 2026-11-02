@@ -25,6 +25,8 @@ import { CALL_OUTCOMES, COUNSELORS, counselorName } from "@/data/lead-lookups";
 import { formatDateToNepalIso, toNepalIso } from "@/lib/leads-format";
 import { useAddCall, useAddFollowup, useAssignLead } from "@/hooks/use-leads";
 import { useCounselors } from "@/hooks/use-users";
+import { apiErrorMessage } from "@/lib/api";
+import { durationLabel, parseCallDuration } from "@/lib/call-duration";
 
 export type LeadAction = "log_call" | "follow_up" | "assign" | null;
 
@@ -79,22 +81,27 @@ const REMINDER_OFFSETS_MS: Record<FollowUpForm["reminder"], number> = {
   "1d": 24 * 60 * 60_000,
 };
 
-/**
- * All lead quick-actions live here. This is the static phase: the forms are
- * laid out with the fields the real workflow needs, but Save only shows a
- * toast — no mutation is performed.
- */
 export function LeadActionDialogs({ action, lead, onClose }: Props) {
   const name = lead?.fullName ?? "lead";
   const { isMock } = useDataSource();
   const { user } = useAuth();
   const addCall = useAddCall(lead?.apiId);
+  const resetCall = addCall.reset;
   const addFollowup = useAddFollowup(lead?.apiId);
   const assignLead = useAssignLead();
   const counselorsQ = useCounselors("", undefined, !isMock);
   const [call, setCall] = useState<CallForm>(EMPTY_CALL);
+  const [durationError, setDurationError] = useState("");
+  const duration = parseCallDuration(call.duration);
   const [fu, setFu] = useState<FollowUpForm>(EMPTY_FU);
   const [assignTo, setAssignTo] = useState("");
+
+  useEffect(() => {
+    if (action === "log_call") {
+      setDurationError("");
+      resetCall();
+    }
+  }, [action, resetCall]);
 
   // Pre-select the current owner when the Assign dialog opens.
   useEffect(() => {
@@ -118,6 +125,10 @@ export function LeadActionDialogs({ action, lead, onClose }: Props) {
   }
 
   function submitCall() {
+    if (duration == null) {
+      setDurationError("Enter a duration, e.g. 4:19 or 259 seconds.");
+      return;
+    }
     // Mock path (or a lead with no backend id) can't persist — keep the toast.
     if (isMock || lead?.apiId == null) {
       done("Call logged");
@@ -127,10 +138,10 @@ export function LeadActionDialogs({ action, lead, onClose }: Props) {
     addCall.mutate(
       {
         call_timestamp: new Date().toISOString(),
-        caller: user?.id ?? null,
+        caller: user?.name ?? "",
         direction: call.direction,
         outcome: call.outcome || null,
-        duration_seconds: call.duration ? Math.round(Number(call.duration) * 60) : null,
+        duration_seconds: duration,
         recording_url: call.recording.trim() || null,
         notes: call.notes.trim() || null,
         next_followup_at: call.nextFollowUp ? toNepalIso(call.nextFollowUp) : null,
@@ -140,8 +151,10 @@ export function LeadActionDialogs({ action, lead, onClose }: Props) {
       {
         onSuccess: () => {
           setCall(EMPTY_CALL);
+          setDurationError("");
           onClose();
         },
+        onError: (error) => setDurationError(apiErrorMessage(error, "Could not log call")),
       },
     );
   }
@@ -162,7 +175,9 @@ export function LeadActionDialogs({ action, lead, onClose }: Props) {
         scheduled_at: toNepalIso(fu.scheduledAt),
         assigned_to: fuAssigned ? Number(fuAssigned) : null,
         purpose: fu.purpose.trim() || null,
-        reminder_at: formatDateToNepalIso(new Date(scheduledDate.getTime() - REMINDER_OFFSETS_MS[fu.reminder])),
+        reminder_at: formatDateToNepalIso(
+          new Date(scheduledDate.getTime() - REMINDER_OFFSETS_MS[fu.reminder]),
+        ),
         status: "pending",
       },
       {
@@ -181,13 +196,18 @@ export function LeadActionDialogs({ action, lead, onClose }: Props) {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Log a call — {name}</DialogTitle>
-            <DialogDescription>Record the outcome of this call on the lead timeline.</DialogDescription>
+            <DialogDescription>
+              Record the outcome of this call on the lead timeline.
+            </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-2">
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
                 <Label>Direction</Label>
-                <Select value={call.direction} onValueChange={(v) => setC("direction", v as CallForm["direction"])}>
+                <Select
+                  value={call.direction}
+                  onValueChange={(v) => setC("direction", v as CallForm["direction"])}
+                >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -215,14 +235,30 @@ export function LeadActionDialogs({ action, lead, onClose }: Props) {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
-                <Label>Duration (minutes)</Label>
+                <Label htmlFor="call-duration">Duration</Label>
                 <Input
-                  type="number"
-                  min={0}
-                  placeholder="e.g. 4"
+                  id="call-duration"
+                  type="text"
+                  placeholder="MM:SS, e.g. 4:19"
+                  aria-invalid={!!durationError || (!!call.duration && duration == null)}
+                  aria-describedby="call-duration-help call-duration-error"
                   value={call.duration}
-                  onChange={(e) => setC("duration", e.target.value)}
+                  onChange={(e) => {
+                    setC("duration", e.target.value);
+                    setDurationError("");
+                  }}
                 />
+                <p
+                  id="call-duration-help"
+                  className="text-muted-foreground text-xs"
+                  aria-live="polite"
+                >
+                  {duration != null ? `= ${durationLabel(duration)}` : "MM:SS, e.g. 4:19"}
+                </p>
+                <p id="call-duration-error" className="text-destructive text-xs" role="alert">
+                  {durationError ||
+                    (call.duration && duration == null ? "Invalid duration. Try 4:19." : "")}
+                </p>
               </div>
               <div className="grid gap-2">
                 <Label>Recording link</Label>
@@ -316,7 +352,10 @@ export function LeadActionDialogs({ action, lead, onClose }: Props) {
             </div>
             <div className="grid gap-2">
               <Label>Reminder</Label>
-              <Select value={fu.reminder} onValueChange={(v) => setF("reminder", v as FollowUpForm["reminder"])}>
+              <Select
+                value={fu.reminder}
+                onValueChange={(v) => setF("reminder", v as FollowUpForm["reminder"])}
+              >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -357,7 +396,11 @@ export function LeadActionDialogs({ action, lead, onClose }: Props) {
               <Label>Counselor</Label>
               <Select value={assignTo || undefined} onValueChange={setAssignTo}>
                 <SelectTrigger>
-                  <SelectValue placeholder={counselorsQ.isFetching ? "Loading counselors…" : "Select counselor"} />
+                  <SelectValue
+                    placeholder={
+                      counselorsQ.isFetching ? "Loading counselors…" : "Select counselor"
+                    }
+                  />
                 </SelectTrigger>
                 <SelectContent>
                   {counselorOptions.map((c) => (

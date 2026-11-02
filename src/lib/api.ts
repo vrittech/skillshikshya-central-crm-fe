@@ -78,7 +78,7 @@ export function apiErrorMessage(error: unknown, fallback = "Something went wrong
     const status = error.response?.status;
     const data = error.response?.data;
     if (typeof data === "string") {
-      return cleanMessage(data);
+      return cleanMessage(data) || fallback;
     }
     if (data && typeof data === "object") {
       const d = data as Record<string, unknown>;

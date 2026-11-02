@@ -193,11 +193,14 @@ export interface ApiLeadPayload {
 /* ----------------------------------------------------------- nested records */
 
 export interface ApiLeadCall {
+  duration_input?: string;
+  duration_formatted?: string;
+  remaining_seconds?: number;
   id: number;
   lead: number;
   call_timestamp: string;
   direction: "inbound" | "outbound";
-  /** User FK id of who made the call (backend requires it). */
+  /** Caller display name. */
   caller: number | string | null;
   caller_name?: string;
   phone_number: string | null;
