@@ -197,8 +197,8 @@ export interface ApiLeadCall {
   lead: number;
   call_timestamp: string;
   direction: "inbound" | "outbound";
-  /** User FK id of who made the call (backend requires it). */
-  caller: number | string | null;
+  /** Display name of who made the call (a free-text field on the backend). */
+  caller: string | null;
   caller_name?: string;
   phone_number: string | null;
   duration_seconds: number | null;
@@ -210,6 +210,15 @@ export interface ApiLeadCall {
   created_by?: number | null;
   created_by_name?: string;
   created_at: string;
+}
+
+export interface ApiAddCallPayload extends Partial<ApiLeadCall> {
+  /** Raw text such as "4:19"; the backend parses it into duration_seconds. */
+  duration_input?: string;
+}
+
+export interface ApiAddCallResponse extends ApiLeadCall {
+  remaining_seconds: number | null;
 }
 
 export type ApiActivityType =
