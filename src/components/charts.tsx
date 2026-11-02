@@ -119,7 +119,7 @@ export function MiniBars({ values, className }: { values: number[]; className?: 
         <span
           key={i}
           className={cn("flex-1 rounded-t", i % 2 === 0 ? "bg-brand" : "bg-brand-fixed-dim")}
-          style={{ height: `${Math.max(12, (v / max) * 100)}%` }}
+          style={{ height: v === 0 ? 0 : `${Math.max(12, (v / max) * 100)}%` }}
         />
       ))}
     </div>
