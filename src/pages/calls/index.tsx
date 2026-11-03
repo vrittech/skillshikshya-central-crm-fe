@@ -1,5 +1,7 @@
-import { ChevronLeft, ChevronRight, Phone, Search } from "lucide-react";
+import { ChevronLeft, ChevronRight, Download, Phone, Search } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
+import { useState } from "react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { HBarList, MiniBars } from "@/components/charts";
@@ -23,6 +25,8 @@ import {
 import { useCallSummary, useCalls } from "@/hooks/use-calls";
 import { useDebouncedValue } from "@/lib/use-debounced-value";
 import { formatDateTime, formatDateToNepalIso } from "@/lib/leads-format";
+import { apiErrorMessage } from "@/lib/api";
+import { callsService } from "@/services/calls.service";
 import type { CallListParams, CallSummaryParams } from "@/types/calls";
 import { useBranches } from "@/hooks/use-branches";
 import { useUsers } from "@/hooks/use-users";
@@ -104,6 +108,7 @@ function formatDuration(seconds: number): string {
 
 export default function CallsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const [exporting, setExporting] = useState(false);
   const { user } = useAuth();
   const isStaff = Boolean(user?.is_staff || user?.is_superuser);
   const usersQuery = useUsers(1, 100);
@@ -197,16 +202,40 @@ export default function CallsPage() {
     setSearchParams(nextParams);
   }
 
+  async function handleExport() {
+    setExporting(true);
+    try {
+      await callsService.exportCsv(summaryParams);
+    } catch (error) {
+      toast.error(apiErrorMessage(error, "Could not export calls."));
+    } finally {
+      setExporting(false);
+    }
+  }
+
   return (
     <div className="space-y-6">
-      <div>
-        <p className="text-brand font-mono text-[11px] font-bold tracking-wider uppercase">
-          CRM Workspace
-        </p>
-        <h1 className="font-headline mt-1 text-3xl font-semibold tracking-tight">Calls</h1>
-        <p className="text-muted-foreground mt-1 text-sm">
-          Call activity across your team.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="text-brand font-mono text-[11px] font-bold tracking-wider uppercase">
+            CRM Workspace
+          </p>
+          <h1 className="font-headline mt-1 text-3xl font-semibold tracking-tight">
+            Calls
+          </h1>
+          <p className="text-muted-foreground mt-1 text-sm">
+            Call activity across your team.
+          </p>
+        </div>
+
+        <Button
+          variant="outline"
+          onClick={handleExport}
+          disabled={exporting}
+        >
+          <Download />
+          {exporting ? "Exporting…" : "Export CSV"}
+        </Button>
       </div>
 
             {summaryQuery.isError ? (
