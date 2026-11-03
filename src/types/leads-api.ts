@@ -202,6 +202,8 @@ export interface ApiLeadCall {
   caller_name?: string;
   phone_number: string | null;
   duration_seconds: number | null;
+  /** Flexible duration text sent when creating a call. */
+  duration_input?: string;
   outcome: string | null;
   notes: string | null;
   recording_url: string | null;

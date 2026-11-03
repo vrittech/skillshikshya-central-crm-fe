@@ -25,6 +25,7 @@ import { CALL_OUTCOMES, COUNSELORS, counselorName } from "@/data/lead-lookups";
 import { formatDateToNepalIso, toNepalIso } from "@/lib/leads-format";
 import { useAddCall, useAddFollowup, useAssignLead } from "@/hooks/use-leads";
 import { useCounselors } from "@/hooks/use-users";
+import { apiErrorMessage } from "@/lib/api";
 
 export type LeadAction = "log_call" | "follow_up" | "assign" | null;
 
@@ -64,6 +65,54 @@ const EMPTY_CALL: CallForm = {
   nextAction: "",
 };
 
+function parseCallDuration(input: string): number | null {
+  const value = input.trim().toLowerCase();
+  if (!value) return null;
+
+  const isDigits = (part: string) => /^\d+$/.test(part);
+
+  if (value.includes(":")) {
+    const parts = value.split(":");
+
+    if (parts.length === 2 && parts.every(isDigits)) {
+      return Number(parts[0] ?? "") * 60 + Number(parts[1] ?? "");
+    }
+
+    if (parts.length === 3 && parts.every(isDigits)) {
+      return (
+        Number(parts[0] ?? "") * 3600 +
+        Number(parts[1] ?? "") * 60 +
+        Number(parts[2] ?? "")
+      );
+    }
+
+    return null;
+  }
+
+  if (value.includes(".")) {
+    const parts = value.split(".");
+    const minutes = parts[0] ?? "";
+    const seconds = parts[1] ?? "";
+
+    if (parts.length !== 2 || !isDigits(minutes) || !isDigits(seconds)) {
+      return null;
+    }
+
+    return Number(minutes) * 60 + Number(seconds.slice(0, 2).padStart(2, "0"));
+  }
+
+  const minutesAndSeconds = /^(\d*)m(\d*)s$/.exec(value);
+  if (minutesAndSeconds) {
+    return Number(minutesAndSeconds[1] || 0) * 60 + Number(minutesAndSeconds[2] || 0);
+  }
+
+  if (isDigits(value)) {
+    return Number(value);
+  }
+
+  return null;
+}
+
 interface FollowUpForm {
   scheduledAt: string;
   assignedTo: string;
@@ -96,6 +145,12 @@ export function LeadActionDialogs({ action, lead, onClose }: Props) {
   const [fu, setFu] = useState<FollowUpForm>(EMPTY_FU);
   const [assignTo, setAssignTo] = useState("");
 
+  const [callDurationError, setCallDurationError] = useState<string | null>(null);
+  const durationSeconds = parseCallDuration(call.duration);
+  const durationError =
+    callDurationError ??
+    (call.duration.trim() && durationSeconds === null ? "Enter a valid duration." : null);
+
   // Pre-select the current owner when the Assign dialog opens.
   useEffect(() => {
     if (action === "assign") setAssignTo(lead?.assignedTo ?? "");
@@ -124,13 +179,19 @@ export function LeadActionDialogs({ action, lead, onClose }: Props) {
       setCall(EMPTY_CALL);
       return;
     }
+    const durationText = call.duration.trim();
+
+    if (durationText && parseCallDuration(call.duration) === null) {
+      setCallDurationError("Enter a valid duration.");
+      return;
+    }
     addCall.mutate(
       {
         call_timestamp: new Date().toISOString(),
         caller: user?.id ?? null,
         direction: call.direction,
         outcome: call.outcome || null,
-        duration_seconds: call.duration ? Math.round(Number(call.duration) * 60) : null,
+        duration_input: durationText ? call.duration : undefined,
         recording_url: call.recording.trim() || null,
         notes: call.notes.trim() || null,
         next_followup_at: call.nextFollowUp ? toNepalIso(call.nextFollowUp) : null,
@@ -141,6 +202,12 @@ export function LeadActionDialogs({ action, lead, onClose }: Props) {
         onSuccess: () => {
           setCall(EMPTY_CALL);
           onClose();
+        },
+        onError: (error) => {
+          const message = apiErrorMessage(error, "Could not log call");
+          if (/insufficient call minutes|duration(?:_input| input)/i.test(message)) {
+            setCallDurationError(message);
+          }
         },
       },
     );
@@ -215,14 +282,31 @@ export function LeadActionDialogs({ action, lead, onClose }: Props) {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
-                <Label>Duration (minutes)</Label>
-                <Input
-                  type="number"
-                  min={0}
-                  placeholder="e.g. 4"
-                  value={call.duration}
-                  onChange={(e) => setC("duration", e.target.value)}
-                />
+                <div className="grid gap-2">
+                  <Label htmlFor="call-duration">Duration</Label>
+                  <Input
+                    id="call-duration"
+                    type="text"
+                    placeholder="MM:SS, e.g. 4:19"
+                    value={call.duration}
+                    aria-invalid={Boolean(durationError)}
+                    aria-describedby={durationError ? "call-duration-error" : undefined}
+                    onChange={(e) => {
+                      setCallDurationError(null);
+                      setC("duration", e.target.value);
+                    }}
+                  />
+                  {durationSeconds !== null && call.duration.trim() !== "" && (
+                    <p className="text-muted-foreground text-xs">
+                      = {Math.floor(durationSeconds / 60)} min {durationSeconds % 60} sec
+                    </p>
+                  )}
+                  {durationError && (
+                    <p id="call-duration-error" role="alert" className="text-destructive text-xs">
+                      {durationError}
+                    </p>
+                  )}
+                </div>
               </div>
               <div className="grid gap-2">
                 <Label>Recording link</Label>
