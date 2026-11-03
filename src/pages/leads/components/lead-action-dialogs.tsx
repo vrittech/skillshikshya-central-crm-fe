@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import axios from "axios";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -23,6 +24,8 @@ import { useAuth } from "@/context/auth";
 import { useDataSource } from "@/context/data-source";
 import { CALL_OUTCOMES, COUNSELORS, counselorName } from "@/data/lead-lookups";
 import { formatDateToNepalIso, toNepalIso } from "@/lib/leads-format";
+import { formatDurationPreview, parseDurationToSeconds } from "@/lib/duration";
+import { cn } from "@/lib/utils";
 import { useAddCall, useAddFollowup, useAssignLead } from "@/hooks/use-leads";
 import { useCounselors } from "@/hooks/use-users";
 
@@ -117,20 +120,37 @@ export function LeadActionDialogs({ action, lead, onClose }: Props) {
     onClose();
   }
 
+  // ---------------------------------------------------------------------------
+  // Duration Live Validation & Submission (US-5)
+  // ---------------------------------------------------------------------------
+
+  const [durationError, setDurationError] = useState<string | null>(null);
+
+  const durationParsed = useMemo(() => {
+    if (!call.duration.trim()) return null;
+    return parseDurationToSeconds(call.duration);
+  }, [call.duration]);
+
   function submitCall() {
     // Mock path (or a lead with no backend id) can't persist — keep the toast.
     if (isMock || lead?.apiId == null) {
       done("Call logged");
       setCall(EMPTY_CALL);
+      setDurationError(null);
       return;
     }
+    if (durationParsed && durationParsed.error) {
+      setDurationError(durationParsed.error);
+      return;
+    }
+    setDurationError(null);
     addCall.mutate(
       {
         call_timestamp: new Date().toISOString(),
         caller: user?.id ?? null,
         direction: call.direction,
         outcome: call.outcome || null,
-        duration_seconds: call.duration ? Math.round(Number(call.duration) * 60) : null,
+        duration_input: call.duration.trim() || undefined,
         recording_url: call.recording.trim() || null,
         notes: call.notes.trim() || null,
         next_followup_at: call.nextFollowUp ? toNepalIso(call.nextFollowUp) : null,
@@ -140,7 +160,19 @@ export function LeadActionDialogs({ action, lead, onClose }: Props) {
       {
         onSuccess: () => {
           setCall(EMPTY_CALL);
+          setDurationError(null);
           onClose();
+        },
+        onError: (err: unknown) => {
+          if (axios.isAxiosError(err)) {
+            const data = err.response?.data as Record<string, unknown> | undefined;
+            if (data?.detail && typeof data.detail === "string" && /insufficient.*minute/i.test(data.detail)) {
+              setDurationError(data.detail);
+            } else if (data?.duration_input) {
+              const msg = Array.isArray(data.duration_input) ? data.duration_input.join(" ") : String(data.duration_input);
+              setDurationError(msg);
+            }
+          }
         },
       },
     );
@@ -215,14 +247,33 @@ export function LeadActionDialogs({ action, lead, onClose }: Props) {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
-                <Label>Duration (minutes)</Label>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="call-duration">Duration</Label>
+                  <span className="text-muted-foreground text-[11px]">MM:SS, e.g. 4:19</span>
+                </div>
                 <Input
-                  type="number"
-                  min={0}
-                  placeholder="e.g. 4"
+                  id="call-duration"
+                  type="text"
+                  placeholder="MM:SS, e.g. 4:19"
                   value={call.duration}
-                  onChange={(e) => setC("duration", e.target.value)}
+                  onChange={(e) => {
+                    setC("duration", e.target.value);
+                    setDurationError(null);
+                  }}
+                  className={cn(
+                    (durationError || (durationParsed && durationParsed.error)) &&
+                      "border-destructive focus-visible:ring-destructive",
+                  )}
                 />
+                {durationError ? (
+                  <p className="text-destructive text-xs font-medium">{durationError}</p>
+                ) : durationParsed && durationParsed.error ? (
+                  <p className="text-destructive text-xs font-medium">{durationParsed.error}</p>
+                ) : durationParsed && durationParsed.seconds != null ? (
+                  <p className="text-muted-foreground font-mono text-xs font-medium">
+                    {formatDurationPreview(durationParsed.seconds)}
+                  </p>
+                ) : null}
               </div>
               <div className="grid gap-2">
                 <Label>Recording link</Label>

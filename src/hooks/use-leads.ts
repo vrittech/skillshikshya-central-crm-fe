@@ -407,10 +407,18 @@ export function useAddCall(leadId?: number) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (payload: Partial<ApiLeadCall>) => leadsService.addCall(leadId as number, payload),
-    onSuccess: () => {
-      toast.success("Call logged");
+    onSuccess: (data) => {
+      let description: string | undefined;
+      if (data?.remaining_seconds != null) {
+        const mins = Math.floor(data.remaining_seconds / 60);
+        const secs = data.remaining_seconds % 60;
+        description = `Remaining balance: ${mins} min ${secs.toString().padStart(2, "0")} sec`;
+      }
+      toast.success("Call logged", { description });
       void qc.invalidateQueries({ queryKey: ["lead"] });
       void qc.invalidateQueries({ queryKey: ["leads"] });
+      void qc.invalidateQueries({ queryKey: ["calls"] });
+      void qc.invalidateQueries({ queryKey: ["call-minutes"] });
     },
     onError: (e) => toast.error(apiErrorMessage(e, "Could not log call")),
   });
@@ -426,6 +434,8 @@ export function useUpdateCall(leadId?: number) {
       toast.success("Call updated");
       void qc.invalidateQueries({ queryKey: ["lead"] });
       void qc.invalidateQueries({ queryKey: ["leads"] });
+      void qc.invalidateQueries({ queryKey: ["calls"] });
+      void qc.invalidateQueries({ queryKey: ["call-minutes"] });
     },
     onError: (e) => toast.error(apiErrorMessage(e, "Could not update call")),
   });

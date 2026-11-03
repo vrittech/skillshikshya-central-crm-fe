@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight, Coins } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Combobox } from "@/components/ui/combobox";
@@ -37,6 +38,10 @@ import { useDebouncedValue } from "@/lib/use-debounced-value";
 import type { CallMinutesTransactionType } from "@/types/call-minutes";
 import type { User } from "@/types";
 
+// ---------------------------------------------------------------------------
+// Constants & Date Helpers
+// ---------------------------------------------------------------------------
+
 const PAGE_SIZE = 10;
 
 const TYPE_LABELS: Record<CallMinutesTransactionType, string> = {
@@ -46,11 +51,23 @@ const TYPE_LABELS: Record<CallMinutesTransactionType, string> = {
 };
 
 function formatDateTime(iso: string) {
-  return new Date(iso).toLocaleString(undefined, {
-    dateStyle: "medium",
-    timeStyle: "short",
-  });
+  try {
+    const d = new Date(iso);
+    const day = d.getDate();
+    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const month = months[d.getMonth()];
+    const year = d.getFullYear();
+    const hours = d.getHours().toString().padStart(2, "0");
+    const minutes = d.getMinutes().toString().padStart(2, "0");
+    return `${day} ${month} ${year}, ${hours}:${minutes}`;
+  } catch {
+    return iso;
+  }
 }
+
+// ---------------------------------------------------------------------------
+// Admin Call Minutes Dialog Component
+// ---------------------------------------------------------------------------
 
 /**
  * Admin dialog: view a user's call-minutes balance + ledger and top it up.
@@ -144,12 +161,13 @@ export function CallMinutesDialog({
         onOpenChange(o);
       }}
     >
-      <DialogContent className="max-w-2xl">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Coins className="text-brand size-5" /> Call minutes{target ? ` — ${target.name}` : ""}
+      <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-2xl min-w-0 p-4 sm:p-6 max-h-[95dvh] sm:max-h-[90dvh] overflow-y-auto overflow-x-hidden">
+        <DialogHeader className="min-w-0">
+          <DialogTitle className="flex items-center gap-2 text-base sm:text-lg min-w-0">
+            <Coins className="text-brand size-5 shrink-0" />
+            <span className="break-words min-w-0">Call minutes{target ? ` — ${target.name}` : ""}</span>
           </DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="text-xs sm:text-sm break-words">
             {target
               ? `Top up minutes for ${target.email}. Minutes are deducted automatically as counselors log calls.`
               : "Pick a user to view their balance and top it up."}
@@ -157,7 +175,7 @@ export function CallMinutesDialog({
         </DialogHeader>
 
         {needsPick && (
-          <div className="grid gap-2">
+          <div className="grid gap-2 min-w-0 w-full max-w-full">
             <Label required>User</Label>
             <Combobox
               value={pickedUserId}
@@ -171,11 +189,14 @@ export function CallMinutesDialog({
               placeholder="Search users by name or email…"
               searchPlaceholder="Type to search…"
               emptyText="No users match."
+              multiline
+              selectedLabel={target ? [target.name, target.email].filter(Boolean).join(" · ") : undefined}
+              className="w-full min-w-0 max-w-full"
             />
           </div>
         )}
 
-        <div className="flex items-center justify-between rounded-xl border px-4 py-3">
+        <div className="flex items-center justify-between rounded-xl border px-4 py-3 min-w-0">
           <div>
             <p className="text-muted-foreground font-mono text-[11px] font-bold tracking-wider uppercase">
               Current balance
@@ -188,8 +209,8 @@ export function CallMinutesDialog({
           </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="flex items-end gap-3">
-          <div className="w-32 space-y-1.5">
+        <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row sm:items-end gap-3 min-w-0">
+          <div className="w-full sm:w-32 space-y-1.5 shrink-0">
             <Label htmlFor="cm-amount">Amount</Label>
             <Input
               id="cm-amount"
@@ -202,7 +223,7 @@ export function CallMinutesDialog({
               required
             />
           </div>
-          <div className="flex-1 space-y-1.5">
+          <div className="w-full sm:flex-1 space-y-1.5 min-w-0">
             <Label htmlFor="cm-note">Note (optional)</Label>
             <Input
               id="cm-note"
@@ -211,13 +232,18 @@ export function CallMinutesDialog({
               onChange={(e) => setNote(e.target.value)}
             />
           </div>
-          <Button type="submit" variant="brand" disabled={!target || addMinutes.isPending}>
+          <Button
+            type="submit"
+            variant="brand"
+            disabled={!target || addMinutes.isPending}
+            className="w-full sm:w-auto shrink-0"
+          >
             {addMinutes.isPending ? "Adding…" : "Add minutes"}
           </Button>
         </form>
 
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
+        <div className="space-y-2 min-w-0 max-w-full">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between min-w-0">
             <p className="text-muted-foreground font-mono text-[11px] font-bold tracking-wider uppercase">
               Transaction history
             </p>
@@ -228,7 +254,7 @@ export function CallMinutesDialog({
                 setPage(1);
               }}
             >
-              <SelectTrigger className="h-8 w-36 text-xs">
+              <SelectTrigger className="h-8 w-full sm:w-36 text-xs">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -240,63 +266,68 @@ export function CallMinutesDialog({
             </Select>
           </div>
 
-          <div className="bg-background overflow-hidden rounded-xl border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Amount</TableHead>
-                  <TableHead>Balance after</TableHead>
-                  <TableHead>Note</TableHead>
-                  <TableHead>Date</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {ledger.isLoading &&
-                  Array.from({ length: 3 }).map((_, i) => (
-                    <TableRow key={i}>
-                      <TableCell colSpan={5}>
-                        <Skeleton className="h-5 w-full" />
+          <div className="bg-background overflow-hidden rounded-xl border min-w-0 max-w-full">
+            <div className="overflow-x-auto min-w-0 max-w-full">
+              <Table className="min-w-[480px]">
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="pl-4 sm:pl-6 text-[11px] font-semibold uppercase tracking-wider">Type</TableHead>
+                    <TableHead className="text-[11px] font-semibold uppercase tracking-wider">Amount</TableHead>
+                    <TableHead className="text-[11px] font-semibold uppercase tracking-wider">Balance after</TableHead>
+                    <TableHead className="text-[11px] font-semibold uppercase tracking-wider">Note</TableHead>
+                    <TableHead className="pr-4 sm:pr-6 text-[11px] font-semibold uppercase tracking-wider">Date</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {ledger.isLoading &&
+                    Array.from({ length: 3 }).map((_, i) => (
+                      <TableRow key={i}>
+                        <TableCell colSpan={5} className="pl-4 sm:pl-6">
+                          <Skeleton className="h-5 w-full" />
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  {!ledger.isLoading && rows.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-muted-foreground py-6 pl-4 pr-4 sm:pl-6 sm:pr-6 text-center text-sm">
+                        No transactions yet.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                  {rows.map((t) => (
+                    <TableRow key={t.id}>
+                      <TableCell className="pl-4 sm:pl-6">
+                        <Badge
+                          variant={t.amount >= 0 ? "brand" : "secondary"}
+                          className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider"
+                        >
+                          {TYPE_LABELS[t.type]}
+                        </Badge>
+                      </TableCell>
+                      <TableCell
+                        className={cn(
+                          "whitespace-nowrap font-medium text-xs sm:text-sm tabular-nums",
+                          t.amount >= 0
+                            ? "font-semibold text-emerald-600 dark:text-emerald-400"
+                            : "font-semibold text-destructive"
+                        )}
+                      >
+                        {t.amount >= 0 ? `+${t.amount}` : t.amount}
+                      </TableCell>
+                      <TableCell className="font-mono text-xs sm:text-sm tabular-nums whitespace-nowrap">
+                        {t.balance_after}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground max-w-32 sm:max-w-40 truncate text-xs sm:text-sm">
+                        {t.note || t.created_by_name || "—"}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground pr-4 sm:pr-6 whitespace-nowrap text-xs sm:text-sm">
+                        {formatDateTime(t.created_at)}
                       </TableCell>
                     </TableRow>
                   ))}
-                {!ledger.isLoading && rows.length === 0 && (
-                  <TableRow>
-                    <TableCell colSpan={5} className="text-muted-foreground py-6 text-center">
-                      No transactions yet.
-                    </TableCell>
-                  </TableRow>
-                )}
-                {rows.map((t) => (
-                  <TableRow key={t.id}>
-                    <TableCell>
-                      <Badge
-                        variant={t.amount >= 0 ? "brand" : "secondary"}
-                        className="text-[11px] font-bold uppercase"
-                      >
-                        {TYPE_LABELS[t.type]}
-                      </Badge>
-                    </TableCell>
-                    <TableCell
-                      className={
-                        t.amount >= 0
-                          ? "font-semibold text-emerald-600 dark:text-emerald-400"
-                          : "font-semibold text-destructive"
-                      }
-                    >
-                      {t.amount >= 0 ? `+${t.amount}` : t.amount}
-                    </TableCell>
-                    <TableCell>{t.balance_after}</TableCell>
-                    <TableCell className="text-muted-foreground max-w-40 truncate">
-                      {t.note || t.created_by_name || "—"}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground whitespace-nowrap">
-                      {formatDateTime(t.created_at)}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableBody>
+              </Table>
+            </div>
           </div>
 
           {totalPages > 1 && (
@@ -326,8 +357,8 @@ export function CallMinutesDialog({
           )}
         </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+        <DialogFooter className="pt-2 sm:pt-4">
+          <Button variant="outline" onClick={() => onOpenChange(false)} className="w-full sm:w-auto">
             Close
           </Button>
         </DialogFooter>

@@ -37,6 +37,8 @@ interface ComboboxProps {
   /** Called after an option is picked (footer can use it to close the popover). */
   className?: string;
   debounce?: number;
+  /** When true, allows trigger and option text to wrap across multiple lines. */
+  multiline?: boolean;
 }
 
 export function Combobox({
@@ -53,6 +55,7 @@ export function Combobox({
   footer,
   className,
   debounce = 300,
+  multiline = false,
 }: ComboboxProps) {
   const [open, setOpen] = React.useState(false);
   const [search, setSearch] = React.useState("");
@@ -80,18 +83,29 @@ export function Combobox({
           aria-expanded={open}
           disabled={disabled}
           className={cn(
-            "border-input focus-visible:border-ring focus-visible:ring-ring/50 flex h-9 w-full items-center justify-between gap-2 rounded-md border bg-transparent px-3 py-2 text-sm whitespace-nowrap shadow-xs transition-[color,box-shadow] outline-none focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50",
+            "border-input focus-visible:border-ring focus-visible:ring-ring/50 flex w-full items-center justify-between gap-2 rounded-md border bg-transparent px-3 py-2 text-sm shadow-xs transition-[color,box-shadow] outline-none focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50",
+            multiline
+              ? "min-h-9 h-auto text-xs sm:text-sm leading-snug whitespace-normal text-left"
+              : "h-9 whitespace-nowrap",
             className,
           )}
         >
-          <span className={cn("line-clamp-1 text-left", !triggerLabel && "text-muted-foreground")}>
+          <span
+            className={cn(
+              "text-left min-w-0 flex-1",
+              multiline
+                ? "whitespace-normal break-words [overflow-wrap:anywhere]"
+                : "line-clamp-1",
+              !triggerLabel && "text-muted-foreground",
+            )}
+          >
             {triggerLabel ?? placeholder}
           </span>
-          <ChevronsUpDownIcon className="size-4 shrink-0 opacity-50" />
+          <ChevronsUpDownIcon className="size-4 shrink-0 opacity-50 self-center" />
         </button>
       </PopoverTrigger>
       <PopoverContent
-        className="w-[var(--radix-popover-trigger-width)] min-w-56 p-0"
+        className="w-[var(--radix-popover-trigger-width)] max-w-[calc(100vw-2rem)] min-w-56 p-0"
         align="start"
         portal={false}
       >
@@ -118,11 +132,21 @@ export function Combobox({
                     onChange(o.value);
                     setOpen(false);
                   }}
+                  className="flex items-center gap-2 cursor-pointer"
                 >
                   <CheckIcon
-                    className={cn("size-4", o.value === value ? "opacity-100" : "opacity-0")}
+                    className={cn("size-4 shrink-0", o.value === value ? "opacity-100" : "opacity-0")}
                   />
-                  <span className="line-clamp-1">{o.label}</span>
+                  <span
+                    className={cn(
+                      "min-w-0 flex-1",
+                      multiline
+                        ? "whitespace-normal break-words [overflow-wrap:anywhere] text-xs sm:text-sm leading-snug"
+                        : "line-clamp-1",
+                    )}
+                  >
+                    {o.label}
+                  </span>
                 </CommandItem>
               ))}
           </CommandList>
