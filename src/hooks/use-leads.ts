@@ -21,6 +21,7 @@ import {
 } from "@/data/lead-adapters";
 import { getLeadById, LEAD_LIST } from "@/data/mock-leads";
 import { isOverdue } from "@/lib/leads-format";
+import type { MyCallMinutes } from "@/types/call-minutes";
 import { leadsService, type LeadListParams } from "@/services/leads.service";
 import type {
   ApiEnrollment,
@@ -407,10 +408,43 @@ export function useAddCall(leadId?: number) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (payload: Partial<ApiLeadCall>) => leadsService.addCall(leadId as number, payload),
-    onSuccess: () => {
-      toast.success("Call logged");
+    onSuccess: (call) => {
+      const remainingSeconds = call?.remaining_seconds;
+      const remainingBalance =
+        remainingSeconds != null
+          ? `${Math.floor(Math.max(0, remainingSeconds) / 60)}:${String(
+              Math.floor(Math.max(0, remainingSeconds) % 60),
+            ).padStart(2, "0")} remaining`
+          : call?.remaining_minutes != null
+            ? `${call.remaining_minutes} minutes remaining`
+            : undefined;
+
+      toast.success("Call logged", {
+        description: remainingBalance
+          ? `Call-minute balance: ${remainingBalance}`
+          : "The call-minute balance will refresh shortly.",
+      });
+
+      if (remainingSeconds != null) {
+        const balanceSeconds = Math.max(0, remainingSeconds);
+        qc.setQueryData<MyCallMinutes>(["call-minutes", "me"], (current) =>
+          current
+            ? {
+                ...current,
+                balance_seconds: balanceSeconds,
+                balance_minutes: Math.floor(balanceSeconds / 60),
+                balance_display: `${Math.floor(balanceSeconds / 60)}:${String(
+                  balanceSeconds % 60,
+                ).padStart(2, "0")}`,
+              }
+            : current,
+        );
+      }
+
       void qc.invalidateQueries({ queryKey: ["lead"] });
       void qc.invalidateQueries({ queryKey: ["leads"] });
+      void qc.invalidateQueries({ queryKey: ["calls"] });
+      void qc.invalidateQueries({ queryKey: ["call-minutes"] });
     },
     onError: (e) => toast.error(apiErrorMessage(e, "Could not log call")),
   });
