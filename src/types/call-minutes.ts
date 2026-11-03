@@ -44,7 +44,8 @@ export interface CallMinutesTransactionsParams {
 
 /** GET /users/me/call-minutes/ — own balance + last 10 transactions. */
 export interface MyCallMinutes {
-  balance: number;
+  balance_seconds: number;
   balance_minutes: number;
+  balance_display: string;
   recent_transactions: CallMinutesTransaction[];
 }

@@ -23,6 +23,7 @@ import { useAuth } from "@/context/auth";
 import { useDataSource } from "@/context/data-source";
 import { CALL_OUTCOMES, COUNSELORS, counselorName } from "@/data/lead-lookups";
 import { formatDateToNepalIso, toNepalIso } from "@/lib/leads-format";
+import { apiErrorMessage } from "@/lib/api";
 import { useAddCall, useAddFollowup, useAssignLead } from "@/hooks/use-leads";
 import { useCounselors } from "@/hooks/use-users";
 
@@ -79,6 +80,34 @@ const REMINDER_OFFSETS_MS: Record<FollowUpForm["reminder"], number> = {
   "1d": 24 * 60 * 60_000,
 };
 
+function durationPreview(input: string): string | null {
+  const value = input.trim().toLowerCase();
+  if (!value) return null;
+
+  let seconds: number;
+  if (/^\d+$/.test(value)) {
+    seconds = Number(value);
+  } else if (/^\d+:\d+$/.test(value)) {
+    const [minutes, remainder] = value.split(":").map(Number);
+    seconds = minutes * 60 + remainder;
+  } else if (/^\d+:\d+:\d+$/.test(value)) {
+    const [hours, minutes, remainder] = value.split(":").map(Number);
+    seconds = hours * 3600 + minutes * 60 + remainder;
+  } else if (/^\d+\.\d+$/.test(value)) {
+    const [minutes, remainder] = value.split(".");
+    seconds = Number(minutes) * 60 + Number(remainder.slice(0, 2).padStart(2, "0"));
+  } else if (/^\d+m\d+s$/.test(value)) {
+    const match = /^(\d+)m(\d+)s$/.exec(value);
+    if (!match) return null;
+    seconds = Number(match[1]) * 60 + Number(match[2]);
+  } else {
+    return null;
+  }
+
+  const total = Math.floor(seconds);
+  return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
+}
+
 /**
  * All lead quick-actions live here. This is the static phase: the forms are
  * laid out with the fields the real workflow needs, but Save only shows a
@@ -130,7 +159,7 @@ export function LeadActionDialogs({ action, lead, onClose }: Props) {
         caller: user?.id ?? null,
         direction: call.direction,
         outcome: call.outcome || null,
-        duration_seconds: call.duration ? Math.round(Number(call.duration) * 60) : null,
+        duration_input: call.duration,
         recording_url: call.recording.trim() || null,
         notes: call.notes.trim() || null,
         next_followup_at: call.nextFollowUp ? toNepalIso(call.nextFollowUp) : null,
@@ -215,14 +244,34 @@ export function LeadActionDialogs({ action, lead, onClose }: Props) {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
-                <Label>Duration (minutes)</Label>
+                <Label htmlFor="call-duration">Duration</Label>
                 <Input
-                  type="number"
-                  min={0}
-                  placeholder="e.g. 4"
+                  id="call-duration"
+                  inputMode="text"
+                  placeholder="MM:SS"
                   value={call.duration}
-                  onChange={(e) => setC("duration", e.target.value)}
+                  aria-invalid={Boolean(addCall.error)}
+                  aria-describedby="call-duration-hint call-duration-preview"
+                  onChange={(e) => {
+                    if (addCall.error) addCall.reset();
+                    setC("duration", e.target.value);
+                  }}
                 />
+                <p id="call-duration-hint" className="text-xs text-muted-foreground">
+                  Enter MM:SS, MM.SS, 4m19s, or total seconds.
+                </p>
+                <p id="call-duration-preview" className="text-xs font-medium">
+                  {durationPreview(call.duration)
+                    ? `Preview: ${durationPreview(call.duration)}`
+                    : call.duration
+                      ? "Enter a valid duration."
+                      : "Preview: —"}
+                </p>
+                {addCall.error && (
+                  <p role="alert" className="text-xs text-destructive">
+                    {apiErrorMessage(addCall.error, "Could not log call")}
+                  </p>
+                )}
               </div>
               <div className="grid gap-2">
                 <Label>Recording link</Label>
