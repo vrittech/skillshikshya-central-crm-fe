@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import axios from "axios";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -22,7 +23,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/context/auth";
 import { useDataSource } from "@/context/data-source";
 import { CALL_OUTCOMES, COUNSELORS, counselorName } from "@/data/lead-lookups";
+import { apiErrorMessage } from "@/lib/api";
 import { formatDateToNepalIso, toNepalIso } from "@/lib/leads-format";
+import { formatDurationPreview, parseDuration } from "@/lib/duration";
 import { useAddCall, useAddFollowup, useAssignLead } from "@/hooks/use-leads";
 import { useCounselors } from "@/hooks/use-users";
 
@@ -79,6 +82,28 @@ const REMINDER_OFFSETS_MS: Record<FollowUpForm["reminder"], number> = {
   "1d": 24 * 60 * 60_000,
 };
 
+function getCallDurationServerError(error: unknown): string | null {
+  if (!axios.isAxiosError(error) || error.response?.status !== 400) return null;
+
+  const data = error.response.data;
+  const message = apiErrorMessage(error, "");
+  if (message.toLowerCase().includes("insufficient")) return message;
+
+  if (data && typeof data === "object" && !Array.isArray(data)) {
+    const errors = data as Record<string, unknown>;
+    const fieldErrors = [errors.duration_input, errors.duration_seconds]
+      .flatMap((value) => {
+        if (typeof value === "string") return [value];
+        if (Array.isArray(value)) return value.filter((item): item is string => typeof item === "string");
+        return [];
+      })
+      .filter(Boolean);
+    if (fieldErrors.length > 0) return fieldErrors.join(" ");
+  }
+
+  return null;
+}
+
 /**
  * All lead quick-actions live here. This is the static phase: the forms are
  * laid out with the fields the real workflow needs, but Save only shows a
@@ -93,6 +118,7 @@ export function LeadActionDialogs({ action, lead, onClose }: Props) {
   const assignLead = useAssignLead();
   const counselorsQ = useCounselors("", undefined, !isMock);
   const [call, setCall] = useState<CallForm>(EMPTY_CALL);
+  const [callDurationServerError, setCallDurationServerError] = useState<string | null>(null);
   const [fu, setFu] = useState<FollowUpForm>(EMPTY_FU);
   const [assignTo, setAssignTo] = useState("");
 
@@ -111,6 +137,8 @@ export function LeadActionDialogs({ action, lead, onClose }: Props) {
     : (counselorsQ.data?.results ?? []).map((u) => ({ value: String(u.id), label: u.name }));
   // Default the follow-up owner to the lead's counsellor, else the current user.
   const fuAssigned = fu.assignedTo || lead?.assignedTo || (user?.id != null ? String(user.id) : "");
+  const durationResult = parseDuration(call.duration);
+  const durationError = callDurationServerError ?? (durationResult.ok ? null : durationResult.error);
 
   function done(message: string) {
     toast.success(message, { description: "Static prototype — no data was changed." });
@@ -118,10 +146,12 @@ export function LeadActionDialogs({ action, lead, onClose }: Props) {
   }
 
   function submitCall() {
+    if (!durationResult.ok) return;
     // Mock path (or a lead with no backend id) can't persist — keep the toast.
     if (isMock || lead?.apiId == null) {
       done("Call logged");
       setCall(EMPTY_CALL);
+      setCallDurationServerError(null);
       return;
     }
     addCall.mutate(
@@ -130,7 +160,7 @@ export function LeadActionDialogs({ action, lead, onClose }: Props) {
         caller: user?.id ?? null,
         direction: call.direction,
         outcome: call.outcome || null,
-        duration_seconds: call.duration ? Math.round(Number(call.duration) * 60) : null,
+        ...(call.duration.trim() ? { duration_input: call.duration } : {}),
         recording_url: call.recording.trim() || null,
         notes: call.notes.trim() || null,
         next_followup_at: call.nextFollowUp ? toNepalIso(call.nextFollowUp) : null,
@@ -140,8 +170,10 @@ export function LeadActionDialogs({ action, lead, onClose }: Props) {
       {
         onSuccess: () => {
           setCall(EMPTY_CALL);
+          setCallDurationServerError(null);
           onClose();
         },
+        onError: (error) => setCallDurationServerError(getCallDurationServerError(error)),
       },
     );
   }
@@ -215,14 +247,27 @@ export function LeadActionDialogs({ action, lead, onClose }: Props) {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
-                <Label>Duration (minutes)</Label>
+                <Label>Duration</Label>
                 <Input
-                  type="number"
-                  min={0}
-                  placeholder="e.g. 4"
+                  type="text"
+                  placeholder="e.g. 4:19"
                   value={call.duration}
-                  onChange={(e) => setC("duration", e.target.value)}
+                  aria-invalid={Boolean(durationError)}
+                  aria-describedby="call-duration-help call-duration-feedback"
+                  onChange={(e) => {
+                    setC("duration", e.target.value);
+                    setCallDurationServerError(null);
+                  }}
                 />
+                <p id="call-duration-help" className="text-muted-foreground text-xs">
+                  MM:SS, e.g. 4:19
+                </p>
+                <p
+                  id="call-duration-feedback"
+                  className={durationError ? "text-destructive text-xs" : "text-muted-foreground text-xs"}
+                >
+                  {durationError ?? (durationResult.ok ? formatDurationPreview(durationResult.seconds) : durationResult.error)}
+                </p>
               </div>
               <div className="grid gap-2">
                 <Label>Recording link</Label>
@@ -265,7 +310,7 @@ export function LeadActionDialogs({ action, lead, onClose }: Props) {
             <Button variant="outline" onClick={onClose} disabled={addCall.isPending}>
               Cancel
             </Button>
-            <Button variant="brand" onClick={submitCall} disabled={addCall.isPending}>
+            <Button variant="brand" onClick={submitCall} disabled={addCall.isPending || !durationResult.ok}>
               {addCall.isPending ? "Logging…" : "Log Call"}
             </Button>
           </DialogFooter>

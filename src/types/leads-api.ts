@@ -212,6 +212,27 @@ export interface ApiLeadCall {
   created_at: string;
 }
 
+export interface ApiCreateLeadCallPayload {
+  call_timestamp: string;
+  direction: "inbound" | "outbound";
+  caller: number | string | null;
+  phone_number: string | null;
+  duration_input?: string;
+  outcome: string | null;
+  notes: string | null;
+  recording_url: string | null;
+  next_followup_at: string | null;
+  next_action: string | null;
+}
+
+export interface ApiCreateLeadCallResponse extends ApiLeadCall {
+  duration_formatted: string;
+  seconds_used: number;
+  remaining_seconds: number;
+  minutes_used: number;
+  remaining_minutes: number;
+}
+
 export type ApiActivityType =
   | "call"
   | "whatsapp"

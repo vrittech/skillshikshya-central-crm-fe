@@ -8,6 +8,7 @@ import {
 import { toast } from "sonner";
 import { useDataSource } from "@/context/data-source";
 import { apiErrorMessage } from "@/lib/api";
+import { formatRemainingBalance } from "@/lib/duration";
 import {
   adaptApiCall,
   adaptApiActivity,
@@ -26,6 +27,7 @@ import type {
   ApiEnrollment,
   ApiEnrollmentPayload,
   ApiFollowup,
+  ApiCreateLeadCallPayload,
   ApiLeadCall,
   ApiLeadDocument,
   ApiLeadPayload,
@@ -406,11 +408,13 @@ export function useAssignLead() {
 export function useAddCall(leadId?: number) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (payload: Partial<ApiLeadCall>) => leadsService.addCall(leadId as number, payload),
-    onSuccess: () => {
-      toast.success("Call logged");
+    mutationFn: (payload: ApiCreateLeadCallPayload) => leadsService.addCall(leadId as number, payload),
+    onSuccess: (call) => {
+      toast.success(`Call logged. Remaining balance: ${formatRemainingBalance(call.remaining_seconds)}`);
       void qc.invalidateQueries({ queryKey: ["lead"] });
       void qc.invalidateQueries({ queryKey: ["leads"] });
+      void qc.invalidateQueries({ queryKey: ["calls"] });
+      void qc.invalidateQueries({ queryKey: ["call-minutes"] });
     },
     onError: (e) => toast.error(apiErrorMessage(e, "Could not log call")),
   });

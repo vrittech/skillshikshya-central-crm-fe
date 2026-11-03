@@ -2,6 +2,8 @@ import { api } from "@/lib/api";
 import type { Paginated } from "@/types";
 import type {
   ApiCourseInterest,
+  ApiCreateLeadCallPayload,
+  ApiCreateLeadCallResponse,
   ApiEnrollment,
   ApiEnrollmentPayload,
   EnrollmentListParams,
@@ -186,8 +188,8 @@ export const leadsService = {
     const { data } = await api.get<Paginated<ApiLeadCall>>(`/leads/${leadId}/calls/`, { params });
     return data;
   },
-  async addCall(leadId: number, payload: Partial<ApiLeadCall>) {
-    const { data } = await api.post<ApiLeadCall>(`/leads/${leadId}/calls/`, payload);
+  async addCall(leadId: number, payload: ApiCreateLeadCallPayload) {
+    const { data } = await api.post<ApiCreateLeadCallResponse>(`/leads/${leadId}/calls/`, payload);
     return data;
   },
   /** PATCH a call — backend silently ignores duration_seconds/caller changes. */
