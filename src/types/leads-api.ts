@@ -7,7 +7,11 @@
  * optional so the client is forward-compatible when they ship.
  */
 
-export type ApiLeadType = "course_inquiry" | "master_class" | "corporate" | "general_inquiry";
+export type ApiLeadType =
+  | "course_inquiry"
+  | "master_class"
+  | "corporate"
+  | "general_inquiry";
 
 /* ------------------------------------------------------------- config lookups */
 
@@ -202,6 +206,7 @@ export interface ApiLeadCall {
   caller_name?: string;
   phone_number: string | null;
   duration_seconds: number | null;
+  duration_input?: string;
   outcome: string | null;
   notes: string | null;
   recording_url: string | null;
@@ -210,6 +215,25 @@ export interface ApiLeadCall {
   created_by?: number | null;
   created_by_name?: string;
   created_at: string;
+  remaining_seconds?: number;
+}
+
+export interface ApiGlobalCall extends ApiLeadCall {
+  lead_name: string;
+  lead_reference_number: string;
+  created_by_name?: string;
+  branch?: number | null;
+}
+
+export interface CallSummary {
+  total_calls: number;
+  inbound_calls: number;
+  outbound_calls: number;
+  total_seconds: number;
+  average_seconds: number;
+  connect_rate: number;
+  calls_per_day: { date: string; count: number }[];
+  top_callers: { caller: string; count: number }[];
 }
 
 export type ApiActivityType =
@@ -235,7 +259,11 @@ export interface ApiLeadActivity {
   created_at?: string;
 }
 
-export type ApiFollowupStatus = "pending" | "completed" | "missed" | "cancelled";
+export type ApiFollowupStatus =
+  | "pending"
+  | "completed"
+  | "missed"
+  | "cancelled";
 
 export interface ApiFollowup {
   id: number;
@@ -340,8 +368,19 @@ export interface EnrollmentListParams {
   branch_id?: number;
 }
 
-export type ApiPaymentStatus = "pending" | "successful" | "failed" | "refunded" | "voided";
-export type ApiPaymentMethod = "cash" | "esewa" | "khalti" | "bank_transfer" | "card" | "connectips";
+export type ApiPaymentStatus =
+  | "pending"
+  | "successful"
+  | "failed"
+  | "refunded"
+  | "voided";
+export type ApiPaymentMethod =
+  | "cash"
+  | "esewa"
+  | "khalti"
+  | "bank_transfer"
+  | "card"
+  | "connectips";
 
 export interface ApiPayment {
   id: number;
@@ -476,7 +515,12 @@ export interface ApiBranchPayload {
 
 /* ---------------------------------------------------------------- students */
 
-export type ApiStudentStatus = "active" | "inactive" | "graduated" | "dropped" | "transferred";
+export type ApiStudentStatus =
+  | "active"
+  | "inactive"
+  | "graduated"
+  | "dropped"
+  | "transferred";
 export type ApiGender = "male" | "female" | "other";
 
 /** One of the last 5 payments returned on the student detail response. */

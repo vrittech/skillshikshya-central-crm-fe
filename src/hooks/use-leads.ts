@@ -55,7 +55,9 @@ export function buildApiParams(
   if (f.course !== "all") p.primary_course = Number(f.course);
   if (f.type !== "all") {
     // Live backend: numeric lead-type FK id. Mock: legacy string enum.
-    p.lead_type = /^\d+$/.test(f.type) ? Number(f.type) : uiLeadTypeToApi(f.type as LeadTypeCode);
+    p.lead_type = /^\d+$/.test(f.type)
+      ? Number(f.type)
+      : uiLeadTypeToApi(f.type as LeadTypeCode);
   }
   if (f.assignedTo !== "all" && f.assignedTo !== "unassigned") {
     p.assigned_counselor = Number(f.assignedTo);
@@ -77,10 +79,21 @@ export function mockMatch(l: LeadListItem, f: LeadFilterState): boolean {
   if (f.type !== "all" && l.leadType !== f.type) return false;
   if (f.priority !== "all" && l.priority !== f.priority) return false;
   if (f.assignedTo === "unassigned" && l.assignedTo !== null) return false;
-  if (f.assignedTo !== "all" && f.assignedTo !== "unassigned" && l.assignedTo !== f.assignedTo)
+  if (
+    f.assignedTo !== "all" &&
+    f.assignedTo !== "unassigned" &&
+    l.assignedTo !== f.assignedTo
+  )
     return false;
   if (f.unassignedOnly && l.assignedTo !== null) return false;
-  if (f.overdueOnly && !(l.nextFollowUpAt && isOverdue(l.nextFollowUpAt) && l.status !== "enrolled"))
+  if (
+    f.overdueOnly &&
+    !(
+      l.nextFollowUpAt &&
+      isOverdue(l.nextFollowUpAt) &&
+      l.status !== "enrolled"
+    )
+  )
     return false;
   if (f.course !== "all" && l.primaryCourseId !== f.course) return false;
   // createdAt is an ISO timestamp; compare on the date part so the range is inclusive.
@@ -90,7 +103,8 @@ export function mockMatch(l: LeadListItem, f: LeadFilterState): boolean {
   if (f.dateTo && createdDay > f.dateTo) return false;
   if (f.search.trim()) {
     const q = f.search.trim().toLowerCase();
-    const hay = `${l.fullName} ${l.primaryPhone} ${l.email ?? ""} ${l.referenceNumber}`.toLowerCase();
+    const hay =
+      `${l.fullName} ${l.primaryPhone} ${l.email ?? ""} ${l.referenceNumber}`.toLowerCase();
     if (!hay.includes(q)) return false;
   }
   return true;
@@ -159,22 +173,26 @@ export function useLead(routeId?: string): LeadDetailResult {
     queryKey: ["lead", "detail", routeId],
     enabled: isApi && !Number.isNaN(numId),
     queryFn: async () => {
-      const [lead, calls, acts, fus, docs, interests, enrolls] = await Promise.all([
-        leadsService.get(numId),
-        leadsService.calls(numId).catch(() => EMPTY_PAGE),
-        leadsService.activities(numId).catch(() => EMPTY_PAGE),
-        leadsService.followups(numId).catch(() => EMPTY_PAGE),
-        leadsService.documents(numId).catch(() => EMPTY_PAGE),
-        leadsService.courseInterests(numId).catch(() => EMPTY_PAGE),
-        leadsService.enrollments(numId, { ordering: "-id" }).catch(() => EMPTY_PAGE),
-      ]);
+      const [lead, calls, acts, fus, docs, interests, enrolls] =
+        await Promise.all([
+          leadsService.get(numId),
+          leadsService.calls(numId).catch(() => EMPTY_PAGE),
+          leadsService.activities(numId).catch(() => EMPTY_PAGE),
+          leadsService.followups(numId).catch(() => EMPTY_PAGE),
+          leadsService.documents(numId).catch(() => EMPTY_PAGE),
+          leadsService.courseInterests(numId).catch(() => EMPTY_PAGE),
+          leadsService
+            .enrollments(numId, { ordering: "-id" })
+            .catch(() => EMPTY_PAGE),
+        ]);
       const ui = adaptApiLead(lead);
       ui.activities = [
         ...calls.results.map(adaptApiCall),
         ...acts.results.map(adaptApiActivity),
       ].sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
       ui.followUps = fus.results.map(adaptApiFollowup);
-      if (interests.results.length) ui.courseInterests = interests.results.map(adaptApiCourseInterest);
+      if (interests.results.length)
+        ui.courseInterests = interests.results.map(adaptApiCourseInterest);
 
       // `enrollments` is ordered newest-first, so results[0] is the latest one;
       // it feeds the hero/summary. The Enrollment tab lists them all via
@@ -218,7 +236,9 @@ export function useCreateLead() {
     },
     onSuccess: (lead) => {
       if (!lead) {
-        toast.success("Lead created", { description: "Mock preview — not saved to the backend." });
+        toast.success("Lead created", {
+          description: "Mock preview — not saved to the backend.",
+        });
         return;
       }
       toast.success(`Lead "${lead.full_name}" created`);
@@ -232,13 +252,21 @@ export function useUpdateLead() {
   const { isMock } = useDataSource();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, payload }: { id: number; payload: ApiLeadPayload }) => {
+    mutationFn: async ({
+      id,
+      payload,
+    }: {
+      id: number;
+      payload: ApiLeadPayload;
+    }) => {
       if (isMock) return null;
       return leadsService.update(id, payload);
     },
     onSuccess: (lead) => {
       if (!lead) {
-        toast.success("Lead updated", { description: "Mock preview — not saved to the backend." });
+        toast.success("Lead updated", {
+          description: "Mock preview — not saved to the backend.",
+        });
         return;
       }
       toast.success("Lead updated");
@@ -298,7 +326,8 @@ export function usePurgeLead() {
       toast.success("Lead permanently deleted");
       void qc.invalidateQueries({ queryKey: ["leads"] });
     },
-    onError: (e) => toast.error(apiErrorMessage(e, "Could not permanently delete lead")),
+    onError: (e) =>
+      toast.error(apiErrorMessage(e, "Could not permanently delete lead")),
   });
 }
 
@@ -329,7 +358,9 @@ export function useBulkDeleteLeads() {
   return useMutation({
     mutationFn: async (ids: number[]) => {
       if (isMock) return { ok: ids.length, failed: 0 };
-      const results = await Promise.allSettled(ids.map((id) => leadsService.remove(id)));
+      const results = await Promise.allSettled(
+        ids.map((id) => leadsService.remove(id)),
+      );
       const failed = results.filter((r) => r.status === "rejected").length;
       return { ok: ids.length - failed, failed };
     },
@@ -341,7 +372,9 @@ export function useBulkDeleteLeads() {
         return;
       }
       if (failed) {
-        toast.warning(`Moved ${ok} to recycle bin — ${failed} could not be deleted`);
+        toast.warning(
+          `Moved ${ok} to recycle bin — ${failed} could not be deleted`,
+        );
       } else {
         toast.success(`${ok} lead${ok === 1 ? "" : "s"} moved to recycle bin`);
       }
@@ -359,10 +392,18 @@ export function useBulkAssignLeads() {
   const { isMock } = useDataSource();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ ids, counselorId }: { ids: number[]; counselorId: number }) => {
+    mutationFn: async ({
+      ids,
+      counselorId,
+    }: {
+      ids: number[];
+      counselorId: number;
+    }) => {
       if (isMock) return { ok: ids.length, failed: 0 };
       const results = await Promise.allSettled(
-        ids.map((id) => leadsService.update(id, { assigned_counselor: counselorId })),
+        ids.map((id) =>
+          leadsService.update(id, { assigned_counselor: counselorId }),
+        ),
       );
       const failed = results.filter((r) => r.status === "rejected").length;
       return { ok: ids.length - failed, failed };
@@ -390,12 +431,21 @@ export function useAssignLead() {
   const { isMock } = useDataSource();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, counselorId }: { id: number; counselorId: number | null }) => {
+    mutationFn: async ({
+      id,
+      counselorId,
+    }: {
+      id: number;
+      counselorId: number | null;
+    }) => {
       if (isMock) return null;
       return leadsService.update(id, { assigned_counselor: counselorId });
     },
     onSuccess: (lead) => {
-      toast.success("Lead assigned", lead ? undefined : { description: "Mock preview — not saved." });
+      toast.success(
+        "Lead assigned",
+        lead ? undefined : { description: "Mock preview — not saved." },
+      );
       void qc.invalidateQueries({ queryKey: ["lead"] });
       void qc.invalidateQueries({ queryKey: ["leads"] });
     },
@@ -406,9 +456,15 @@ export function useAssignLead() {
 export function useAddCall(leadId?: number) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (payload: Partial<ApiLeadCall>) => leadsService.addCall(leadId as number, payload),
-    onSuccess: () => {
-      toast.success("Call logged");
+    mutationFn: (payload: Partial<ApiLeadCall>) =>
+      leadsService.addCall(leadId as number, payload),
+    onSuccess: (call) => {
+      toast.success("Call logged", {
+        description:
+          call.remaining_seconds == null
+            ? undefined
+            : `${Math.floor(call.remaining_seconds / 60)} min ${call.remaining_seconds % 60} sec remaining`,
+      });
       void qc.invalidateQueries({ queryKey: ["lead"] });
       void qc.invalidateQueries({ queryKey: ["leads"] });
     },
@@ -420,8 +476,13 @@ export function useAddCall(leadId?: number) {
 export function useUpdateCall(leadId?: number) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ callId, payload }: { callId: number; payload: Partial<ApiLeadCall> }) =>
-      leadsService.updateCall(leadId as number, callId, payload),
+    mutationFn: ({
+      callId,
+      payload,
+    }: {
+      callId: number;
+      payload: Partial<ApiLeadCall>;
+    }) => leadsService.updateCall(leadId as number, callId, payload),
     onSuccess: () => {
       toast.success("Call updated");
       void qc.invalidateQueries({ queryKey: ["lead"] });
@@ -434,13 +495,15 @@ export function useUpdateCall(leadId?: number) {
 export function useAddFollowup(leadId?: number) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (payload: Partial<ApiFollowup>) => leadsService.addFollowup(leadId as number, payload),
+    mutationFn: (payload: Partial<ApiFollowup>) =>
+      leadsService.addFollowup(leadId as number, payload),
     onSuccess: () => {
       toast.success("Follow-up scheduled");
       void qc.invalidateQueries({ queryKey: ["lead"] });
       void qc.invalidateQueries({ queryKey: ["leads"] });
     },
-    onError: (e) => toast.error(apiErrorMessage(e, "Could not schedule follow-up")),
+    onError: (e) =>
+      toast.error(apiErrorMessage(e, "Could not schedule follow-up")),
   });
 }
 
@@ -449,13 +512,20 @@ export function useAddFollowup(leadId?: number) {
 // See be-mds/lead_app_enrollments_payments_api_guide.md.
 
 /** All enrollments of one lead (newest first by default). */
-export function useLeadEnrollments(leadId?: number, params: EnrollmentListParams = {}) {
+export function useLeadEnrollments(
+  leadId?: number,
+  params: EnrollmentListParams = {},
+) {
   const { source } = useDataSource();
   const enabled = source === "api" && leadId != null;
   const query = useQuery({
     queryKey: ["lead", "enrollments", leadId, params],
     enabled,
-    queryFn: () => leadsService.enrollments(leadId as number, { ordering: "-id", ...params }),
+    queryFn: () =>
+      leadsService.enrollments(leadId as number, {
+        ordering: "-id",
+        ...params,
+      }),
     placeholderData: keepPreviousData,
   });
   return {
@@ -495,13 +565,23 @@ export function useEnrollmentPayments(
  * One payment by id — used where only the flat `/api/payments/` row is at hand
  * (it omits `notes`), so corrections start from the full record.
  */
-export function usePayment(leadId?: number, enrollmentId?: number, id?: number) {
+export function usePayment(
+  leadId?: number,
+  enrollmentId?: number,
+  id?: number,
+) {
   const { source } = useDataSource();
-  const enabled = source === "api" && leadId != null && enrollmentId != null && id != null;
+  const enabled =
+    source === "api" && leadId != null && enrollmentId != null && id != null;
   const query = useQuery({
     queryKey: ["lead", "payment", leadId, enrollmentId, id],
     enabled,
-    queryFn: () => leadsService.payment(leadId as number, enrollmentId as number, id as number),
+    queryFn: () =>
+      leadsService.payment(
+        leadId as number,
+        enrollmentId as number,
+        id as number,
+      ),
   });
   return { payment: query.data ?? null, isLoading: enabled && query.isLoading };
 }
@@ -529,49 +609,66 @@ export function useLeadPayments(leadId?: number) {
 
   const rows = queries
     .flatMap((q, i) =>
-      (q.data?.results ?? []).map((p) => ({ payment: p as ApiPayment, enrollment: enrollments[i] })),
+      (q.data?.results ?? []).map((p) => ({
+        payment: p as ApiPayment,
+        enrollment: enrollments[i],
+      })),
     )
-    .sort((a, b) => +new Date(b.payment.payment_date) - +new Date(a.payment.payment_date));
+    .sort(
+      (a, b) =>
+        +new Date(b.payment.payment_date) - +new Date(a.payment.payment_date),
+    );
 
   return {
     rows,
-    isLoading: enrLoading || queries.some((q) => q.isLoading && q.fetchStatus !== "idle"),
+    isLoading:
+      enrLoading ||
+      queries.some((q) => q.isLoading && q.fetchStatus !== "idle"),
   };
 }
 
 export function useAddEnrollment(leadId?: number) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (payload: ApiEnrollmentPayload) => leadsService.addEnrollment(leadId as number, payload),
+    mutationFn: (payload: ApiEnrollmentPayload) =>
+      leadsService.addEnrollment(leadId as number, payload),
     onSuccess: () => {
       toast.success("Enrollment created");
       void qc.invalidateQueries({ queryKey: ["lead"] });
       void qc.invalidateQueries({ queryKey: ["leads"] });
       void qc.invalidateQueries({ queryKey: ["enrollments"] });
     },
-    onError: (e) => toast.error(apiErrorMessage(e, "Could not create enrollment")),
+    onError: (e) =>
+      toast.error(apiErrorMessage(e, "Could not create enrollment")),
   });
 }
 
 export function useUpdateEnrollment(leadId?: number) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, payload }: { id: number; payload: ApiEnrollmentPayload }) =>
-      leadsService.updateEnrollment(leadId as number, id, payload),
+    mutationFn: ({
+      id,
+      payload,
+    }: {
+      id: number;
+      payload: ApiEnrollmentPayload;
+    }) => leadsService.updateEnrollment(leadId as number, id, payload),
     onSuccess: () => {
       toast.success("Enrollment updated");
       void qc.invalidateQueries({ queryKey: ["lead"] });
       void qc.invalidateQueries({ queryKey: ["leads"] });
       void qc.invalidateQueries({ queryKey: ["enrollments"] });
     },
-    onError: (e) => toast.error(apiErrorMessage(e, "Could not update enrollment")),
+    onError: (e) =>
+      toast.error(apiErrorMessage(e, "Could not update enrollment")),
   });
 }
 
 export function useDeleteEnrollment(leadId?: number) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (id: number) => leadsService.deleteEnrollment(leadId as number, id),
+    mutationFn: (id: number) =>
+      leadsService.deleteEnrollment(leadId as number, id),
     onSuccess: () => {
       toast.success("Enrollment deleted");
       void qc.invalidateQueries({ queryKey: ["lead"] });
@@ -579,7 +676,8 @@ export function useDeleteEnrollment(leadId?: number) {
       void qc.invalidateQueries({ queryKey: ["enrollments"] });
       void qc.invalidateQueries({ queryKey: ["payments"] });
     },
-    onError: (e) => toast.error(apiErrorMessage(e, "Could not delete enrollment")),
+    onError: (e) =>
+      toast.error(apiErrorMessage(e, "Could not delete enrollment")),
   });
 }
 
@@ -587,7 +685,11 @@ export function useAddPayment(leadId?: number, enrollmentId?: number) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (payload: ApiPaymentPayload) =>
-      leadsService.addPayment(leadId as number, enrollmentId as number, payload),
+      leadsService.addPayment(
+        leadId as number,
+        enrollmentId as number,
+        payload,
+      ),
     onSuccess: () => {
       toast.success("Payment recorded");
       void qc.invalidateQueries({ queryKey: ["lead"] });
@@ -608,7 +710,12 @@ export function useUpdatePayment(leadId?: number, enrollmentId?: number) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ id, payload }: { id: number; payload: ApiPaymentPayload }) =>
-      leadsService.updatePayment(leadId as number, enrollmentId as number, id, payload),
+      leadsService.updatePayment(
+        leadId as number,
+        enrollmentId as number,
+        id,
+        payload,
+      ),
     onSuccess: () => {
       toast.success("Payment updated");
       void qc.invalidateQueries({ queryKey: ["lead"] });
