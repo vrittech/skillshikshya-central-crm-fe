@@ -15,6 +15,14 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
+  Sheet,
+  SheetBody,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
+import {
   Table,
   TableBody,
   TableCell,
@@ -27,7 +35,7 @@ import { useDebouncedValue } from "@/lib/use-debounced-value";
 import { formatDateTime, formatDateToNepalIso } from "@/lib/leads-format";
 import { apiErrorMessage } from "@/lib/api";
 import { callsService } from "@/services/calls.service";
-import type { CallListParams, CallSummaryParams } from "@/types/calls";
+import type { CallListParams, CallRecord, CallSummaryParams } from "@/types/calls";
 import { useBranches } from "@/hooks/use-branches";
 import { useUsers } from "@/hooks/use-users";
 import { useAuth } from "@/context/auth";
@@ -109,6 +117,7 @@ function formatDuration(seconds: number): string {
 export default function CallsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [exporting, setExporting] = useState(false);
+  const [selectedCall, setSelectedCall] = useState<CallRecord | null>(null);
   const { user } = useAuth();
   const isStaff = Boolean(user?.is_staff || user?.is_superuser);
   const usersQuery = useUsers(1, 100);
@@ -585,7 +594,11 @@ export default function CallsPage() {
 
                   {!callsQuery.isLoading &&
                     rows.map((call) => (
-                      <TableRow key={call.id}>
+                      <TableRow
+                        key={call.id}
+                        className="cursor-pointer"
+                        onClick={() => setSelectedCall(call)}
+                      >
                         <TableCell className="whitespace-nowrap">
                           {formatDateTime(call.call_timestamp)}
                         </TableCell>
@@ -594,6 +607,7 @@ export default function CallsPage() {
                           <Link
                             className="text-brand font-medium hover:underline"
                             to={`/leads/${call.lead}`}
+                            onClick={(event) => event.stopPropagation()}
                           >
                             {call.lead_name}
                           </Link>
@@ -614,6 +628,7 @@ export default function CallsPage() {
                               href={call.recording_url}
                               target="_blank"
                               rel="noreferrer"
+                              onClick={(event) => event.stopPropagation()}
                             >
                               Listen
                             </a>
@@ -660,6 +675,99 @@ export default function CallsPage() {
           </>
         )}
       </div>
+
+      <Sheet
+        open={selectedCall !== null}
+        onOpenChange={(open) => {
+          if (!open) setSelectedCall(null);
+        }}
+      >
+        <SheetContent>
+          <SheetHeader>
+            <SheetTitle>Call details</SheetTitle>
+            <SheetDescription>
+              Full information about this call.
+            </SheetDescription>
+          </SheetHeader>
+
+          {selectedCall && (
+            <SheetBody>
+              <dl className="grid gap-4">
+                <div>
+                  <dt className="text-muted-foreground text-xs">Date and time</dt>
+                  <dd className="text-sm">{formatDateTime(selectedCall.call_timestamp)}</dd>
+                </div>
+                <div>
+                  <dt className="text-muted-foreground text-xs">Direction</dt>
+                  <dd className="text-sm capitalize">{selectedCall.direction || "—"}</dd>
+                </div>
+                <div>
+                  <dt className="text-muted-foreground text-xs">Lead</dt>
+                  <dd className="text-sm">
+                    {selectedCall.lead_name || "—"}
+                    {selectedCall.lead_reference_number
+                      ? ` · ${selectedCall.lead_reference_number}`
+                      : ""}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-muted-foreground text-xs">Phone</dt>
+                  <dd className="text-sm">{selectedCall.phone_number || "—"}</dd>
+                </div>
+                <div>
+                  <dt className="text-muted-foreground text-xs">Caller</dt>
+                  <dd className="text-sm">{selectedCall.caller || "—"}</dd>
+                </div>
+                <div>
+                  <dt className="text-muted-foreground text-xs">Logged by</dt>
+                  <dd className="text-sm">{selectedCall.created_by_name || "—"}</dd>
+                </div>
+                <div>
+                  <dt className="text-muted-foreground text-xs">Duration</dt>
+                  <dd className="text-sm">{selectedCall.duration_formatted || "—"}</dd>
+                </div>
+                <div>
+                  <dt className="text-muted-foreground text-xs">Outcome</dt>
+                  <dd className="text-sm">{selectedCall.outcome || "—"}</dd>
+                </div>
+                <div>
+                  <dt className="text-muted-foreground text-xs">Notes</dt>
+                  <dd className="whitespace-pre-wrap text-sm">{selectedCall.notes || "—"}</dd>
+                </div>
+                <div>
+                  <dt className="text-muted-foreground text-xs">Next action</dt>
+                  <dd className="text-sm">{selectedCall.next_action || "—"}</dd>
+                </div>
+                <div>
+                  <dt className="text-muted-foreground text-xs">Next follow-up</dt>
+                  <dd className="text-sm">
+                    {selectedCall.next_followup_at
+                      ? formatDateTime(selectedCall.next_followup_at)
+                      : "—"}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-muted-foreground text-xs">Recording</dt>
+                  <dd className="text-sm">
+                    {selectedCall.recording_url ? (
+                      <a
+                        className="text-brand hover:underline"
+                        href={selectedCall.recording_url}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        Listen to recording
+                      </a>
+                    ) : (
+                      "—"
+                    )}
+                  </dd>
+                </div>
+              </dl>
+            </SheetBody>
+          )}
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }
