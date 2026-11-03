@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -28,12 +29,10 @@ import { useCounselors } from "@/hooks/use-users";
 
 export type LeadAction = "log_call" | "follow_up" | "assign" | null;
 
-/** Minimal shape the dialogs need — satisfied by both Lead and LeadListItem. */
 export interface LeadActionTarget {
   fullName: string;
   assignedTo: string | null;
   assignedToName?: string;
-  /** Numeric backend id — required to persist actions on the live path. */
   apiId?: number;
   primaryPhone?: string;
 }
@@ -71,7 +70,12 @@ interface FollowUpForm {
   reminder: "30m" | "1h" | "1d";
 }
 
-const EMPTY_FU: FollowUpForm = { scheduledAt: "", assignedTo: "", purpose: "", reminder: "1h" };
+const EMPTY_FU: FollowUpForm = {
+  scheduledAt: "",
+  assignedTo: "",
+  purpose: "",
+  reminder: "1h",
+};
 
 const REMINDER_OFFSETS_MS: Record<FollowUpForm["reminder"], number> = {
   "30m": 30 * 60_000,
@@ -80,60 +84,156 @@ const REMINDER_OFFSETS_MS: Record<FollowUpForm["reminder"], number> = {
 };
 
 /**
- * All lead quick-actions live here. This is the static phase: the forms are
- * laid out with the fields the real workflow needs, but Save only shows a
- * toast — no mutation is performed.
+ * Converts supported call duration formats into seconds.
+ *
+ * Examples:
+ * 4:19   -> 259
+ * 4.19   -> 259
+ * 4m19s  -> 259
+ * 259    -> 259
+ * 4.5    -> 245
+ * 7:89   -> 509
  */
+function parseCallDuration(value: string): number | null {
+  const input = value.trim().toLowerCase();
+
+  if (!input) return null;
+
+  // Plain whole numbers are interpreted as seconds.
+  if (/^\d+$/.test(input)) {
+    const seconds = Number(input);
+    return Number.isSafeInteger(seconds) ? seconds : null;
+  }
+
+  // Supports 4:19 and 4.19.
+  const minuteSecondMatch = input.match(/^(\d+)\s*[:.]\s*(\d{1,2})$/);
+
+  if (minuteSecondMatch) {
+    const minutes = Number(minuteSecondMatch[1]);
+    const seconds = Number(minuteSecondMatch[2]);
+
+    if (seconds > 59) return null;
+
+    const total = minutes * 60 + seconds;
+    return Number.isSafeInteger(total) ? total : null;
+  }
+
+  // Supports 4m19s and 4m.
+  const textMatch = input.match(/^(\d+)\s*m\s*(\d{1,2})?\s*s?$/);
+
+  if (textMatch) {
+    const minutes = Number(textMatch[1]);
+    const seconds = Number(textMatch[2] ?? 0);
+
+    if (seconds > 59) return null;
+
+    const total = minutes * 60 + seconds;
+    return Number.isSafeInteger(total) ? total : null;
+  }
+
+  return null;
+}
+
+//   // Supports 4m19s and 4m.
+//   const textMatch = input.match(/^(\d+)\s*m\s*(\d{1,2})?\s*s?$/);
+
+//   if (textMatch) {
+//     const minutes = Number(textMatch[1]);
+//     const seconds = Number(textMatch[2] ?? 0);
+//     const total = minutes * 60 + seconds;
+
+//     return Number.isSafeInteger(total) ? total : null;
+//   }
+
+//   return null;
+// }
+
 export function LeadActionDialogs({ action, lead, onClose }: Props) {
   const name = lead?.fullName ?? "lead";
   const { isMock } = useDataSource();
   const { user } = useAuth();
+
   const addCall = useAddCall(lead?.apiId);
   const addFollowup = useAddFollowup(lead?.apiId);
   const assignLead = useAssignLead();
   const counselorsQ = useCounselors("", undefined, !isMock);
+
   const [call, setCall] = useState<CallForm>(EMPTY_CALL);
   const [fu, setFu] = useState<FollowUpForm>(EMPTY_FU);
   const [assignTo, setAssignTo] = useState("");
 
   // Pre-select the current owner when the Assign dialog opens.
   useEffect(() => {
-    if (action === "assign") setAssignTo(lead?.assignedTo ?? "");
+    if (action === "assign") {
+      setAssignTo(lead?.assignedTo ?? "");
+    }
   }, [action, lead?.assignedTo]);
+
   const setC = <K extends keyof CallForm>(k: K, v: CallForm[K]) =>
     setCall((c) => ({ ...c, [k]: v }));
+
   const setF = <K extends keyof FollowUpForm>(k: K, v: FollowUpForm[K]) =>
     setFu((f) => ({ ...f, [k]: v }));
 
-  // Real counselors (Counselor role) on the live path; mock list otherwise.
+  // Duration parsing and validation.
+  const durationSeconds = parseCallDuration(call.duration);
+
+  const durationHasError =
+    call.duration.trim() !== "" && durationSeconds === null;
+
+  const durationPreview =
+    durationSeconds !== null
+      ? `${Math.floor(durationSeconds / 60)}:${String(
+          durationSeconds % 60,
+        ).padStart(2, "0")} (${durationSeconds} seconds)`
+      : null;
+
+  // Real counselors on the live path; mock list otherwise.
   const counselorOptions = isMock
     ? COUNSELORS.map((c) => ({ value: c.id, label: c.name }))
-    : (counselorsQ.data?.results ?? []).map((u) => ({ value: String(u.id), label: u.name }));
-  // Default the follow-up owner to the lead's counsellor, else the current user.
-  const fuAssigned = fu.assignedTo || lead?.assignedTo || (user?.id != null ? String(user.id) : "");
+    : (counselorsQ.data?.results ?? []).map((u) => ({
+        value: String(u.id),
+        label: u.name,
+      }));
+
+  // Default follow-up owner to lead's counselor, else current user.
+  const fuAssigned =
+    fu.assignedTo ||
+    lead?.assignedTo ||
+    (user?.id != null ? String(user.id) : "");
 
   function done(message: string) {
-    toast.success(message, { description: "Static prototype — no data was changed." });
+    toast.success(message, {
+      description: "Static prototype — no data was changed.",
+    });
     onClose();
   }
 
   function submitCall() {
-    // Mock path (or a lead with no backend id) can't persist — keep the toast.
+    if (durationHasError) {
+      toast.error("Please enter a valid call duration.");
+      return;
+    }
+
+    // Mock path (or lead without backend id) cannot persist.
     if (isMock || lead?.apiId == null) {
       done("Call logged");
       setCall(EMPTY_CALL);
       return;
     }
+
     addCall.mutate(
       {
         call_timestamp: new Date().toISOString(),
         caller: user?.id ?? null,
         direction: call.direction,
         outcome: call.outcome || null,
-        duration_seconds: call.duration ? Math.round(Number(call.duration) * 60) : null,
+        duration_seconds: call.duration.trim() ? durationSeconds : null,
         recording_url: call.recording.trim() || null,
         notes: call.notes.trim() || null,
-        next_followup_at: call.nextFollowUp ? toNepalIso(call.nextFollowUp) : null,
+        next_followup_at: call.nextFollowUp
+          ? toNepalIso(call.nextFollowUp)
+          : null,
         next_action: call.nextAction.trim() || null,
         phone_number: lead?.primaryPhone ?? null,
       },
@@ -152,17 +252,25 @@ export function LeadActionDialogs({ action, lead, onClose }: Props) {
       setFu(EMPTY_FU);
       return;
     }
+
     if (!fu.scheduledAt) {
       toast.error("Pick a date & time for the follow-up.");
       return;
     }
+
     const scheduledDate = new Date(fu.scheduledAt);
+
     addFollowup.mutate(
       {
         scheduled_at: toNepalIso(fu.scheduledAt),
         assigned_to: fuAssigned ? Number(fuAssigned) : null,
         purpose: fu.purpose.trim() || null,
-        reminder_at: formatDateToNepalIso(new Date(scheduledDate.getTime() - REMINDER_OFFSETS_MS[fu.reminder])),
+        reminder_at: formatDateToNepalIso(
+          new Date(
+            scheduledDate.getTime() -
+              REMINDER_OFFSETS_MS[fu.reminder],
+          ),
+        ),
         status: "pending",
       },
       {
@@ -177,17 +285,28 @@ export function LeadActionDialogs({ action, lead, onClose }: Props) {
   return (
     <>
       {/* Log Call */}
-      <Dialog open={action === "log_call"} onOpenChange={(o) => !o && onClose()}>
+      <Dialog
+        open={action === "log_call"}
+        onOpenChange={(o) => !o && onClose()}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Log a call — {name}</DialogTitle>
-            <DialogDescription>Record the outcome of this call on the lead timeline.</DialogDescription>
+            <DialogDescription>
+              Record the outcome of this call on the lead timeline.
+            </DialogDescription>
           </DialogHeader>
+
           <div className="grid gap-4 py-2">
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
                 <Label>Direction</Label>
-                <Select value={call.direction} onValueChange={(v) => setC("direction", v as CallForm["direction"])}>
+                <Select
+                  value={call.direction}
+                  onValueChange={(v) =>
+                    setC("direction", v as CallForm["direction"])
+                  }
+                >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -197,9 +316,13 @@ export function LeadActionDialogs({ action, lead, onClose }: Props) {
                   </SelectContent>
                 </Select>
               </div>
+
               <div className="grid gap-2">
                 <Label>Outcome</Label>
-                <Select value={call.outcome} onValueChange={(v) => setC("outcome", v)}>
+                <Select
+                  value={call.outcome}
+                  onValueChange={(v) => setC("outcome", v)}
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="Select outcome" />
                   </SelectTrigger>
@@ -213,17 +336,32 @@ export function LeadActionDialogs({ action, lead, onClose }: Props) {
                 </Select>
               </div>
             </div>
+
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
-                <Label>Duration (minutes)</Label>
+                <Label>Duration</Label>
                 <Input
-                  type="number"
-                  min={0}
-                  placeholder="e.g. 4"
+                  type="text"
+                  inputMode="decimal"
+                  placeholder="e.g. 4:19, 4.19, 4m19s, or 259"
                   value={call.duration}
                   onChange={(e) => setC("duration", e.target.value)}
+                  aria-invalid={durationHasError}
                 />
+
+                {durationHasError && (
+                  <p className="text-sm text-destructive">
+                    Invalid duration. Try 4:19, 4.19, 4m19s, or 259.
+                  </p>
+                )}
+
+                {durationPreview && (
+                  <p className="text-sm text-muted-foreground">
+                    Duration: {durationPreview}
+                  </p>
+                )}
               </div>
+
               <div className="grid gap-2">
                 <Label>Recording link</Label>
                 <Input
@@ -233,6 +371,7 @@ export function LeadActionDialogs({ action, lead, onClose }: Props) {
                 />
               </div>
             </div>
+
             <div className="grid gap-2">
               <Label>Notes</Label>
               <Textarea
@@ -242,6 +381,7 @@ export function LeadActionDialogs({ action, lead, onClose }: Props) {
                 onChange={(e) => setC("notes", e.target.value)}
               />
             </div>
+
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
                 <Label>Next follow-up</Label>
@@ -251,6 +391,7 @@ export function LeadActionDialogs({ action, lead, onClose }: Props) {
                   onChange={(e) => setC("nextFollowUp", e.target.value)}
                 />
               </div>
+
               <div className="grid gap-2">
                 <Label>Next action</Label>
                 <Input
@@ -261,11 +402,21 @@ export function LeadActionDialogs({ action, lead, onClose }: Props) {
               </div>
             </div>
           </div>
+
           <DialogFooter>
-            <Button variant="outline" onClick={onClose} disabled={addCall.isPending}>
+            <Button
+              variant="outline"
+              onClick={onClose}
+              disabled={addCall.isPending}
+            >
               Cancel
             </Button>
-            <Button variant="brand" onClick={submitCall} disabled={addCall.isPending}>
+
+            <Button
+              variant="brand"
+              onClick={submitCall}
+              disabled={addCall.isPending || durationHasError}
+            >
               {addCall.isPending ? "Logging…" : "Log Call"}
             </Button>
           </DialogFooter>
@@ -273,12 +424,18 @@ export function LeadActionDialogs({ action, lead, onClose }: Props) {
       </Dialog>
 
       {/* Add Follow-up */}
-      <Dialog open={action === "follow_up"} onOpenChange={(o) => !o && onClose()}>
+      <Dialog
+        open={action === "follow_up"}
+        onOpenChange={(o) => !o && onClose()}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Schedule follow-up — {name}</DialogTitle>
-            <DialogDescription>Set the next touchpoint and its purpose.</DialogDescription>
+            <DialogDescription>
+              Set the next touchpoint and its purpose.
+            </DialogDescription>
           </DialogHeader>
+
           <div className="grid gap-4 py-2">
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
@@ -289,9 +446,13 @@ export function LeadActionDialogs({ action, lead, onClose }: Props) {
                   onChange={(e) => setF("scheduledAt", e.target.value)}
                 />
               </div>
+
               <div className="grid gap-2">
                 <Label>Assigned to</Label>
-                <Select value={fuAssigned} onValueChange={(v) => setF("assignedTo", v)}>
+                <Select
+                  value={fuAssigned}
+                  onValueChange={(v) => setF("assignedTo", v)}
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="Select counselor" />
                   </SelectTrigger>
@@ -305,6 +466,7 @@ export function LeadActionDialogs({ action, lead, onClose }: Props) {
                 </Select>
               </div>
             </div>
+
             <div className="grid gap-2">
               <Label>Purpose</Label>
               <Textarea
@@ -314,9 +476,15 @@ export function LeadActionDialogs({ action, lead, onClose }: Props) {
                 onChange={(e) => setF("purpose", e.target.value)}
               />
             </div>
+
             <div className="grid gap-2">
               <Label>Reminder</Label>
-              <Select value={fu.reminder} onValueChange={(v) => setF("reminder", v as FollowUpForm["reminder"])}>
+              <Select
+                value={fu.reminder}
+                onValueChange={(v) =>
+                  setF("reminder", v as FollowUpForm["reminder"])
+                }
+              >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -328,11 +496,21 @@ export function LeadActionDialogs({ action, lead, onClose }: Props) {
               </Select>
             </div>
           </div>
+
           <DialogFooter>
-            <Button variant="outline" onClick={onClose} disabled={addFollowup.isPending}>
+            <Button
+              variant="outline"
+              onClick={onClose}
+              disabled={addFollowup.isPending}
+            >
               Cancel
             </Button>
-            <Button variant="brand" onClick={submitFollowUp} disabled={addFollowup.isPending}>
+
+            <Button
+              variant="brand"
+              onClick={submitFollowUp}
+              disabled={addFollowup.isPending}
+            >
               {addFollowup.isPending ? "Scheduling…" : "Schedule"}
             </Button>
           </DialogFooter>
@@ -340,24 +518,40 @@ export function LeadActionDialogs({ action, lead, onClose }: Props) {
       </Dialog>
 
       {/* Assign */}
-      <Dialog open={action === "assign"} onOpenChange={(o) => !o && onClose()}>
+      <Dialog
+        open={action === "assign"}
+        onOpenChange={(o) => !o && onClose()}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Assign lead — {name}</DialogTitle>
             <DialogDescription>
               Currently{" "}
               {lead?.assignedTo
-                ? `assigned to ${lead.assignedToName ?? counselorName(lead.assignedTo)}`
+                ? `assigned to ${
+                    lead.assignedToName ??
+                    counselorName(lead.assignedTo)
+                  }`
                 : "in the unassigned pool"}
               .
             </DialogDescription>
           </DialogHeader>
+
           <div className="grid gap-4 py-2">
             <div className="grid gap-2">
               <Label>Counselor</Label>
-              <Select value={assignTo || undefined} onValueChange={setAssignTo}>
+              <Select
+                value={assignTo || undefined}
+                onValueChange={setAssignTo}
+              >
                 <SelectTrigger>
-                  <SelectValue placeholder={counselorsQ.isFetching ? "Loading counselors…" : "Select counselor"} />
+                  <SelectValue
+                    placeholder={
+                      counselorsQ.isFetching
+                        ? "Loading counselors…"
+                        : "Select counselor"
+                    }
+                  />
                 </SelectTrigger>
                 <SelectContent>
                   {counselorOptions.map((c) => (
@@ -368,15 +562,22 @@ export function LeadActionDialogs({ action, lead, onClose }: Props) {
                 </SelectContent>
               </Select>
             </div>
+
             <div className="grid gap-2">
               <Label>Reason (optional)</Label>
               <Input placeholder="e.g. Rebalancing workload" />
             </div>
           </div>
+
           <DialogFooter>
-            <Button variant="outline" onClick={onClose} disabled={assignLead.isPending}>
+            <Button
+              variant="outline"
+              onClick={onClose}
+              disabled={assignLead.isPending}
+            >
               Cancel
             </Button>
+
             <Button
               variant="brand"
               disabled={assignLead.isPending}
@@ -385,13 +586,20 @@ export function LeadActionDialogs({ action, lead, onClose }: Props) {
                   done("Lead reassigned");
                   return;
                 }
+
                 if (!assignTo) {
                   toast.error("Select a counselor.");
                   return;
                 }
+
                 assignLead.mutate(
-                  { id: lead.apiId, counselorId: Number(assignTo) },
-                  { onSuccess: () => onClose() },
+                  {
+                    id: lead.apiId,
+                    counselorId: Number(assignTo),
+                  },
+                  {
+                    onSuccess: () => onClose(),
+                  },
                 );
               }}
             >

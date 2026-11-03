@@ -411,11 +411,11 @@ export function useAddCall(leadId?: number) {
       toast.success("Call logged");
       void qc.invalidateQueries({ queryKey: ["lead"] });
       void qc.invalidateQueries({ queryKey: ["leads"] });
+      void qc.invalidateQueries({ queryKey: ["call-minutes", "me"] });
     },
     onError: (e) => toast.error(apiErrorMessage(e, "Could not log call")),
   });
 }
-
 /** PATCH an existing lead call (outcome/notes/next steps). */
 export function useUpdateCall(leadId?: number) {
   const qc = useQueryClient();
