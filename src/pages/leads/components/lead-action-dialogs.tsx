@@ -23,6 +23,7 @@ import { useAuth } from "@/context/auth";
 import { useDataSource } from "@/context/data-source";
 import { CALL_OUTCOMES, COUNSELORS, counselorName } from "@/data/lead-lookups";
 import { formatDateToNepalIso, toNepalIso } from "@/lib/leads-format";
+import { formatDurationPreview, parseDuration } from "@/lib/duration";
 import { useAddCall, useAddFollowup, useAssignLead } from "@/hooks/use-leads";
 import { useCounselors } from "@/hooks/use-users";
 
@@ -124,13 +125,18 @@ export function LeadActionDialogs({ action, lead, onClose }: Props) {
       setCall(EMPTY_CALL);
       return;
     }
+    const parsedDuration = parseDuration(call.duration);
+    if (parsedDuration.error) {
+      toast.error(parsedDuration.error);
+      return;
+    }
     addCall.mutate(
       {
         call_timestamp: new Date().toISOString(),
         caller: user?.id ?? null,
         direction: call.direction,
         outcome: call.outcome || null,
-        duration_seconds: call.duration ? Math.round(Number(call.duration) * 60) : null,
+        duration_seconds: parsedDuration.seconds,
         recording_url: call.recording.trim() || null,
         notes: call.notes.trim() || null,
         next_followup_at: call.nextFollowUp ? toNepalIso(call.nextFollowUp) : null,
@@ -215,14 +221,20 @@ export function LeadActionDialogs({ action, lead, onClose }: Props) {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
-                <Label>Duration (minutes)</Label>
+                                <Label>Duration (MM:SS)</Label>
                 <Input
-                  type="number"
-                  min={0}
-                  placeholder="e.g. 4"
+                  placeholder="e.g. 4:19"
                   value={call.duration}
                   onChange={(e) => setC("duration", e.target.value)}
                 />
+                {parseDuration(call.duration).seconds != null && (
+                  <p className="text-muted-foreground text-xs">
+                    = {formatDurationPreview(parseDuration(call.duration).seconds as number)}
+                  </p>
+                )}
+                {parseDuration(call.duration).error && (
+                  <p className="text-destructive text-xs">{parseDuration(call.duration).error}</p>
+                )}
               </div>
               <div className="grid gap-2">
                 <Label>Recording link</Label>

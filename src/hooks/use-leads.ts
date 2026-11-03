@@ -407,10 +407,16 @@ export function useAddCall(leadId?: number) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (payload: Partial<ApiLeadCall>) => leadsService.addCall(leadId as number, payload),
-    onSuccess: () => {
-      toast.success("Call logged");
+    onSuccess: (data) => {
+      // The API returns remaining_seconds after a call is saved (see the calls API guide)
+      const left = (data as { remaining_seconds?: number }).remaining_seconds;
+      toast.success(
+        left == null ? "Call logged" : `Call logged. ${Math.floor(left / 60)}m ${left % 60}s left`,
+      );
       void qc.invalidateQueries({ queryKey: ["lead"] });
       void qc.invalidateQueries({ queryKey: ["leads"] });
+      void qc.invalidateQueries({ queryKey: ["calls"] });
+      void qc.invalidateQueries({ queryKey: ["call-minutes"] });
     },
     onError: (e) => toast.error(apiErrorMessage(e, "Could not log call")),
   });
