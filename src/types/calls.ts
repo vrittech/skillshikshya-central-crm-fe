@@ -33,3 +33,27 @@ export interface CallListParams {
   ordering?: string;
   branch_id?: number;
 }
+
+
+export type CallSummaryParams = Omit<
+  CallListParams,
+  "page" | "page_size" | "ordering"
+>;
+
+export interface CallSummary {
+  total_calls: number;
+  inbound: number;
+  outbound: number;
+  total_seconds: number;
+  total_formatted: string;
+  avg_seconds: number;
+  connected_calls: number;
+  connect_rate: number;
+  by_day: { date: string; calls: number; seconds: number }[];
+  by_user: {
+    user_id: number | null;
+    name: string;
+    calls: number;
+    seconds: number;
+  }[];
+}

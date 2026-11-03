@@ -1,6 +1,8 @@
 import { ChevronLeft, ChevronRight, Phone, Search } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { HBarList, MiniBars } from "@/components/charts";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -18,10 +20,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { useCalls } from "@/hooks/use-calls";
+import { useCallSummary, useCalls } from "@/hooks/use-calls";
 import { useDebouncedValue } from "@/lib/use-debounced-value";
 import { formatDateTime, formatDateToNepalIso } from "@/lib/leads-format";
-import type { CallListParams } from "@/types/calls";
+import type { CallListParams, CallSummaryParams } from "@/types/calls";
 import { useBranches } from "@/hooks/use-branches";
 import { useUsers } from "@/hooks/use-users";
 import { useAuth } from "@/context/auth";
@@ -94,6 +96,12 @@ function presetDateRange(preset: string): { from: string; to: string } | null {
   return null;
 }
 
+function formatDuration(seconds: number): string {
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = seconds % 60;
+  return `${String(minutes).padStart(2, "0")}:${String(remainingSeconds).padStart(2, "0")}`;
+}
+
 export default function CallsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuth();
@@ -126,6 +134,15 @@ export default function CallsPage() {
     branch_id: isStaff && Number.isInteger(branchId) && branchId! > 0 ? branchId : undefined,
   };
 
+  const summaryParams: CallSummaryParams = {
+    search: params.search,
+    direction: params.direction,
+    created_by: params.created_by,
+    call_timestamp__gte: params.call_timestamp__gte,
+    call_timestamp__lte: params.call_timestamp__lte,
+    branch_id: params.branch_id,
+  };
+
   const hasActiveFilters = Boolean(
     searchText.trim() ||
       direction ||
@@ -138,6 +155,7 @@ export default function CallsPage() {
   );
 
   const callsQuery = useCalls(params);
+  const summaryQuery = useCallSummary(summaryParams);
   const data = callsQuery.data;
   const rows = data?.results ?? [];
   const count = data?.count ?? 0;
@@ -190,6 +208,133 @@ export default function CallsPage() {
           Call activity across your team.
         </p>
       </div>
+
+            {summaryQuery.isError ? (
+        <div className="bg-card flex flex-col items-center gap-3 rounded-2xl border px-4 py-8 text-center">
+          <p className="text-sm font-medium">Could not load call summary.</p>
+          <Button
+            variant="outline"
+            onClick={() => void summaryQuery.refetch()}
+            disabled={summaryQuery.isFetching}
+          >
+            {summaryQuery.isFetching ? "Retrying…" : "Retry"}
+          </Button>
+        </div>
+      ) : (
+        <>
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Total calls</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {summaryQuery.isLoading || !summaryQuery.data ? (
+                  <Skeleton className="h-10 w-full" />
+                ) : (
+                  <>
+                    <p className="font-headline text-2xl font-semibold tabular-nums">
+                      {summaryQuery.data.total_calls}
+                    </p>
+                    <p className="text-muted-foreground mt-1 text-sm">
+                      {summaryQuery.data.inbound} inbound · {summaryQuery.data.outbound} outbound
+                    </p>
+                  </>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Talk time</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {summaryQuery.isLoading || !summaryQuery.data ? (
+                  <Skeleton className="h-10 w-full" />
+                ) : (
+                  <p className="font-headline text-2xl font-semibold tabular-nums">
+                    {summaryQuery.data.total_formatted}
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Average duration</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {summaryQuery.isLoading || !summaryQuery.data ? (
+                  <Skeleton className="h-10 w-full" />
+                ) : (
+                  <p className="font-headline text-2xl font-semibold tabular-nums">
+                    {formatDuration(summaryQuery.data.avg_seconds)}
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Connect rate</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {summaryQuery.isLoading || !summaryQuery.data ? (
+                  <Skeleton className="h-10 w-full" />
+                ) : (
+                  <p className="font-headline text-2xl font-semibold tabular-nums">
+                    {(summaryQuery.data.connect_rate * 100).toFixed(1)}%
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="grid gap-4 lg:grid-cols-2">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Calls per day</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {summaryQuery.isLoading || !summaryQuery.data ? (
+                  <Skeleton className="h-24 w-full" />
+                ) : summaryQuery.data.by_day.length > 0 ? (
+                  <MiniBars
+                    values={summaryQuery.data.by_day.map((day) => day.calls)}
+                  />
+                ) : (
+                  <p className="text-muted-foreground py-8 text-center text-sm">
+                    No calls in this range.
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Top 10 callers</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {summaryQuery.isLoading || !summaryQuery.data ? (
+                  <Skeleton className="h-24 w-full" />
+                ) : summaryQuery.data.by_user.length > 0 ? (
+                  <HBarList
+                    data={summaryQuery.data.by_user
+                      .slice(0, 10)
+                      .map((caller) => ({
+                        label: caller.name,
+                        value: caller.calls,
+                      }))}
+                  />
+                ) : (
+                  <p className="text-muted-foreground py-8 text-center text-sm">
+                    No calls in this range.
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </>
+      )}
 
       <div className="flex flex-wrap items-center gap-2">
         <div className="relative min-w-[13rem] max-w-sm flex-1">
