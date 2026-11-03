@@ -10,6 +10,7 @@ import type {
   ApiLead,
   ApiLeadActivity,
   ApiLeadCall,
+  ApiLeadCallCreateResponse,
   ApiLeadDocument,
   ApiLeadPayload,
   ApiPayment,
@@ -186,8 +187,8 @@ export const leadsService = {
     const { data } = await api.get<Paginated<ApiLeadCall>>(`/leads/${leadId}/calls/`, { params });
     return data;
   },
-  async addCall(leadId: number, payload: Partial<ApiLeadCall>) {
-    const { data } = await api.post<ApiLeadCall>(`/leads/${leadId}/calls/`, payload);
+  async addCall(leadId: number, payload: Partial<ApiLeadCall> & { duration_input?: string }) {
+    const { data } = await api.post<ApiLeadCallCreateResponse>(`/leads/${leadId}/calls/`, payload);
     return data;
   },
   /** PATCH a call — backend silently ignores duration_seconds/caller changes. */

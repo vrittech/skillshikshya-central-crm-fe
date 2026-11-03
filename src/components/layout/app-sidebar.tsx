@@ -66,8 +66,11 @@ export function AppSidebar({ open, onClose }: { open: boolean; onClose: () => vo
 
   // Nav visibility is driven by the previewed mock role (and real staff flag for
   // the admin section), demonstrating permission-aware navigation before RBAC ships.
-  const visible = (item: NavItem) => !item.cap || can(item.cap);
-  const items = [...navItems, ...(user?.is_staff ? adminItems : [])].filter(visible);
+  const visible = (item: NavItem) =>
+    !item.cap || user?.is_staff || user?.is_superuser || can(item.cap);
+
+  const items = [...navItems, ...(user?.is_staff || user?.is_superuser ? adminItems : [])]
+    .filter(visible);
 
   // `md:hidden` when collapsed keeps the mobile slide-over full-width regardless.
   const hideWhenCollapsed = collapsed ? "md:hidden" : "";

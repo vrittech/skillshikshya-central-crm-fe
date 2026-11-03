@@ -59,11 +59,10 @@ import { leadsService } from "@/services/leads.service";
 import type { LeadListItem } from "@/types/leads";
 import { LeadActionDialogs, type LeadAction } from "./components/lead-action-dialogs";
 import {
-  DEFAULT_FILTERS,
   LeadFilters,
   type LeadFilterOptions,
-  type LeadFilterState,
 } from "./components/lead-filters";
+import { DEFAULT_FILTERS, type LeadFilterState } from "./components/lead-filter-state";
 import { LeadSummaryCards } from "./components/lead-summary-cards";
 import { LeadTable } from "./components/lead-table";
 

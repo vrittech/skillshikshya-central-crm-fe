@@ -62,6 +62,7 @@ export interface RegisterPayload {
   exclude_from_calls?: boolean;
   exclude_from_enrollment?: boolean;
   branch?: number | null;
+  groups?: number[];
 }
 
 export type UpdateUserPayload = Partial<

@@ -43,6 +43,7 @@ export function DataSourceProvider({ children }: { children: React.ReactNode }) 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 
+// oxlint-disable-next-line react/only-export-components -- keep this hook next to its context provider.
 export function useDataSource() {
   const ctx = useContext(Ctx);
   if (!ctx) throw new Error("useDataSource must be used within DataSourceProvider");

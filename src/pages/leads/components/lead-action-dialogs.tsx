@@ -21,6 +21,8 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/context/auth";
 import { useDataSource } from "@/context/data-source";
+import { apiErrorMessage } from "@/lib/api";
+import { formatDurationPreview, parseDurationToSeconds } from "@/lib/duration";
 import { CALL_OUTCOMES, COUNSELORS, counselorName } from "@/data/lead-lookups";
 import { formatDateToNepalIso, toNepalIso } from "@/lib/leads-format";
 import { useAddCall, useAddFollowup, useAssignLead } from "@/hooks/use-leads";
@@ -111,6 +113,12 @@ export function LeadActionDialogs({ action, lead, onClose }: Props) {
     : (counselorsQ.data?.results ?? []).map((u) => ({ value: String(u.id), label: u.name }));
   // Default the follow-up owner to the lead's counsellor, else the current user.
   const fuAssigned = fu.assignedTo || lead?.assignedTo || (user?.id != null ? String(user.id) : "");
+  const parsedDuration = parseDurationToSeconds(call.duration);
+  const durationError = parsedDuration === null
+    ? "Enter a valid duration. Use MM:SS, MM.SS, M min S sec, or total seconds."
+    : addCall.error
+      ? apiErrorMessage(addCall.error, "Could not log call")
+      : "";
 
   function done(message: string) {
     toast.success(message, { description: "Static prototype — no data was changed." });
@@ -118,6 +126,7 @@ export function LeadActionDialogs({ action, lead, onClose }: Props) {
   }
 
   function submitCall() {
+    if (parsedDuration === null) return;
     // Mock path (or a lead with no backend id) can't persist — keep the toast.
     if (isMock || lead?.apiId == null) {
       done("Call logged");
@@ -130,7 +139,7 @@ export function LeadActionDialogs({ action, lead, onClose }: Props) {
         caller: user?.id ?? null,
         direction: call.direction,
         outcome: call.outcome || null,
-        duration_seconds: call.duration ? Math.round(Number(call.duration) * 60) : null,
+        duration_input: call.duration,
         recording_url: call.recording.trim() || null,
         notes: call.notes.trim() || null,
         next_followup_at: call.nextFollowUp ? toNepalIso(call.nextFollowUp) : null,
@@ -215,14 +224,27 @@ export function LeadActionDialogs({ action, lead, onClose }: Props) {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
-                <Label>Duration (minutes)</Label>
+                <Label htmlFor="call-duration">Duration</Label>
                 <Input
-                  type="number"
-                  min={0}
-                  placeholder="e.g. 4"
+                  id="call-duration"
+                  type="text"
+                  inputMode="decimal"
+                  placeholder="MM:SS, e.g. 4:19"
                   value={call.duration}
-                  onChange={(e) => setC("duration", e.target.value)}
+                  aria-invalid={Boolean(durationError)}
+                  aria-describedby="call-duration-hint call-duration-preview call-duration-error"
+                  onChange={(e) => {
+                    addCall.reset();
+                    setC("duration", e.target.value);
+                  }}
                 />
+                <p id="call-duration-hint" className="text-muted-foreground text-xs">MM:SS, e.g. 4:19</p>
+                {call.duration.trim() && parsedDuration !== null && (
+                  <p id="call-duration-preview" className="text-muted-foreground text-xs">
+                    {formatDurationPreview(parsedDuration)}
+                  </p>
+                )}
+                {durationError && <p id="call-duration-error" className="text-destructive text-xs" role="alert">{durationError}</p>}
               </div>
               <div className="grid gap-2">
                 <Label>Recording link</Label>
@@ -265,7 +287,7 @@ export function LeadActionDialogs({ action, lead, onClose }: Props) {
             <Button variant="outline" onClick={onClose} disabled={addCall.isPending}>
               Cancel
             </Button>
-            <Button variant="brand" onClick={submitCall} disabled={addCall.isPending}>
+            <Button variant="brand" onClick={submitCall} disabled={addCall.isPending || parsedDuration === null}>
               {addCall.isPending ? "Logging…" : "Log Call"}
             </Button>
           </DialogFooter>

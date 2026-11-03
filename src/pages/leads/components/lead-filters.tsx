@@ -19,39 +19,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
-
-export interface LeadFilterState {
-  search: string;
-  status: string;
-  source: string;
-  type: string;
-  course: string;
-  assignedTo: string;
-  priority: string;
-  overdueOnly: boolean;
-  unassignedOnly: boolean;
-  /** Exact created day, `YYYY-MM-DD` ("" = unset) — maps to `?created_date=`. */
-  createdDate: string;
-  /** Created on or after, `YYYY-MM-DD` ("" = unset) — maps to `?from_date=`. */
-  dateFrom: string;
-  /** Created on or before, `YYYY-MM-DD` ("" = unset) — maps to `?to_date=`. */
-  dateTo: string;
-}
-
-export const DEFAULT_FILTERS: LeadFilterState = {
-  search: "",
-  status: "all",
-  source: "all",
-  type: "all",
-  course: "all",
-  assignedTo: "all",
-  priority: "all",
-  overdueOnly: false,
-  unassignedOnly: false,
-  createdDate: "",
-  dateFrom: "",
-  dateTo: "",
-};
+import { DEFAULT_FILTERS, type LeadFilterState } from "./lead-filter-state";
 
 export interface FilterOption {
   value: string;

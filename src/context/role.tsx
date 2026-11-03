@@ -55,6 +55,7 @@ const ALL: Capability[] = [
   "recycle_bin.view",
 ];
 
+// oxlint-disable-next-line react/only-export-components -- role metadata is also used by the role switcher.
 export const ROLE_DEFS: Record<MockRole, RoleDef> = {
   admin: {
     role: "admin",
@@ -136,6 +137,7 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
   return <RoleContext.Provider value={value}>{children}</RoleContext.Provider>;
 }
 
+// oxlint-disable-next-line react/only-export-components -- keep this hook next to its context provider.
 export function useRole() {
   const ctx = useContext(RoleContext);
   if (!ctx) throw new Error("useRole must be used within RoleProvider");

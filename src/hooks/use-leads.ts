@@ -35,7 +35,7 @@ import type {
   PaymentListParams,
 } from "@/types/leads-api";
 import type { Lead, LeadListItem, LeadTypeCode } from "@/types/leads";
-import type { LeadFilterState } from "@/pages/leads/components/lead-filters";
+import type { LeadFilterState } from "@/pages/leads/components/lead-filter-state";
 
 const EMPTY_PAGE = { count: 0, next: null, previous: null, results: [] };
 
@@ -406,9 +406,15 @@ export function useAssignLead() {
 export function useAddCall(leadId?: number) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (payload: Partial<ApiLeadCall>) => leadsService.addCall(leadId as number, payload),
-    onSuccess: () => {
-      toast.success("Call logged");
+    mutationFn: (payload: Partial<ApiLeadCall> & { duration_input?: string }) => leadsService.addCall(leadId as number, payload),
+    onSuccess: (call) => {
+      const remaining = call.remaining_seconds;
+      const balance = remaining == null
+        ? "Balance unavailable"
+        : `Remaining balance: ${Math.floor(remaining / 60)} min ${remaining % 60} sec`;
+      toast.success("Call logged", { description: balance });
+      void qc.invalidateQueries({ queryKey: ["calls"] });
+      void qc.invalidateQueries({ queryKey: ["call-minutes"] });
       void qc.invalidateQueries({ queryKey: ["lead"] });
       void qc.invalidateQueries({ queryKey: ["leads"] });
     },

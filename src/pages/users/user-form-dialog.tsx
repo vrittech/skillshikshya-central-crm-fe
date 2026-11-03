@@ -213,18 +213,11 @@ export function UserFormDialog({
         name: form.name,
         email: form.email,
         password: form.password,
+        branch: form.branch ? Number(form.branch) : null,
+        groups: form.group ? [Number(form.group)] : [],
         ...buildCommon(),
       };
-      register.mutate(payload, {
-        onSuccess: (data) => {
-          // groups and branch can't be set at registration — patch right after if chosen
-          const post: Record<string, unknown> = {};
-          if (form.group) post.groups = [Number(form.group)];
-          if (form.branch) post.branch = Number(form.branch);
-          if (Object.keys(post).length) update.mutate({ id: data.user.id, payload: post });
-          onOpenChange(false);
-        },
-      });
+      register.mutate(payload, { onSuccess: () => onOpenChange(false) });
     }
   }
 

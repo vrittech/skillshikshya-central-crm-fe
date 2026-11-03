@@ -212,6 +212,13 @@ export interface ApiLeadCall {
   created_at: string;
 }
 
+export interface ApiLeadCallCreateResponse extends ApiLeadCall {
+  seconds_used: number;
+  remaining_seconds: number | null;
+  minutes_used: number;
+  remaining_minutes: number | null;
+}
+
 export type ApiActivityType =
   | "call"
   | "whatsapp"
