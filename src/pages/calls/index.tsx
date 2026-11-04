@@ -5,6 +5,8 @@ import {
   ArrowUpDown,
   ChevronLeft,
   ChevronRight,
+  Download,
+  Loader2,
   PhoneCall,
   PhoneIncoming,
   PhoneOutgoing,
@@ -12,6 +14,7 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Combobox } from "@/components/ui/combobox";
@@ -27,6 +30,7 @@ import { useCounselors } from "@/hooks/use-users";
 import { apiErrorMessage } from "@/lib/api";
 import { formatDateTime, formatMmSs, formatPhone } from "@/lib/leads-format";
 import { cn } from "@/lib/utils";
+import { callsService } from "@/services/calls.service";
 import type { CallOutcome } from "@/types/leads";
 import { CallsSummary } from "./calls-summary";
 
@@ -71,6 +75,7 @@ export default function CallsPage() {
   const { filters, params, hasFilters, setFilters, setPage, clearFilters } = useCallFilters();
   const callsQ = useCalls(params, filters.page, PAGE_SIZE);
   const [userSearch, setUserSearch] = useState("");
+  const [exporting, setExporting] = useState(false);
   const counselorsQ = useCounselors(userSearch);
   const branchesQ = useBranches(1, 100, "", isStaff);
 
@@ -91,14 +96,31 @@ export default function CallsPage() {
   const currentPage = Math.min(filters.page, totalPages);
   const start = (currentPage - 1) * PAGE_SIZE;
 
+  async function handleExport() {
+    setExporting(true);
+    try {
+      await callsService.exportCsv(params);
+    } catch (err) {
+      toast.error(apiErrorMessage(err, "Export failed"));
+    } finally {
+      setExporting(false);
+    }
+  }
+
   return (
     <div className="space-y-6">
-      <div>
-        <p className="text-brand font-mono text-[11px] font-bold tracking-wider uppercase">CRM Workspace</p>
-        <h1 className="font-headline mt-1 text-3xl font-semibold tracking-tight">Calls</h1>
-        <p className="text-muted-foreground mt-1 text-sm">
-          Every call your team logged{isStaff ? " across branches" : " in your branch"}.
-        </p>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <p className="text-brand font-mono text-[11px] font-bold tracking-wider uppercase">CRM Workspace</p>
+          <h1 className="font-headline mt-1 text-3xl font-semibold tracking-tight">Calls</h1>
+          <p className="text-muted-foreground mt-1 text-sm">
+            Every call your team logged{isStaff ? " across branches" : " in your branch"}.
+          </p>
+        </div>
+        <Button variant="outline" onClick={handleExport} disabled={exporting}>
+          {exporting ? <Loader2 className="animate-spin" /> : <Download />}
+          {exporting ? "Preparing…" : "Export CSV"}
+        </Button>
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
