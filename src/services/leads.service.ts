@@ -63,7 +63,7 @@ export interface LeadListParams {
   ordering?: string;
 }
 
-/** Query params accepted by GET /api/leads/{id}/calls/ (see lead_app_calls_api_guide.md). */
+
 export interface CallListParams {
   page?: number;
   page_size?: number;
@@ -73,7 +73,15 @@ export interface CallListParams {
   /** e.g. "-call_timestamp" for newest first. */
   ordering?: string;
 }
+export type AddCallPayload = Partial<ApiLeadCall> & { duration_input?: string };
 
+/** POST response: the saved call plus the call-minutes charge (see lead_app_calls_api_guide.md). */
+export type AddCallResponse = ApiLeadCall & {
+  seconds_used?: number;
+  remaining_seconds?: number;
+  minutes_used?: number;
+  remaining_minutes?: number;
+};
 export const leadsService = {
   async list(params: LeadListParams = {}) {
     const { data } = await api.get<Paginated<ApiLead>>("/leads/", { params });
@@ -186,8 +194,8 @@ export const leadsService = {
     const { data } = await api.get<Paginated<ApiLeadCall>>(`/leads/${leadId}/calls/`, { params });
     return data;
   },
-  async addCall(leadId: number, payload: Partial<ApiLeadCall>) {
-    const { data } = await api.post<ApiLeadCall>(`/leads/${leadId}/calls/`, payload);
+    async addCall(leadId: number, payload: AddCallPayload) {
+    const { data } = await api.post<AddCallResponse>(`/leads/${leadId}/calls/`, payload);
     return data;
   },
   /** PATCH a call — backend silently ignores duration_seconds/caller changes. */

@@ -25,6 +25,8 @@ import { CALL_OUTCOMES, COUNSELORS, counselorName } from "@/data/lead-lookups";
 import { formatDateToNepalIso, toNepalIso } from "@/lib/leads-format";
 import { useAddCall, useAddFollowup, useAssignLead } from "@/hooks/use-leads";
 import { useCounselors } from "@/hooks/use-users";
+import { apiErrorMessage } from "@/lib/api";
+import { formatDurationPreview, parseDuration } from "@/lib/duration";
 
 export type LeadAction = "log_call" | "follow_up" | "assign" | null;
 
@@ -89,12 +91,17 @@ export function LeadActionDialogs({ action, lead, onClose }: Props) {
   const { isMock } = useDataSource();
   const { user } = useAuth();
   const addCall = useAddCall(lead?.apiId);
+  type CallPayload = Parameters<typeof addCall.mutate>[0] & { duration_input?: string };
   const addFollowup = useAddFollowup(lead?.apiId);
   const assignLead = useAssignLead();
   const counselorsQ = useCounselors("", undefined, !isMock);
   const [call, setCall] = useState<CallForm>(EMPTY_CALL);
   const [fu, setFu] = useState<FollowUpForm>(EMPTY_FU);
   const [assignTo, setAssignTo] = useState("");
+  const [durationServerError, setDurationServerError] = useState<string | null>(null);
+  const durationParse = parseDuration(call.duration);
+  const durationError = !durationParse.ok && call.duration.trim() ? durationParse.error : null;
+  const shownDurationError = durationError ?? durationServerError;
 
   // Pre-select the current owner when the Assign dialog opens.
   useEffect(() => {
@@ -118,32 +125,35 @@ export function LeadActionDialogs({ action, lead, onClose }: Props) {
   }
 
   function submitCall() {
-    // Mock path (or a lead with no backend id) can't persist — keep the toast.
+    // Mock path (or a lead with no backend id) can't persist, keep the toast.
     if (isMock || lead?.apiId == null) {
       done("Call logged");
       setCall(EMPTY_CALL);
       return;
     }
-    addCall.mutate(
-      {
-        call_timestamp: new Date().toISOString(),
-        caller: user?.id ?? null,
-        direction: call.direction,
-        outcome: call.outcome || null,
-        duration_seconds: call.duration ? Math.round(Number(call.duration) * 60) : null,
-        recording_url: call.recording.trim() || null,
-        notes: call.notes.trim() || null,
-        next_followup_at: call.nextFollowUp ? toNepalIso(call.nextFollowUp) : null,
-        next_action: call.nextAction.trim() || null,
-        phone_number: lead?.primaryPhone ?? null,
+    if (durationError) return;
+    setDurationServerError(null);
+    // The backend parses duration_input (4:19, 4.19, 4m19s, 259), so send the raw text.
+    const payload: CallPayload = {
+      call_timestamp: new Date().toISOString(),
+      caller: user?.id ?? null,
+      direction: call.direction,
+      outcome: call.outcome || null,
+      recording_url: call.recording.trim() || null,
+      notes: call.notes.trim() || null,
+      next_followup_at: call.nextFollowUp ? toNepalIso(call.nextFollowUp) : null,
+      next_action: call.nextAction.trim() || null,
+      phone_number: lead?.primaryPhone ?? null,
+    };
+    if (call.duration.trim()) payload.duration_input = call.duration.trim();
+    addCall.mutate(payload, {
+      onSuccess: () => {
+        setCall(EMPTY_CALL);
+        setDurationServerError(null);
+        onClose();
       },
-      {
-        onSuccess: () => {
-          setCall(EMPTY_CALL);
-          onClose();
-        },
-      },
-    );
+      onError: (e) => setDurationServerError(apiErrorMessage(e, "Could not log call")),
+    });
   }
 
   function submitFollowUp() {
@@ -215,14 +225,29 @@ export function LeadActionDialogs({ action, lead, onClose }: Props) {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
-                <Label>Duration (minutes)</Label>
+                <Label htmlFor="call-duration">Duration</Label>
                 <Input
-                  type="number"
-                  min={0}
-                  placeholder="e.g. 4"
+                  id="call-duration"
+                  type="text"
+                  autoComplete="off"
+                  placeholder="MM:SS, e.g. 4:19"
+                  aria-invalid={shownDurationError ? true : undefined}
+                  aria-describedby="call-duration-help"
                   value={call.duration}
-                  onChange={(e) => setC("duration", e.target.value)}
+                  onChange={(e) => {
+                    setC("duration", e.target.value);
+                    setDurationServerError(null);
+                  }}
                 />
+                <p
+                  id="call-duration-help"
+                  className={shownDurationError ? "text-xs text-destructive" : "text-xs text-muted-foreground"}
+                >
+                  {shownDurationError ??
+                    (durationParse.ok && call.duration.trim()
+                      ? `= ${formatDurationPreview(durationParse.seconds)}`
+                      : "MM:SS, e.g. 4:19")}
+                </p>
               </div>
               <div className="grid gap-2">
                 <Label>Recording link</Label>
