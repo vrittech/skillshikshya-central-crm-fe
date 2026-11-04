@@ -28,6 +28,7 @@ import { apiErrorMessage } from "@/lib/api";
 import { formatDateTime, formatMmSs, formatPhone } from "@/lib/leads-format";
 import { cn } from "@/lib/utils";
 import type { CallOutcome } from "@/types/leads";
+import { CallsSummary } from "./calls-summary";
 
 const PAGE_SIZE = 20;
 
@@ -194,6 +195,8 @@ export default function CallsPage() {
           </Button>
         )}
       </div>
+
+      <CallsSummary params={params} />
 
       <div className="bg-card overflow-hidden rounded-2xl border shadow-[0_1px_3px_0_rgba(0,0,0,0.05),0_1px_2px_-1px_rgba(0,0,0,0.05)]">
         {/* kept outside the table so they stay centred at phone width */}
