@@ -4,9 +4,15 @@ import { apiErrorMessage } from "@/lib/api";
 import { authService } from "@/services/auth.service";
 import { usersService } from "@/services/users.service";
 import { useGroups } from "@/hooks/use-groups";
-import type { RegisterPayload, UpdateUserPayload } from "@/types";
+import type { RegisterPayload, UpdateUserPayload, User } from "@/types";
 
-export function useUsers(page: number, pageSize: number, search = "", branchId?: number) {
+export function useUsers(
+  page: number,
+  pageSize: number,
+  search = "",
+  branchId?: number,
+  enabled = true,
+) {
   return useQuery({
     queryKey: ["users", page, pageSize, search, branchId ?? null],
     queryFn: () =>
@@ -16,7 +22,29 @@ export function useUsers(page: number, pageSize: number, search = "", branchId?:
         search: search || undefined,
         branch_id: branchId,
       }),
+    enabled,
     placeholderData: keepPreviousData,
+  });
+}
+
+export function useCallLogUsers(enabled = true) {
+  return useQuery({
+    queryKey: ["users", "call-log-options"],
+    queryFn: async (): Promise<User[]> => {
+      const pageSize = 100;
+      const firstPage = await usersService.list({ page: 1, page_size: pageSize });
+      const pageCount = Math.ceil(firstPage.count / pageSize);
+      if (pageCount <= 1) return firstPage.results;
+
+      const remainingPages = await Promise.all(
+        Array.from({ length: pageCount - 1 }, (_, index) =>
+          usersService.list({ page: index + 2, page_size: pageSize }),
+        ),
+      );
+      return [...firstPage.results, ...remainingPages.flatMap((page) => page.results)];
+    },
+    enabled,
+    staleTime: 5 * 60 * 1000,
   });
 }
 
