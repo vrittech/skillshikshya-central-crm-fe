@@ -212,6 +212,89 @@ export interface ApiLeadCall {
   created_at: string;
 }
 
+/** POST response metadata added when a call is charged against the user's balance. */
+export interface ApiLeadCallCreateResponse extends ApiLeadCall {
+  seconds_used: number;
+  remaining_seconds: number;
+  minutes_used: number;
+  remaining_minutes: number;
+}
+
+export interface CallSummaryParams {
+  search?: string;
+  direction?: "inbound" | "outbound";
+  outcome?: string;
+  caller?: string;
+  notes?: string;
+  created_by?: number;
+  student?: number;
+  lead?: number;
+  call_timestamp__gte?: string;
+  call_timestamp__lte?: string;
+  branch_id?: number;
+}
+
+export interface CallListParams extends CallSummaryParams {
+  page: number;
+  page_size: number;
+  ordering?: string;
+}
+
+export interface CallListResponse {
+  count: number;
+  page_size: number;
+  total_pages: number;
+  current_page: number;
+  next: string | null;
+  previous: string | null;
+  results: GlobalCall[];
+}
+
+export interface GlobalCall {
+  id: number;
+  lead: number;
+  lead_name: string;
+  lead_reference_number: string;
+  call_timestamp: string;
+  direction: "inbound" | "outbound";
+  caller: string | null;
+  phone_number: string | null;
+  duration_seconds: number | null;
+  outcome: string | null;
+  notes: string | null;
+  recording_url: string | null;
+  next_followup_at: string | null;
+  next_action: string | null;
+  branch: number | null;
+  created_by: number | null;
+  created_by_name: string;
+  created_at: string;
+}
+
+export interface CallsPerDay {
+  date: string;
+  count: number;
+}
+
+export interface TopCallUser {
+  id: number | null;
+  name: string;
+  email: string | null;
+  call_count: number;
+}
+
+export interface CallSummary {
+  total_calls: number;
+  inbound_calls: number;
+  outbound_calls: number;
+  connected_calls: number;
+  total_duration_seconds: number;
+  average_duration_seconds: number;
+  connect_rate: number;
+  calls_per_day: CallsPerDay[];
+  top_callers: TopCallUser[];
+}
+
 export type ApiActivityType =
   | "call"
   | "whatsapp"

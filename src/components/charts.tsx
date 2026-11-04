@@ -5,6 +5,7 @@
  */
 
 import { cn } from "@/lib/utils";
+import { formatNepalDayLabel } from "@/lib/calls-overview";
 
 /* ---------------------------------------------------------------- funnel */
 
@@ -123,5 +124,93 @@ export function MiniBars({ values, className }: { values: number[]; className?: 
         />
       ))}
     </div>
+  );
+}
+
+/* ------------------------------------------------------- daily call counts */
+
+export interface DailyCallDatum {
+  date: string;
+  count: number;
+}
+
+export function DailyCallsChart({ data }: { data: DailyCallDatum[] }) {
+  const width = 720;
+  const height = 250;
+  const left = 38;
+  const right = 12;
+  const top = 14;
+  const bottom = 48;
+  const plotWidth = width - left - right;
+  const plotHeight = height - top - bottom;
+  const maxCount = Math.max(1, ...data.map((item) => item.count));
+  const slotWidth = data.length ? plotWidth / data.length : plotWidth;
+  const barWidth = Math.min(28, Math.max(3, slotWidth * 0.58));
+  const labelStep = Math.max(1, Math.ceil(data.length / 8));
+
+  return (
+    <svg
+      viewBox={`0 0 ${width} ${height}`}
+      className="text-brand h-64 w-full"
+      role="img"
+      aria-label="Calls per day in Nepal local time"
+      preserveAspectRatio="none"
+    >
+      {[0, 0.5, 1].map((fraction) => {
+        const y = top + plotHeight * fraction;
+        const value = Math.round(maxCount * (1 - fraction));
+        return (
+          <g key={fraction}>
+            <line
+              x1={left}
+              x2={width - right}
+              y1={y}
+              y2={y}
+              className="stroke-border"
+              strokeDasharray={fraction === 1 ? undefined : "3 4"}
+            />
+            <text
+              x={left - 8}
+              y={y + 4}
+              textAnchor="end"
+              className="fill-muted-foreground"
+              fontSize="10"
+            >
+              {value}
+            </text>
+          </g>
+        );
+      })}
+      {data.map((item, index) => {
+        const barHeight = (item.count / maxCount) * plotHeight;
+        const x = left + slotWidth * index + (slotWidth - barWidth) / 2;
+        const showLabel = index % labelStep === 0 || index === data.length - 1;
+        return (
+          <g key={item.date}>
+            <rect
+              x={x}
+              y={top + plotHeight - barHeight}
+              width={barWidth}
+              height={Math.max(1, barHeight)}
+              rx="3"
+              className="fill-brand"
+            >
+              <title>{`${formatNepalDayLabel(item.date)}: ${item.count} calls`}</title>
+            </rect>
+            {showLabel && (
+              <text
+                x={x + barWidth / 2}
+                y={height - 16}
+                textAnchor="middle"
+                className="fill-muted-foreground"
+                fontSize="10"
+              >
+                {formatNepalDayLabel(item.date)}
+              </text>
+            )}
+          </g>
+        );
+      })}
+    </svg>
   );
 }
