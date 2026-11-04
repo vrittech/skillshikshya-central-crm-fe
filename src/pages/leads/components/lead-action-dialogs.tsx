@@ -105,35 +105,30 @@ function parseCallDuration(value: string): number | null {
     return Number.isSafeInteger(seconds) ? seconds : null;
   }
 
-  // Supports 4:19 and 4.19.
+  // Supports 4:19 and 4.19, including overflow like 7:89.
   const minuteSecondMatch = input.match(/^(\d+)\s*[:.]\s*(\d{1,2})$/);
 
   if (minuteSecondMatch) {
     const minutes = Number(minuteSecondMatch[1]);
     const seconds = Number(minuteSecondMatch[2]);
-
-    if (seconds > 59) return null;
-
     const total = minutes * 60 + seconds;
+
     return Number.isSafeInteger(total) ? total : null;
   }
 
-  // Supports 4m19s and 4m.
+  // Supports 4m19s and 4m, including overflow seconds.
   const textMatch = input.match(/^(\d+)\s*m\s*(\d{1,2})?\s*s?$/);
 
   if (textMatch) {
     const minutes = Number(textMatch[1]);
     const seconds = Number(textMatch[2] ?? 0);
-
-    if (seconds > 59) return null;
-
     const total = minutes * 60 + seconds;
+
     return Number.isSafeInteger(total) ? total : null;
   }
 
   return null;
 }
-
 //   // Supports 4m19s and 4m.
 //   const textMatch = input.match(/^(\d+)\s*m\s*(\d{1,2})?\s*s?$/);
 
@@ -225,7 +220,7 @@ export function LeadActionDialogs({ action, lead, onClose }: Props) {
     addCall.mutate(
       {
         call_timestamp: new Date().toISOString(),
-        caller: user?.id ?? null,
+       caller: user?.name ?? "",
         direction: call.direction,
         outcome: call.outcome || null,
         duration_seconds: call.duration.trim() ? durationSeconds : null,
