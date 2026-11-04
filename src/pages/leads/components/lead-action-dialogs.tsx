@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { parseDuration, formatDuration } from "@/lib/duration";
 import {
   Dialog,
   DialogContent,
@@ -24,6 +25,7 @@ import { useDataSource } from "@/context/data-source";
 import { CALL_OUTCOMES, COUNSELORS, counselorName } from "@/data/lead-lookups";
 import { formatDateToNepalIso, toNepalIso } from "@/lib/leads-format";
 import { useAddCall, useAddFollowup, useAssignLead } from "@/hooks/use-leads";
+import { apiErrorMessage } from "@/lib/api";
 import { useCounselors } from "@/hooks/use-users";
 
 export type LeadAction = "log_call" | "follow_up" | "assign" | null;
@@ -71,8 +73,12 @@ interface FollowUpForm {
   reminder: "30m" | "1h" | "1d";
 }
 
-const EMPTY_FU: FollowUpForm = { scheduledAt: "", assignedTo: "", purpose: "", reminder: "1h" };
-
+const EMPTY_FU: FollowUpForm = {
+  scheduledAt: "",
+  assignedTo: "",
+  purpose: "",
+  reminder: "1h",
+};
 const REMINDER_OFFSETS_MS: Record<FollowUpForm["reminder"], number> = {
   "30m": 30 * 60_000,
   "1h": 60 * 60_000,
@@ -95,6 +101,7 @@ export function LeadActionDialogs({ action, lead, onClose }: Props) {
   const [call, setCall] = useState<CallForm>(EMPTY_CALL);
   const [fu, setFu] = useState<FollowUpForm>(EMPTY_FU);
   const [assignTo, setAssignTo] = useState("");
+  const [durationError, setDurationError] = useState("");
 
   // Pre-select the current owner when the Assign dialog opens.
   useEffect(() => {
@@ -108,12 +115,20 @@ export function LeadActionDialogs({ action, lead, onClose }: Props) {
   // Real counselors (Counselor role) on the live path; mock list otherwise.
   const counselorOptions = isMock
     ? COUNSELORS.map((c) => ({ value: c.id, label: c.name }))
-    : (counselorsQ.data?.results ?? []).map((u) => ({ value: String(u.id), label: u.name }));
+    : (counselorsQ.data?.results ?? []).map((u) => ({
+        value: String(u.id),
+        label: u.name,
+      }));
   // Default the follow-up owner to the lead's counsellor, else the current user.
-  const fuAssigned = fu.assignedTo || lead?.assignedTo || (user?.id != null ? String(user.id) : "");
+  const fuAssigned =
+    fu.assignedTo ||
+    lead?.assignedTo ||
+    (user?.id != null ? String(user.id) : "");
 
   function done(message: string) {
-    toast.success(message, { description: "Static prototype — no data was changed." });
+    toast.success(message, {
+      description: "Static prototype — no data was changed.",
+    });
     onClose();
   }
 
@@ -124,16 +139,22 @@ export function LeadActionDialogs({ action, lead, onClose }: Props) {
       setCall(EMPTY_CALL);
       return;
     }
+    if (call.duration.trim() && parseDuration(call.duration) === null) {
+      setDurationError("Enter a duration like 4:19, 4.19, 4m19s or 259");
+      return;
+    }
     addCall.mutate(
       {
         call_timestamp: new Date().toISOString(),
         caller: user?.id ?? null,
         direction: call.direction,
         outcome: call.outcome || null,
-        duration_seconds: call.duration ? Math.round(Number(call.duration) * 60) : null,
+        duration_seconds: parseDuration(call.duration),
         recording_url: call.recording.trim() || null,
         notes: call.notes.trim() || null,
-        next_followup_at: call.nextFollowUp ? toNepalIso(call.nextFollowUp) : null,
+        next_followup_at: call.nextFollowUp
+          ? toNepalIso(call.nextFollowUp)
+          : null,
         next_action: call.nextAction.trim() || null,
         phone_number: lead?.primaryPhone ?? null,
       },
@@ -141,6 +162,10 @@ export function LeadActionDialogs({ action, lead, onClose }: Props) {
         onSuccess: () => {
           setCall(EMPTY_CALL);
           onClose();
+        },
+        onError: (e) => {
+          const msg = apiErrorMessage(e, "Could not log call");
+          if (/duration|minute/i.test(msg)) setDurationError(msg);
         },
       },
     );
@@ -162,7 +187,9 @@ export function LeadActionDialogs({ action, lead, onClose }: Props) {
         scheduled_at: toNepalIso(fu.scheduledAt),
         assigned_to: fuAssigned ? Number(fuAssigned) : null,
         purpose: fu.purpose.trim() || null,
-        reminder_at: formatDateToNepalIso(new Date(scheduledDate.getTime() - REMINDER_OFFSETS_MS[fu.reminder])),
+        reminder_at: formatDateToNepalIso(
+          new Date(scheduledDate.getTime() - REMINDER_OFFSETS_MS[fu.reminder]),
+        ),
         status: "pending",
       },
       {
@@ -177,17 +204,27 @@ export function LeadActionDialogs({ action, lead, onClose }: Props) {
   return (
     <>
       {/* Log Call */}
-      <Dialog open={action === "log_call"} onOpenChange={(o) => !o && onClose()}>
+      <Dialog
+        open={action === "log_call"}
+        onOpenChange={(o) => !o && onClose()}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Log a call — {name}</DialogTitle>
-            <DialogDescription>Record the outcome of this call on the lead timeline.</DialogDescription>
+            <DialogDescription>
+              Record the outcome of this call on the lead timeline.
+            </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-2">
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
                 <Label>Direction</Label>
-                <Select value={call.direction} onValueChange={(v) => setC("direction", v as CallForm["direction"])}>
+                <Select
+                  value={call.direction}
+                  onValueChange={(v) =>
+                    setC("direction", v as CallForm["direction"])
+                  }
+                >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -199,7 +236,10 @@ export function LeadActionDialogs({ action, lead, onClose }: Props) {
               </div>
               <div className="grid gap-2">
                 <Label>Outcome</Label>
-                <Select value={call.outcome} onValueChange={(v) => setC("outcome", v)}>
+                <Select
+                  value={call.outcome}
+                  onValueChange={(v) => setC("outcome", v)}
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="Select outcome" />
                   </SelectTrigger>
@@ -215,14 +255,24 @@ export function LeadActionDialogs({ action, lead, onClose }: Props) {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
-                <Label>Duration (minutes)</Label>
+                <Label>Duration (MM:SS)</Label>
                 <Input
-                  type="number"
-                  min={0}
-                  placeholder="e.g. 4"
+                  type="text"
+                  placeholder="e.g. 4:20"
                   value={call.duration}
-                  onChange={(e) => setC("duration", e.target.value)}
+                  onChange={(e) => {
+                    setC("duration", e.target.value);
+                    setDurationError("");
+                  }}
                 />
+                {call.duration && parseDuration(call.duration) !== null && (
+                  <p className="text-xs text-muted-foreground">
+                    = {formatDuration(parseDuration(call.duration)!)}
+                  </p>
+                )}
+                {durationError && (
+                  <p className="text-xs text-destructive">{durationError}</p>
+                )}
               </div>
               <div className="grid gap-2">
                 <Label>Recording link</Label>
@@ -262,10 +312,18 @@ export function LeadActionDialogs({ action, lead, onClose }: Props) {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={onClose} disabled={addCall.isPending}>
+            <Button
+              variant="outline"
+              onClick={onClose}
+              disabled={addCall.isPending}
+            >
               Cancel
             </Button>
-            <Button variant="brand" onClick={submitCall} disabled={addCall.isPending}>
+            <Button
+              variant="brand"
+              onClick={submitCall}
+              disabled={addCall.isPending}
+            >
               {addCall.isPending ? "Logging…" : "Log Call"}
             </Button>
           </DialogFooter>
@@ -273,11 +331,16 @@ export function LeadActionDialogs({ action, lead, onClose }: Props) {
       </Dialog>
 
       {/* Add Follow-up */}
-      <Dialog open={action === "follow_up"} onOpenChange={(o) => !o && onClose()}>
+      <Dialog
+        open={action === "follow_up"}
+        onOpenChange={(o) => !o && onClose()}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Schedule follow-up — {name}</DialogTitle>
-            <DialogDescription>Set the next touchpoint and its purpose.</DialogDescription>
+            <DialogDescription>
+              Set the next touchpoint and its purpose.
+            </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-2">
             <div className="grid grid-cols-2 gap-4">
@@ -291,7 +354,10 @@ export function LeadActionDialogs({ action, lead, onClose }: Props) {
               </div>
               <div className="grid gap-2">
                 <Label>Assigned to</Label>
-                <Select value={fuAssigned} onValueChange={(v) => setF("assignedTo", v)}>
+                <Select
+                  value={fuAssigned}
+                  onValueChange={(v) => setF("assignedTo", v)}
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="Select counselor" />
                   </SelectTrigger>
@@ -316,7 +382,12 @@ export function LeadActionDialogs({ action, lead, onClose }: Props) {
             </div>
             <div className="grid gap-2">
               <Label>Reminder</Label>
-              <Select value={fu.reminder} onValueChange={(v) => setF("reminder", v as FollowUpForm["reminder"])}>
+              <Select
+                value={fu.reminder}
+                onValueChange={(v) =>
+                  setF("reminder", v as FollowUpForm["reminder"])
+                }
+              >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -329,10 +400,18 @@ export function LeadActionDialogs({ action, lead, onClose }: Props) {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={onClose} disabled={addFollowup.isPending}>
+            <Button
+              variant="outline"
+              onClick={onClose}
+              disabled={addFollowup.isPending}
+            >
               Cancel
             </Button>
-            <Button variant="brand" onClick={submitFollowUp} disabled={addFollowup.isPending}>
+            <Button
+              variant="brand"
+              onClick={submitFollowUp}
+              disabled={addFollowup.isPending}
+            >
               {addFollowup.isPending ? "Scheduling…" : "Schedule"}
             </Button>
           </DialogFooter>
@@ -357,7 +436,13 @@ export function LeadActionDialogs({ action, lead, onClose }: Props) {
               <Label>Counselor</Label>
               <Select value={assignTo || undefined} onValueChange={setAssignTo}>
                 <SelectTrigger>
-                  <SelectValue placeholder={counselorsQ.isFetching ? "Loading counselors…" : "Select counselor"} />
+                  <SelectValue
+                    placeholder={
+                      counselorsQ.isFetching
+                        ? "Loading counselors…"
+                        : "Select counselor"
+                    }
+                  />
                 </SelectTrigger>
                 <SelectContent>
                   {counselorOptions.map((c) => (
@@ -374,7 +459,11 @@ export function LeadActionDialogs({ action, lead, onClose }: Props) {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={onClose} disabled={assignLead.isPending}>
+            <Button
+              variant="outline"
+              onClick={onClose}
+              disabled={assignLead.isPending}
+            >
               Cancel
             </Button>
             <Button
