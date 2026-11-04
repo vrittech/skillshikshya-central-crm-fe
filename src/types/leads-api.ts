@@ -212,6 +212,17 @@ export interface ApiLeadCall {
   created_at: string;
 }
 
+export type ApiLeadCallPayload = Partial<ApiLeadCall> & {
+  duration_input?: string;
+};
+
+export interface ApiLeadCallCreateResponse extends ApiLeadCall {
+  seconds_used: number;
+  remaining_seconds: number | null;
+  minutes_used: number | null;
+  remaining_minutes: number | null;
+}
+
 export type ApiActivityType =
   | "call"
   | "whatsapp"

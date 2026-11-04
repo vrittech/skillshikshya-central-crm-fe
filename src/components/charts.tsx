@@ -92,8 +92,8 @@ export function HBarList({ data, max }: { data: { label: string; value: number }
   const top = max ?? Math.max(1, ...data.map((d) => d.value));
   return (
     <div className="space-y-2.5">
-      {data.map((d) => (
-        <div key={d.label} className="grid grid-cols-[1fr_auto] items-center gap-2">
+      {data.map((d, index) => (
+        <div key={`${d.label}-${index}`} className="grid grid-cols-[1fr_auto] items-center gap-2">
           <div className="min-w-0">
             <p className="mb-1 truncate text-xs font-medium">{d.label}</p>
             <div className="bg-muted h-2 overflow-hidden rounded-full">
@@ -111,7 +111,15 @@ export function HBarList({ data, max }: { data: { label: string; value: number }
 
 /* ----------------------------------------------------- mini vertical bars */
 
-export function MiniBars({ values, className }: { values: number[]; className?: string }) {
+export function MiniBars({
+  values,
+  labels,
+  className,
+}: {
+  values: number[];
+  labels?: string[];
+  className?: string;
+}) {
   const max = Math.max(1, ...values);
   return (
     <div className={cn("flex h-24 items-end gap-1.5 pt-2", className)}>
@@ -120,6 +128,8 @@ export function MiniBars({ values, className }: { values: number[]; className?: 
           key={i}
           className={cn("flex-1 rounded-t", i % 2 === 0 ? "bg-brand" : "bg-brand-fixed-dim")}
           style={{ height: `${Math.max(12, (v / max) * 100)}%` }}
+          title={labels?.[i]}
+          aria-label={labels?.[i]}
         />
       ))}
     </div>

@@ -23,6 +23,11 @@ import { useAuth } from "@/context/auth";
 import { useDataSource } from "@/context/data-source";
 import { CALL_OUTCOMES, COUNSELORS, counselorName } from "@/data/lead-lookups";
 import { formatDateToNepalIso, toNepalIso } from "@/lib/leads-format";
+import { apiErrorMessage } from "@/lib/api";
+import {
+  formatCallDurationPreview,
+  parseCallDuration,
+} from "@/lib/call-duration";
 import { useAddCall, useAddFollowup, useAssignLead } from "@/hooks/use-leads";
 import { useCounselors } from "@/hooks/use-users";
 
@@ -104,6 +109,11 @@ export function LeadActionDialogs({ action, lead, onClose }: Props) {
     setCall((c) => ({ ...c, [k]: v }));
   const setF = <K extends keyof FollowUpForm>(k: K, v: FollowUpForm[K]) =>
     setFu((f) => ({ ...f, [k]: v }));
+  const parsedDuration = parseCallDuration(call.duration);
+  const durationServerError = addCall.error
+    ? apiErrorMessage(addCall.error, "Could not log call")
+    : null;
+  const durationError = parsedDuration.error ?? durationServerError;
 
   // Real counselors (Counselor role) on the live path; mock list otherwise.
   const counselorOptions = isMock
@@ -124,13 +134,14 @@ export function LeadActionDialogs({ action, lead, onClose }: Props) {
       setCall(EMPTY_CALL);
       return;
     }
+    if (parsedDuration.error) return;
     addCall.mutate(
       {
         call_timestamp: new Date().toISOString(),
         caller: user?.id ?? null,
         direction: call.direction,
         outcome: call.outcome || null,
-        duration_seconds: call.duration ? Math.round(Number(call.duration) * 60) : null,
+        ...(call.duration.trim() ? { duration_input: call.duration.trim() } : {}),
         recording_url: call.recording.trim() || null,
         notes: call.notes.trim() || null,
         next_followup_at: call.nextFollowUp ? toNepalIso(call.nextFollowUp) : null,
@@ -215,14 +226,33 @@ export function LeadActionDialogs({ action, lead, onClose }: Props) {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
-                <Label>Duration (minutes)</Label>
+                <Label htmlFor="call-duration">Duration</Label>
                 <Input
-                  type="number"
-                  min={0}
-                  placeholder="e.g. 4"
+                  id="call-duration"
+                  type="text"
+                  inputMode="text"
+                  placeholder="MM:SS, e.g. 4:19"
                   value={call.duration}
-                  onChange={(e) => setC("duration", e.target.value)}
+                  onChange={(e) => {
+                    setC("duration", e.target.value);
+                    if (addCall.error) addCall.reset();
+                  }}
+                  aria-invalid={!!durationError}
+                  aria-describedby={durationError ? "call-duration-error" : "call-duration-hint call-duration-preview"}
                 />
+                <p id="call-duration-hint" className="text-muted-foreground text-xs">
+                  MM:SS, e.g. 4:19
+                </p>
+                {parsedDuration.seconds !== null && (
+                  <p id="call-duration-preview" className="text-muted-foreground text-xs" aria-live="polite">
+                    {formatCallDurationPreview(parsedDuration.seconds)}
+                  </p>
+                )}
+                {durationError && (
+                  <p id="call-duration-error" className="text-destructive text-xs" role="alert">
+                    {durationError}
+                  </p>
+                )}
               </div>
               <div className="grid gap-2">
                 <Label>Recording link</Label>
@@ -265,7 +295,11 @@ export function LeadActionDialogs({ action, lead, onClose }: Props) {
             <Button variant="outline" onClick={onClose} disabled={addCall.isPending}>
               Cancel
             </Button>
-            <Button variant="brand" onClick={submitCall} disabled={addCall.isPending}>
+            <Button
+              variant="brand"
+              onClick={submitCall}
+              disabled={addCall.isPending || !!parsedDuration.error}
+            >
               {addCall.isPending ? "Logging…" : "Log Call"}
             </Button>
           </DialogFooter>
