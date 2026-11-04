@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { apiErrorMessage } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -54,6 +55,37 @@ interface CallForm {
   nextAction: string;
 }
 
+// parse a flexible duration string into seconds, or null if invalid. Accepts formats Like "4:19", "0:04:19", "4.19", etc
+function parseCallDuration(value: string): number | null {
+  const s = value.trim().toLowerCase();
+
+  if (!s) return null;
+
+  if (/^\d+:\d+$/.test(s)) {
+    const [minutes, seconds] = s.split(":").map(Number);
+    return minutes * 60 + seconds;
+  }
+
+  if (/^\d+:\d+:\d+$/.test(s)) {
+    const [hours, minutes, seconds] = s.split(":").map(Number);
+    return hours * 3600 + minutes * 60 + seconds;
+  }
+
+  if (/^\d+\.\d+$/.test(s)) {
+    const [minutes, seconds] = s.split(".");
+    return Number(minutes) * 60 + Number(seconds.slice(0, 2).padStart(2, "0"));
+  }
+
+  if (/^\d+m\d+s$/.test(s)) {
+    const match = s.match(/^(\d+)m(\d+)s$/);
+    if (match) return Number(match[1]) * 60 + Number(match[2]);
+  }
+
+  if (/^\d+$/.test(s)) return Number(s);
+
+  return null;
+}
+
 const EMPTY_CALL: CallForm = {
   direction: "outbound",
   outcome: "interested",
@@ -89,6 +121,7 @@ export function LeadActionDialogs({ action, lead, onClose }: Props) {
   const { isMock } = useDataSource();
   const { user } = useAuth();
   const addCall = useAddCall(lead?.apiId);
+  const [durationError, setDurationError] = useState<string | null>(null);
   const addFollowup = useAddFollowup(lead?.apiId);
   const assignLead = useAssignLead();
   const counselorsQ = useCounselors("", undefined, !isMock);
@@ -118,6 +151,14 @@ export function LeadActionDialogs({ action, lead, onClose }: Props) {
   }
 
   function submitCall() {
+    setDurationError(null);
+    if (
+      call.duration.trim() &&
+      parseCallDuration(call.duration) === null
+      ) {
+        setDurationError("Invalid duration format. Example: 4:19");
+        return;
+      }
     // Mock path (or a lead with no backend id) can't persist — keep the toast.
     if (isMock || lead?.apiId == null) {
       done("Call logged");
@@ -130,7 +171,8 @@ export function LeadActionDialogs({ action, lead, onClose }: Props) {
         caller: user?.id ?? null,
         direction: call.direction,
         outcome: call.outcome || null,
-        duration_seconds: call.duration ? Math.round(Number(call.duration) * 60) : null,
+        // duration_seconds: call.duration ? Math.round(Number(call.duration) * 60) : null,
+        duration_input: call.duration.trim() || undefined,
         recording_url: call.recording.trim() || null,
         notes: call.notes.trim() || null,
         next_followup_at: call.nextFollowUp ? toNepalIso(call.nextFollowUp) : null,
@@ -140,7 +182,19 @@ export function LeadActionDialogs({ action, lead, onClose }: Props) {
       {
         onSuccess: () => {
           setCall(EMPTY_CALL);
+          setDurationError(null);
           onClose();
+        },
+        onError: (error) => {
+          const message = apiErrorMessage(error, "Could not log call");
+          if (
+            message.toLowerCase().includes("insufficient call minutes") ||
+            message.toLowerCase().includes("duration")
+          ) {
+            setDurationError(message);
+          } else {
+            toast.error(message);
+          }
         },
       },
     );
@@ -214,15 +268,31 @@ export function LeadActionDialogs({ action, lead, onClose }: Props) {
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
+              {/* // Duration and recording link are optional, but we want to show the user how to enter duration in a flexible format.  */}
               <div className="grid gap-2">
-                <Label>Duration (minutes)</Label>
+                <Label>Duration</Label>
                 <Input
-                  type="number"
-                  min={0}
-                  placeholder="e.g. 4"
+                  type="text"
+                  placeholder="MM:SS (e.g. 4:19)"
                   value={call.duration}
-                  onChange={(e) => setC("duration", e.target.value)}
+                  onChange={(e) => {
+                    setC("duration", e.target.value);
+                    setDurationError(null);
+                  }}
                 />
+                <p className="text-xs text-muted-foreground">
+                  Enter duration in MM:SS format (e.g. 4:19)
+                </p>
+                {call.duration.trim() && (
+                  <p className="text-xs">
+                  {parseCallDuration(call.duration) === null
+                    ? "Invalid duration format"
+                    : `= ${Math.floor(parseCallDuration(call.duration)! / 60)} min ${parseCallDuration(call.duration)! % 60} sec`}
+                    </p>
+                  )}
+                  {durationError && (
+                    <p className="text-xs text-destructive">{durationError}</p>
+                  )}
               </div>
               <div className="grid gap-2">
                 <Label>Recording link</Label>

@@ -403,16 +403,40 @@ export function useAssignLead() {
   });
 }
 
+// export function useAddCall(leadId?: number) {
+//   const qc = useQueryClient();
+//   return useMutation({
+//     mutationFn: (payload: Partial<ApiLeadCall>) => leadsService.addCall(leadId as number, payload),
+//     onSuccess: () => {
+//       toast.success("Call logged");
+//       void qc.invalidateQueries({ queryKey: ["lead"] });
+//       void qc.invalidateQueries({ queryKey: ["leads"] });
+//     },
+//     onError: (e) => toast.error(apiErrorMessage(e, "Could not log call")),
+//   });
+// }
+
 export function useAddCall(leadId?: number) {
   const qc = useQueryClient();
+
   return useMutation({
-    mutationFn: (payload: Partial<ApiLeadCall>) => leadsService.addCall(leadId as number, payload),
-    onSuccess: () => {
-      toast.success("Call logged");
+    mutationFn: (payload: Partial<ApiLeadCall>) =>
+      leadsService.addCall(leadId as number, payload),
+
+    onSuccess: (call) => {
+      const remaining = call.remaining_seconds;
+
+      toast.success("Call logged", {
+        description:
+          remaining != null
+            ? `Remaining balance: ${Math.floor(remaining / 60)} min ${remaining % 60} sec`
+            : "Call saved successfully.",
+      });
+
       void qc.invalidateQueries({ queryKey: ["lead"] });
       void qc.invalidateQueries({ queryKey: ["leads"] });
+      void qc.invalidateQueries({ queryKey: ["calls"] });
     },
-    onError: (e) => toast.error(apiErrorMessage(e, "Could not log call")),
   });
 }
 
