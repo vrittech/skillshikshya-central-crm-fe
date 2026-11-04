@@ -23,6 +23,7 @@ import RolesPage from "@/pages/roles";
 import SettingsPage from "@/pages/settings";
 import StudentsPage from "@/pages/students";
 import UsersPage from "@/pages/users";
+import CallsPage from "@/pages/calls";
 
 export default function App() {
   return (
@@ -59,7 +60,8 @@ export default function App() {
           <Route path="/courses/course-batches" element={<BatchesPage defaultTab="course-batches" />} />
           <Route path="/users" element={<UsersPage />} />
           <Route path="/roles" element={<RolesPage />} />
-          <Route path="/calls" element={<ComingSoonPage title="Calls" />} />
+          <Route path="/calls" element={<CallsPage />} />
+          {/* <Route path="/calls" element={<ComingSoonPage title="Calls" />} /> */}
           <Route path="/call-minutes" element={<CallMinutesPage />} />
           <Route path="*" element={<ComingSoonPage title="Not found" />} />
           </Route>
