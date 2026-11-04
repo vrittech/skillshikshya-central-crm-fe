@@ -210,6 +210,11 @@ export interface ApiLeadCall {
   created_by?: number | null;
   created_by_name?: string;
   created_at: string;
+  /** Raw duration text (write): "4:19", "4.19", "4m19s" or "259"; the backend parses it. */
+  duration_input?: string;
+  // POST response only: caller's balance after the deduction
+  remaining_seconds?: number | null;
+  remaining_minutes?: number | null;
 }
 
 export type ApiActivityType =
