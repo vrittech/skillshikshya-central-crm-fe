@@ -31,7 +31,9 @@ import { apiErrorMessage } from "@/lib/api";
 import { formatDateTime, formatMmSs, formatPhone } from "@/lib/leads-format";
 import { cn } from "@/lib/utils";
 import { callsService } from "@/services/calls.service";
+import type { GlobalCall } from "@/types/calls";
 import type { CallOutcome } from "@/types/leads";
+import { CallDetailSheet } from "./call-detail-sheet";
 import { CallsSummary } from "./calls-summary";
 
 const PAGE_SIZE = 20;
@@ -74,6 +76,7 @@ export default function CallsPage() {
   const isStaff = !!user?.is_staff;
   const { filters, params, hasFilters, setFilters, setPage, clearFilters } = useCallFilters();
   const callsQ = useCalls(params, filters.page, PAGE_SIZE);
+  const [activeCall, setActiveCall] = useState<GlobalCall | null>(null);
   const [userSearch, setUserSearch] = useState("");
   const [exporting, setExporting] = useState(false);
   const counselorsQ = useCounselors(userSearch);
@@ -282,7 +285,13 @@ export default function CallsPage() {
                     </TableRow>
                   ))}
                 {rows.map((c) => (
-                  <TableRow key={c.id}>
+                  <TableRow
+                    key={c.id}
+                    tabIndex={0}
+                    className="cursor-pointer"
+                    onClick={() => setActiveCall(c)}
+                    onKeyDown={(e) => e.key === "Enter" && setActiveCall(c)}
+                  >
                     <TableCell className="text-muted-foreground whitespace-nowrap">
                       {formatDateTime(c.call_timestamp)}
                     </TableCell>
@@ -293,7 +302,11 @@ export default function CallsPage() {
                       </Badge>
                     </TableCell>
                     <TableCell className="whitespace-nowrap">
-                      <Link to={`/leads/${c.lead}`} className="font-semibold hover:underline">
+                      <Link
+                        to={`/leads/${c.lead}`}
+                        className="font-semibold hover:underline"
+                        onClick={(e) => e.stopPropagation()}
+                      >
                         {c.lead_name}
                       </Link>
                       <p className="text-muted-foreground font-mono text-xs">{c.lead_reference_number}</p>
@@ -311,6 +324,7 @@ export default function CallsPage() {
                           target="_blank"
                           rel="noreferrer"
                           className="text-brand text-sm font-medium hover:underline"
+                          onClick={(e) => e.stopPropagation()}
                         >
                           Listen
                         </a>
@@ -349,6 +363,8 @@ export default function CallsPage() {
           </div>
         </div>
       </div>
+
+      <CallDetailSheet call={activeCall} onClose={() => setActiveCall(null)} />
     </div>
   );
 }
