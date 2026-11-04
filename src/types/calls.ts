@@ -12,6 +12,8 @@ export interface ApiCall {
   duration_formatted?: string;
   outcome: string | null;
   notes: string | null;
+  next_followup_at?: string | null;
+  next_action?: string | null;
   recording_url?: string | null;
   branch?: number | null;
   created_by?: number | null;

@@ -1,3 +1,4 @@
+
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { XIcon } from "lucide-react";
 import * as React from "react";
@@ -8,12 +9,15 @@ const SheetTrigger = DialogPrimitive.Trigger;
 const SheetClose = DialogPrimitive.Close;
 const SheetPortal = DialogPrimitive.Portal;
 
-function SheetOverlay({ className, ...props }: React.ComponentProps<typeof DialogPrimitive.Overlay>) {
+function SheetOverlay({
+  className,
+  ...props
+}: React.ComponentProps<typeof DialogPrimitive.Overlay>) {
   return (
     <DialogPrimitive.Overlay
       data-slot="sheet-overlay"
       className={cn(
-        "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-black/50",
+        "fixed inset-0 z-50 bg-black/50",
         className,
       )}
       {...props}
@@ -26,23 +30,26 @@ function SheetContent({
   children,
   side = "right",
   ...props
-}: React.ComponentProps<typeof DialogPrimitive.Content> & { side?: "right" | "left" }) {
+}: React.ComponentProps<typeof DialogPrimitive.Content> & {
+  side?: "right" | "left";
+}) {
   return (
     <SheetPortal>
       <SheetOverlay />
       <DialogPrimitive.Content
         data-slot="sheet-content"
         className={cn(
-          "bg-background fixed z-50 flex h-dvh w-full flex-col gap-0 border-l shadow-lg transition duration-300 ease-in-out data-[state=open]:animate-in data-[state=closed]:animate-out",
+          "bg-background fixed z-50 flex h-[100dvh] max-h-[100dvh] w-[90vw] max-w-lg flex-col overflow-y-auto overscroll-contain border-l shadow-lg outline-none",
           side === "right"
-            ? "inset-y-0 right-0 sm:max-w-md data-[state=open]:slide-in-from-right data-[state=closed]:slide-out-to-right"
-            : "inset-y-0 left-0 border-r border-l-0 sm:max-w-md data-[state=open]:slide-in-from-left data-[state=closed]:slide-out-to-left",
+            ? "inset-y-0 right-0"
+            : "inset-y-0 left-0 border-r border-l-0",
           className,
         )}
         {...props}
       >
         {children}
-        <DialogPrimitive.Close className="ring-offset-background focus:ring-ring absolute top-4 right-4 cursor-pointer rounded-sm opacity-70 transition-opacity hover:opacity-100 focus:ring-2 focus:ring-offset-2 focus:outline-hidden">
+
+        <DialogPrimitive.Close className="ring-offset-background focus:ring-ring absolute right-4 top-4 z-10 cursor-pointer rounded-sm bg-background p-1 opacity-70 transition-opacity hover:opacity-100 focus:ring-2 focus:ring-offset-2 focus:outline-hidden">
           <XIcon className="size-4" />
           <span className="sr-only">Close</span>
         </DialogPrimitive.Close>
@@ -51,15 +58,36 @@ function SheetContent({
   );
 }
 
-function SheetHeader({ className, ...props }: React.ComponentProps<"div">) {
-  return <div data-slot="sheet-header" className={cn("flex flex-col gap-1 border-b p-5", className)} {...props} />;
+function SheetHeader({
+  className,
+  ...props
+}: React.ComponentProps<"div">) {
+  return (
+    <div
+      data-slot="sheet-header"
+      className={cn("flex flex-col gap-1 border-b p-5 pr-12", className)}
+      {...props}
+    />
+  );
 }
 
-function SheetBody({ className, ...props }: React.ComponentProps<"div">) {
-  return <div data-slot="sheet-body" className={cn("flex-1 overflow-y-auto p-5", className)} {...props} />;
+function SheetBody({
+  className,
+  ...props
+}: React.ComponentProps<"div">) {
+  return (
+    <div
+      data-slot="sheet-body"
+      className={cn("min-h-0 flex-1 overflow-y-auto p-5", className)}
+      {...props}
+    />
+  );
 }
 
-function SheetFooter({ className, ...props }: React.ComponentProps<"div">) {
+function SheetFooter({
+  className,
+  ...props
+}: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="sheet-footer"
@@ -69,7 +97,10 @@ function SheetFooter({ className, ...props }: React.ComponentProps<"div">) {
   );
 }
 
-function SheetTitle({ className, ...props }: React.ComponentProps<typeof DialogPrimitive.Title>) {
+function SheetTitle({
+  className,
+  ...props
+}: React.ComponentProps<typeof DialogPrimitive.Title>) {
   return (
     <DialogPrimitive.Title
       data-slot="sheet-title"

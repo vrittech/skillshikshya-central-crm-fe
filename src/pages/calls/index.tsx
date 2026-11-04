@@ -20,11 +20,20 @@ import type {
   CallListParams,
 } from "@/types/calls";
 
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
+
 export default function CallsPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const [calls, setCalls] = useState<ApiCall[]>([]);
+  const [selectedCall, setSelectedCall] = useState<ApiCall | null>(null);
   const [users, setUsers] = useState<User[]>([]);
   const [loggedBy, setLoggedBy] = useState(
     searchParams.get("created_by") ?? ""
@@ -68,8 +77,19 @@ export default function CallsPage() {
   }, []);
 
   // Keep filters, sorting and page number in the URL
+
+  // Keep filters, sorting and page number in the URL
   useEffect(() => {
-    const params = new URLSearchParams();
+    const params = new URLSearchParams(searchParams);
+
+    params.delete("search");
+    params.delete("direction");
+    params.delete("created_by");
+    params.delete("datePreset");
+    params.delete("startDate");
+    params.delete("endDate");
+    params.delete("ordering");
+    params.delete("page");
 
     if (search.trim()) params.set("search", search.trim());
     if (direction) params.set("direction", direction);
@@ -97,6 +117,7 @@ export default function CallsPage() {
     searchParams,
     setSearchParams,
   ]);
+
 
   // Load calls and summary
   useEffect(() => {
@@ -523,7 +544,7 @@ export default function CallsPage() {
             >
                 When
                 </th>
-                
+
                 <th className="p-3 text-left">Direction</th>
                 <th className="p-3 text-left">Lead</th>
                 <th className="p-3 text-left">Phone</th>
@@ -549,7 +570,11 @@ export default function CallsPage() {
 
             <tbody>
               {calls.map((call) => (
-                <tr key={call.id} className="border-t">
+                <tr
+                   key={call.id}
+                   onClick={() => setSelectedCall(call)}
+                   className="border-t cursor-pointer hover:bg-muted/50"
+                   >
                   <td className="p-3">
                     {new Date(call.call_timestamp).toLocaleString("en-GB", {
                       timeZone: "Asia/Kathmandu",
@@ -567,7 +592,10 @@ export default function CallsPage() {
                   <td className="p-3">
                     <button
                       type="button"
-                      onClick={() => navigate(`/leads/${call.lead}`)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigate(`/leads/${call.lead}`);
+                        }}
                       className="text-left font-medium text-primary hover:underline"
                     >
                       {call.lead_name}
@@ -629,6 +657,136 @@ export default function CallsPage() {
           </table>
         </div>
       )}
+
+      {/* Call Details Side Panel */}
+<Sheet
+  open={!!selectedCall}
+  onOpenChange={(open) => {
+    if (!open) setSelectedCall(null);
+  }}
+>
+  <SheetContent className="w-[90vw] max-w-lg overflow-y-auto">
+    {selectedCall && (
+      <>
+        <SheetHeader>
+          <SheetTitle>Call Details</SheetTitle>
+          <SheetDescription>
+            Complete information about this call.
+          </SheetDescription>
+        </SheetHeader>
+
+        <div className="mt-6 space-y-5 text-sm">
+          <div>
+            <p className="text-muted-foreground">Lead</p>
+            <p className="font-medium">{selectedCall.lead_name || "—"}</p>
+            <p className="text-xs text-muted-foreground">
+              {selectedCall.lead_reference_number || "—"}
+            </p>
+          </div>
+
+          <div>
+            <p className="text-muted-foreground">Phone Number</p>
+            <p className="font-medium">
+              {selectedCall.phone_number || "—"}
+            </p>
+          </div>
+
+          <div>
+            <p className="text-muted-foreground">Date & Time (Nepal)</p>
+            <p className="font-medium">
+              {new Date(selectedCall.call_timestamp).toLocaleString(
+                "en-GB",
+                { timeZone: "Asia/Kathmandu" }
+              )}
+            </p>
+          </div>
+
+          <div>
+            <p className="text-muted-foreground">Direction</p>
+            <p className="font-medium capitalize">
+              {selectedCall.direction || "—"}
+            </p>
+          </div>
+
+          <div>
+            <p className="text-muted-foreground">Duration</p>
+            <p className="font-medium">
+              {selectedCall.duration_formatted ||
+                `${Math.floor((selectedCall.duration_seconds ?? 0) / 60)
+                  .toString()
+                  .padStart(2, "0")}:${((selectedCall.duration_seconds ?? 0) % 60)
+                  .toString()
+                  .padStart(2, "0")}`}
+            </p>
+          </div>
+
+          <div>
+            <p className="text-muted-foreground">Caller</p>
+            <p className="font-medium">
+              {selectedCall.caller ?? "—"}
+            </p>
+          </div>
+
+          <div>
+            <p className="text-muted-foreground">Outcome</p>
+            <p className="font-medium capitalize">
+              {selectedCall.outcome || "—"}
+            </p>
+          </div>
+
+          <div>
+            <p className="text-muted-foreground">Notes</p>
+            <p className="whitespace-pre-wrap">
+              {selectedCall.notes || "—"}
+            </p>
+          </div>
+
+          <div>
+            <p className="text-muted-foreground">Next Action</p>
+            <p className="font-medium">
+              {selectedCall.next_action || "—"}
+            </p>
+          </div>
+
+          <div>
+            <p className="text-muted-foreground">Follow-up Date</p>
+            <p className="font-medium">
+              {selectedCall.next_followup_at
+                ? new Date(selectedCall.next_followup_at).toLocaleString(
+                    "en-GB",
+                    { timeZone: "Asia/Kathmandu" }
+                  )
+                : "—"}
+            </p>
+          </div>
+
+          <div>
+            <p className="text-muted-foreground">Logged By</p>
+            <p className="font-medium">
+              {selectedCall.created_by_name || "—"}
+            </p>
+          </div>
+
+          <div>
+            <p className="text-muted-foreground">Recording</p>
+            {selectedCall.recording_url ? (
+              <a
+                href={selectedCall.recording_url}
+                target="_blank"
+                rel="noreferrer"
+                className="text-primary underline"
+              >
+                Listen to Recording
+              </a>
+            ) : (
+              <p>—</p>
+            )}
+          </div>
+        </div>
+      </>
+    )}
+  </SheetContent>
+</Sheet>
 
       {/* Pagination */}
       <div className="flex items-center justify-between border-t pt-4">
