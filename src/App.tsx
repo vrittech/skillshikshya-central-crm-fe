@@ -13,6 +13,7 @@ import FollowUpsPage from "@/pages/follow-ups";
 import InvoicesPage from "@/pages/invoices";
 import LeadsPage from "@/pages/leads";
 import PaymentsPage from "@/pages/payments";
+import CallsPage from "@/pages/calls";
 import LeadDetailPage from "@/pages/leads/lead-detail";
 import LeadFormPage from "@/pages/leads/lead-form";
 import RecycleBinPage from "@/pages/leads/recycle-bin";
@@ -59,7 +60,7 @@ export default function App() {
           <Route path="/courses/course-batches" element={<BatchesPage defaultTab="course-batches" />} />
           <Route path="/users" element={<UsersPage />} />
           <Route path="/roles" element={<RolesPage />} />
-          <Route path="/calls" element={<ComingSoonPage title="Calls" />} />
+          <Route path="/calls" element={<CallsPage />} />
           <Route path="/call-minutes" element={<CallMinutesPage />} />
           <Route path="*" element={<ComingSoonPage title="Not found" />} />
           </Route>
