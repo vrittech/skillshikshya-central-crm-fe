@@ -106,6 +106,12 @@ export function formatDuration(seconds: number | undefined): string {
   return `${m} min ${s.toString().padStart(2, "0")} sec`;
 }
 
+export function formatMmSs(seconds: number): string {
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
+}
+
 export function initialsOf(name: string | null | undefined): string {
   if (!name) return "?";
   return (
