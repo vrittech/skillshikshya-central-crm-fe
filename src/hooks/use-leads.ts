@@ -20,7 +20,7 @@ import {
   uiLeadTypeToApi,
 } from "@/data/lead-adapters";
 import { getLeadById, LEAD_LIST } from "@/data/mock-leads";
-import { isOverdue } from "@/lib/leads-format";
+import { formatDuration, isOverdue } from "@/lib/leads-format";
 import { leadsService, type LeadListParams } from "@/services/leads.service";
 import type {
   ApiEnrollment,
@@ -407,10 +407,20 @@ export function useAddCall(leadId?: number) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (payload: Partial<ApiLeadCall>) => leadsService.addCall(leadId as number, payload),
-    onSuccess: () => {
-      toast.success("Call logged");
+    onSuccess: (call) => {
+      const remaining = call.remaining_seconds;
+      toast.success(
+        "Call logged",
+        remaining != null
+          ? { description: `Remaining balance: ${remaining ? formatDuration(remaining) : "0 sec"}` }
+          : undefined,
+      );
       void qc.invalidateQueries({ queryKey: ["lead"] });
       void qc.invalidateQueries({ queryKey: ["leads"] });
+      // a logged call also changes the Calls page and the caller's minute balance
+      void qc.invalidateQueries({ queryKey: ["calls"] });
+      void qc.invalidateQueries({ queryKey: ["call-minutes"] });
+      void qc.invalidateQueries({ queryKey: ["users"] });
     },
     onError: (e) => toast.error(apiErrorMessage(e, "Could not log call")),
   });

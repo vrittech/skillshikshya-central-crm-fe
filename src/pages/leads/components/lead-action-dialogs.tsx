@@ -1,3 +1,4 @@
+import axios from "axios";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -22,7 +23,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/context/auth";
 import { useDataSource } from "@/context/data-source";
 import { CALL_OUTCOMES, COUNSELORS, counselorName } from "@/data/lead-lookups";
-import { formatDateToNepalIso, toNepalIso } from "@/lib/leads-format";
+import { formatDateToNepalIso, formatDuration, toNepalIso } from "@/lib/leads-format";
 import { useAddCall, useAddFollowup, useAssignLead } from "@/hooks/use-leads";
 import { useCounselors } from "@/hooks/use-users";
 
@@ -79,6 +80,41 @@ const REMINDER_OFFSETS_MS: Record<FollowUpForm["reminder"], number> = {
   "1d": 24 * 60 * 60_000,
 };
 
+const DURATION_HINT = "MM:SS, e.g. 4:19";
+
+// mirrors parse_duration_to_seconds on the backend, which still does the real parse
+// "4:19", "4.19", "4m19s" and "259" are all 259 s; "4.5" is 4 min 05 sec, not 4.5 min
+function parseDurationInput(raw: string): number | null {
+  const s = raw.trim().toLowerCase();
+  const isNum = (p: string) => /^\d+$/.test(p);
+  if (s.includes(":")) {
+    const parts = s.split(":");
+    if (!parts.every(isNum)) return null;
+    const [a, b, c] = parts.map(Number);
+    if (parts.length === 2) return a * 60 + b;
+    if (parts.length === 3) return a * 3600 + b * 60 + c;
+    return null;
+  }
+  if (s.includes(".")) {
+    const parts = s.split(".");
+    if (parts.length !== 2 || !isNum(parts[0]) || !/^\d*$/.test(parts[1])) return null;
+    return Number(parts[0]) * 60 + Number(parts[1].slice(0, 2));
+  }
+  const ms = s.match(/^(\d*)m(\d*)s$/);
+  if (ms) return Number(ms[1]) * 60 + Number(ms[2]);
+  return isNum(s) ? Number(s) : null;
+}
+
+function durationErrorMessage(error: unknown): string {
+  if (!axios.isAxiosError(error)) return "";
+  const data = error.response?.data as Record<string, unknown> | undefined;
+  const first = (v: unknown) => (Array.isArray(v) ? String(v[0]) : typeof v === "string" ? v : "");
+  const inputError = first(data?.duration_input);
+  if (inputError) return inputError;
+  const detail = first(data?.detail);
+  return detail.includes("Insufficient call minutes") ? detail : "";
+}
+
 /**
  * All lead quick-actions live here. This is the static phase: the forms are
  * laid out with the fields the real workflow needs, but Save only shows a
@@ -95,6 +131,7 @@ export function LeadActionDialogs({ action, lead, onClose }: Props) {
   const [call, setCall] = useState<CallForm>(EMPTY_CALL);
   const [fu, setFu] = useState<FollowUpForm>(EMPTY_FU);
   const [assignTo, setAssignTo] = useState("");
+  const [durationError, setDurationError] = useState("");
 
   // Pre-select the current owner when the Assign dialog opens.
   useEffect(() => {
@@ -111,6 +148,7 @@ export function LeadActionDialogs({ action, lead, onClose }: Props) {
     : (counselorsQ.data?.results ?? []).map((u) => ({ value: String(u.id), label: u.name }));
   // Default the follow-up owner to the lead's counsellor, else the current user.
   const fuAssigned = fu.assignedTo || lead?.assignedTo || (user?.id != null ? String(user.id) : "");
+  const durationSeconds = parseDurationInput(call.duration);
 
   function done(message: string) {
     toast.success(message, { description: "Static prototype — no data was changed." });
@@ -124,13 +162,18 @@ export function LeadActionDialogs({ action, lead, onClose }: Props) {
       setCall(EMPTY_CALL);
       return;
     }
+    const durationInput = call.duration.trim();
+    if (durationInput && durationSeconds == null) {
+      setDurationError(`Invalid duration. Use ${DURATION_HINT}.`);
+      return;
+    }
     addCall.mutate(
       {
         call_timestamp: new Date().toISOString(),
         caller: user?.id ?? null,
         direction: call.direction,
         outcome: call.outcome || null,
-        duration_seconds: call.duration ? Math.round(Number(call.duration) * 60) : null,
+        duration_input: durationInput || undefined,
         recording_url: call.recording.trim() || null,
         notes: call.notes.trim() || null,
         next_followup_at: call.nextFollowUp ? toNepalIso(call.nextFollowUp) : null,
@@ -140,8 +183,10 @@ export function LeadActionDialogs({ action, lead, onClose }: Props) {
       {
         onSuccess: () => {
           setCall(EMPTY_CALL);
+          setDurationError("");
           onClose();
         },
+        onError: (e) => setDurationError(durationErrorMessage(e)),
       },
     );
   }
@@ -215,14 +260,21 @@ export function LeadActionDialogs({ action, lead, onClose }: Props) {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
-                <Label>Duration (minutes)</Label>
+                <Label>Duration</Label>
                 <Input
-                  type="number"
-                  min={0}
-                  placeholder="e.g. 4"
+                  placeholder={DURATION_HINT}
                   value={call.duration}
-                  onChange={(e) => setC("duration", e.target.value)}
+                  onChange={(e) => {
+                    setC("duration", e.target.value);
+                    setDurationError("");
+                  }}
                 />
+                <p className={durationError ? "text-destructive text-xs" : "text-muted-foreground text-xs"}>
+                  {durationError ||
+                    (durationSeconds != null
+                      ? `= ${durationSeconds ? formatDuration(durationSeconds) : "0 sec"}`
+                      : DURATION_HINT)}
+                </p>
               </div>
               <div className="grid gap-2">
                 <Label>Recording link</Label>
