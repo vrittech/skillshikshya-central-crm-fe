@@ -25,6 +25,8 @@ import { CALL_OUTCOMES, COUNSELORS, counselorName } from "@/data/lead-lookups";
 import { formatDateToNepalIso, toNepalIso } from "@/lib/leads-format";
 import { useAddCall, useAddFollowup, useAssignLead } from "@/hooks/use-leads";
 import { useCounselors } from "@/hooks/use-users";
+import { apiErrorMessage } from "@/lib/api";
+import { durationLabel, parseCallDuration } from "@/lib/call-duration";
 
 export type LeadAction = "log_call" | "follow_up" | "assign" | null;
 
@@ -79,11 +81,6 @@ const REMINDER_OFFSETS_MS: Record<FollowUpForm["reminder"], number> = {
   "1d": 24 * 60 * 60_000,
 };
 
-/**
- * All lead quick-actions live here. This is the static phase: the forms are
- * laid out with the fields the real workflow needs, but Save only shows a
- * toast — no mutation is performed.
- */
 export function LeadActionDialogs({ action, lead, onClose }: Props) {
   const name = lead?.fullName ?? "lead";
   const { isMock } = useDataSource();
@@ -93,8 +90,20 @@ export function LeadActionDialogs({ action, lead, onClose }: Props) {
   const assignLead = useAssignLead();
   const counselorsQ = useCounselors("", undefined, !isMock);
   const [call, setCall] = useState<CallForm>(EMPTY_CALL);
+  const [callError, setCallError] = useState("");
+  const durationSeconds = parseCallDuration(call.duration);
+  const durationError = durationSeconds === null
+    ? "Enter a duration such as 4:19, 4.19, 4m19s or 259."
+    : callError;
   const [fu, setFu] = useState<FollowUpForm>(EMPTY_FU);
   const [assignTo, setAssignTo] = useState("");
+
+  useEffect(() => {
+    if (action === "log_call") {
+      setCall(EMPTY_CALL);
+      setCallError("");
+    }
+  }, [action, lead?.apiId]);
 
   // Pre-select the current owner when the Assign dialog opens.
   useEffect(() => {
@@ -118,6 +127,8 @@ export function LeadActionDialogs({ action, lead, onClose }: Props) {
   }
 
   function submitCall() {
+    if (durationSeconds === null || addCall.isPending) return;
+    setCallError("");
     // Mock path (or a lead with no backend id) can't persist — keep the toast.
     if (isMock || lead?.apiId == null) {
       done("Call logged");
@@ -127,10 +138,10 @@ export function LeadActionDialogs({ action, lead, onClose }: Props) {
     addCall.mutate(
       {
         call_timestamp: new Date().toISOString(),
-        caller: user?.id ?? null,
+        caller: user?.name ?? "",
         direction: call.direction,
         outcome: call.outcome || null,
-        duration_seconds: call.duration ? Math.round(Number(call.duration) * 60) : null,
+        duration_input: call.duration.trim() || "0",
         recording_url: call.recording.trim() || null,
         notes: call.notes.trim() || null,
         next_followup_at: call.nextFollowUp ? toNepalIso(call.nextFollowUp) : null,
@@ -142,6 +153,7 @@ export function LeadActionDialogs({ action, lead, onClose }: Props) {
           setCall(EMPTY_CALL);
           onClose();
         },
+        onError: (error) => setCallError(apiErrorMessage(error, "Could not log call.")),
       },
     );
   }
@@ -215,14 +227,23 @@ export function LeadActionDialogs({ action, lead, onClose }: Props) {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
-                <Label>Duration (minutes)</Label>
+                <Label htmlFor="call-duration">Duration</Label>
                 <Input
-                  type="number"
-                  min={0}
-                  placeholder="e.g. 4"
+                  id="call-duration"
+                  type="text"
+                  placeholder="MM:SS, e.g. 4:19"
+                  aria-invalid={!!durationError}
+                  aria-describedby="call-duration-hint call-duration-preview"
                   value={call.duration}
-                  onChange={(e) => setC("duration", e.target.value)}
+                  onChange={(e) => {
+                    setC("duration", e.target.value);
+                    setCallError("");
+                  }}
                 />
+                <p id="call-duration-hint" className="text-muted-foreground text-xs">MM:SS, e.g. 4:19</p>
+                <p id="call-duration-preview" aria-live="polite" className={durationError ? "text-destructive text-xs" : "text-muted-foreground text-xs"}>
+                  {durationError || `= ${durationLabel(durationSeconds ?? 0)}`}
+                </p>
               </div>
               <div className="grid gap-2">
                 <Label>Recording link</Label>
