@@ -197,11 +197,14 @@ export interface ApiLeadCall {
   lead: number;
   call_timestamp: string;
   direction: "inbound" | "outbound";
-  /** User FK id of who made the call (backend requires it). */
+  /** Caller name; older records can contain a user ID as text. */
   caller: number | string | null;
   caller_name?: string;
   phone_number: string | null;
   duration_seconds: number | null;
+  duration_input?: string;
+  duration_formatted?: string;
+  remaining_seconds?: number | null;
   outcome: string | null;
   notes: string | null;
   recording_url: string | null;

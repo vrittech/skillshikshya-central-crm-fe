@@ -1,0 +1,13 @@
+# Calls review
+
+All six stories are implemented. The manager can select a branch, search call notes, sort by duration, open a call and export the same view. A saved link includes the exact Nepal start and end dates, sort and page. The chart shows days with activity and the top ten users who logged calls. A zero-second call counts toward volume and average duration. It contributes zero to the number of connected calls.
+
+The frontend sends the duration exactly as typed. In the live check, entering `4.19` showed `4 min 19 sec`, deducted 259 seconds and displayed the updated balance. An attempt to log more seconds than the balance allowed kept the dialog open and showed the server’s error under the duration field.
+
+**Branch access.** A non-staff user assigned to a branch sees only that branch. A non-staff user with no assigned branch currently sees every branch because the branch filter returns its input queryset. That exposes lead names, phone numbers, notes and recordings, and makes bulk extraction possible. The brief asks for this behavior to be documented. A follow-up should audit unassigned accounts, require a branch when provisioning counselors, and return an empty queryset until one is assigned.
+
+**One improvement to make next.** Put branch resolution in one shared policy for both reading and writing. During testing, a call created through a lead could be saved without a branch and disappear from its counselor’s list. This change resolves the parent lead in the caller’s allowed scope and assigns its branch to the new call. A shared policy would make the same rule easier to enforce in other nested endpoints.
+
+**AI use.** Codex produced the implementation, tests and review materials. The API guide and backend parser were checked against each other because an existing docstring described `4.5` as decimal minutes while the running parser and its tests return 245 seconds. Verification also caught a test command that discovered zero tests and three report totals that lost trailing decimal places on SQLite. One approach considered and rejected was changing those existing report assertions to compare numeric values. The final patch preserves the assertions and formats the totals to the expected two decimal places.
+
+**Verification.** The Django suite passed locally on SQLite. The frontend tests, build and lint passed, with the seven pre-existing lint warnings. A 20,004-call test measured two list queries, three summary queries and one export query. LibreOffice Calc imported the UTF-8 CSV with Nepali names intact and a formula-like note as text. The PostgreSQL 15 workflow is included for verification on GitHub.
