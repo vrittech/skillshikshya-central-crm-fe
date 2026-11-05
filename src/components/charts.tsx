@@ -111,15 +111,18 @@ export function HBarList({ data, max }: { data: { label: string; value: number }
 
 /* ----------------------------------------------------- mini vertical bars */
 
-export function MiniBars({ values, className }: { values: number[]; className?: string }) {
+export function MiniBars({ values, labels, className }: { values: number[]; labels?: string[]; className?: string }) {
   const max = Math.max(1, ...values);
   return (
     <div className={cn("flex h-24 items-end gap-1.5 pt-2", className)}>
       {values.map((v, i) => (
         <span
           key={i}
+          title={labels?.[i]}
+          aria-label={labels?.[i]}
+          role={labels ? "img" : undefined}
           className={cn("flex-1 rounded-t", i % 2 === 0 ? "bg-brand" : "bg-brand-fixed-dim")}
-          style={{ height: `${Math.max(12, (v / max) * 100)}%` }}
+          style={{ height: `${Math.max(labels ? 0 : 12, (v / max) * 100)}%` }}
         />
       ))}
     </div>
