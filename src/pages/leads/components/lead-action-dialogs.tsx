@@ -25,6 +25,8 @@ import { CALL_OUTCOMES, COUNSELORS, counselorName } from "@/data/lead-lookups";
 import { formatDateToNepalIso, toNepalIso } from "@/lib/leads-format";
 import { useAddCall, useAddFollowup, useAssignLead } from "@/hooks/use-leads";
 import { useCounselors } from "@/hooks/use-users";
+import { parseDuration, formatDuration } from "@/lib/duration";
+import { apiErrorMessage } from "@/lib/api";
 
 export type LeadAction = "log_call" | "follow_up" | "assign" | null;
 
@@ -71,7 +73,7 @@ interface FollowUpForm {
   reminder: "30m" | "1h" | "1d";
 }
 
-const EMPTY_FU: FollowUpForm = { scheduledAt: "", assignedTo: "", purpose: "", reminder: "1h" };
+const EMPTY_FU: FollowUpForm = { scheduledAt: "", assignedTo: "", purpose: "", reminder: "1h", };
 
 const REMINDER_OFFSETS_MS: Record<FollowUpForm["reminder"], number> = {
   "30m": 30 * 60_000,
@@ -95,6 +97,7 @@ export function LeadActionDialogs({ action, lead, onClose }: Props) {
   const [call, setCall] = useState<CallForm>(EMPTY_CALL);
   const [fu, setFu] = useState<FollowUpForm>(EMPTY_FU);
   const [assignTo, setAssignTo] = useState("");
+  const [durationError, setDurationError] = useState<string | null>(null);
 
   // Pre-select the current owner when the Assign dialog opens.
   useEffect(() => {
@@ -105,10 +108,13 @@ export function LeadActionDialogs({ action, lead, onClose }: Props) {
   const setF = <K extends keyof FollowUpForm>(k: K, v: FollowUpForm[K]) =>
     setFu((f) => ({ ...f, [k]: v }));
 
+  const durationText = call.duration.trim();
+  const durationSeconds = durationText ? parseDuration(durationText) : null;
+  const durationInvalid = durationText !== "" && durationSeconds === null;
   // Real counselors (Counselor role) on the live path; mock list otherwise.
   const counselorOptions = isMock
     ? COUNSELORS.map((c) => ({ value: c.id, label: c.name }))
-    : (counselorsQ.data?.results ?? []).map((u) => ({ value: String(u.id), label: u.name }));
+    : (counselorsQ.data?.results ?? []).map((u) => ({ value: String(u.id), label: u.name, }));
   // Default the follow-up owner to the lead's counsellor, else the current user.
   const fuAssigned = fu.assignedTo || lead?.assignedTo || (user?.id != null ? String(user.id) : "");
 
@@ -118,6 +124,13 @@ export function LeadActionDialogs({ action, lead, onClose }: Props) {
   }
 
   function submitCall() {
+    // Stop if the user entered an invalid duration.
+    if (durationInvalid) {
+      setDurationError("Use MM:SS, e.g. 4:19");
+      return;
+    }
+
+    setDurationError(null);
     // Mock path (or a lead with no backend id) can't persist — keep the toast.
     if (isMock || lead?.apiId == null) {
       done("Call logged");
@@ -130,7 +143,7 @@ export function LeadActionDialogs({ action, lead, onClose }: Props) {
         caller: user?.id ?? null,
         direction: call.direction,
         outcome: call.outcome || null,
-        duration_seconds: call.duration ? Math.round(Number(call.duration) * 60) : null,
+        duration_seconds: durationSeconds,
         recording_url: call.recording.trim() || null,
         notes: call.notes.trim() || null,
         next_followup_at: call.nextFollowUp ? toNepalIso(call.nextFollowUp) : null,
@@ -140,7 +153,16 @@ export function LeadActionDialogs({ action, lead, onClose }: Props) {
       {
         onSuccess: () => {
           setCall(EMPTY_CALL);
+          setDurationError(null);
           onClose();
+        },
+        onError: (e) => {
+          const message = apiErrorMessage(e, "");
+          const cleanedMessage = message.replace(/^duration seconds:\s*/i, "");
+
+          if (/insufficient|duration/i.test(message)) {
+            setDurationError(cleanedMessage);
+          }
         },
       },
     );
@@ -215,14 +237,32 @@ export function LeadActionDialogs({ action, lead, onClose }: Props) {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
-                <Label>Duration (minutes)</Label>
+                <Label>Duration</Label>
                 <Input
-                  type="number"
-                  min={0}
-                  placeholder="e.g. 4"
+                  type="text"
+                  placeholder="MM:SS, e.g. 4:19"
+                  aria-invalid={Boolean(durationError) || durationInvalid}
                   value={call.duration}
-                  onChange={(e) => setC("duration", e.target.value)}
+                  onChange={(e) => {
+                    setC("duration", e.target.value);
+                    setDurationError(null);
+                  }}
                 />
+                {durationError ? (
+                  <p className="text-xs text-destructive">{durationError}</p>
+                ) : durationInvalid ? (
+                  <p className="text-xs text-destructive">
+                    Use MM:SS, e.g. 4:19
+                  </p>
+                ) : durationSeconds !== null ? (
+                  <p className="text-xs text-muted-foreground">
+                    = {formatDuration(durationSeconds)}
+                  </p>
+                ) : (
+                  <p className="text-xs text-muted-foreground">
+                    MM:SS, e.g. 4:19
+                  </p>
+                )}
               </div>
               <div className="grid gap-2">
                 <Label>Recording link</Label>
