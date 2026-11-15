@@ -21,6 +21,7 @@ import {
 } from "@/data/lead-adapters";
 import { getLeadById, LEAD_LIST } from "@/data/mock-leads";
 import { isOverdue } from "@/lib/leads-format";
+import { formatDuration } from "@/lib/duration";
 import { leadsService, type LeadListParams } from "@/services/leads.service";
 import type {
   ApiEnrollment,
@@ -407,11 +408,23 @@ export function useAddCall(leadId?: number) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (payload: Partial<ApiLeadCall>) => leadsService.addCall(leadId as number, payload),
-    onSuccess: () => {
-      toast.success("Call logged");
-      void qc.invalidateQueries({ queryKey: ["lead"] });
-      void qc.invalidateQueries({ queryKey: ["leads"] });
-    },
+        onSuccess: (data) => {
+            void qc.invalidateQueries({ queryKey: ["lead"] });
+            void qc.invalidateQueries({ queryKey: ["leads"] });
+            void qc.invalidateQueries({ queryKey: ["calls"] });
+            void qc.invalidateQueries({ queryKey: ["users"] });
+            void qc.invalidateQueries({ queryKey: ["call-minutes"] });
+            // The POST response carries the exact remaining balance in seconds.
+            const { remaining_seconds: remaining } = data as unknown as {
+              remaining_seconds?: number | null;
+            };
+            toast.success("Call logged", {
+              description:
+                typeof remaining === "number"
+                  ? `Remaining balance: ${formatDuration(remaining)}`
+                  : undefined,
+            });
+          },
     onError: (e) => toast.error(apiErrorMessage(e, "Could not log call")),
   });
 }
