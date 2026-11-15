@@ -57,3 +57,11 @@ export function formatDuration(seconds: number): string {
 
   return `${minutes} min ${remainingSeconds} sec`;
 }
+
+/** MM:SS for the table and exports, e.g. 259 -> "04:19". */
+export function formatClock(seconds: number): string {
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = seconds % 60;
+
+  return `${String(minutes).padStart(2, "0")}:${String(remainingSeconds).padStart(2, "0")}`;
+}
