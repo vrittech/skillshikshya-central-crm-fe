@@ -34,9 +34,7 @@ import {
 import { useDataSource } from "@/context/data-source";
 import { CALL_OUTCOMES } from "@/data/lead-lookups";
 import { useCalls, useExportCalls } from "@/hooks/use-calls";
-import { useCounselors } from "@/hooks/use-users";
 import { formatClock } from "@/lib/duration";
-import { formatDateTime } from "@/lib/leads-format";
 import { cn } from "@/lib/utils";
 import { CallsOverview } from "@/pages/calls/calls-overview";
 import {
@@ -45,6 +43,10 @@ import {
   type DatePreset,
   type SortKey,
 } from "@/pages/calls/use-call-filters";
+
+import { useAuth } from "@/context/auth";
+import { useBranches } from "@/hooks/use-branches";
+import { useUsers } from "@/hooks/use-users";
 
 const DIRECTION_TONE: Record<string, string> = {
   inbound: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
@@ -58,6 +60,17 @@ const DATE_PRESETS: { value: DatePreset; label: string }[] = [
   { value: "month", label: "This month" },
   { value: "custom", label: "Custom" },
 ];
+
+// Always display call times in Nepal time, regardless of the browser timezone.
+const NPT_DATE_TIME = new Intl.DateTimeFormat("en-GB", {
+  timeZone: "Asia/Kathmandu",
+  day: "numeric",
+  month: "short",
+  year: "numeric",
+  hour: "numeric",
+  minute: "2-digit",
+  hour12: true,
+});
 
 function outcomeLabel(outcome: string | null) {
   if (!outcome) return "—";
@@ -105,7 +118,10 @@ export default function CallsPage() {
     f.listParams,
   );
   const exportCalls = useExportCalls();
-  const counselorsQ = useCounselors("", undefined, !isMock);
+  const { user } = useAuth();
+  const isStaff = Boolean(user?.is_staff || user?.is_superuser);
+  const usersQ = useUsers(1, 100);
+  const branchesQ = useBranches(1, 100, "", isStaff && !isMock);
   const [searchInput, setSearchInput] = useState(values.search);
 
   // Type-ahead search: wait 300 ms after the last keystroke before touching the URL.
@@ -130,9 +146,13 @@ export default function CallsPage() {
     );
   }
 
-  const userOptions = (counselorsQ.data?.results ?? []).map((u) => ({
+  const userOptions = (usersQ.data?.results ?? []).map((u) => ({
     value: String(u.id),
     label: u.name,
+  }));
+  const branchOptions = (branchesQ.data?.results ?? []).map((b) => ({
+    value: String(b.id),
+    label: b.name,
   }));
   const totalPages = Math.max(1, Math.ceil(count / PAGE_SIZE));
   const firstRow = count === 0 ? 0 : (f.page - 1) * PAGE_SIZE + 1;
@@ -212,6 +232,24 @@ export default function CallsPage() {
             ))}
           </SelectContent>
         </Select>
+        {isStaff && (
+          <Select
+            value={values.branch || "all"}
+            onValueChange={(v) => update({ branch: v === "all" ? null : v })}
+          >
+            <SelectTrigger className="w-40">
+              <SelectValue placeholder="Branch" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All branches</SelectItem>
+              {branchOptions.map((b) => (
+                <SelectItem key={b.value} value={b.value}>
+                  {b.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
         <Select
           value={values.range}
           onValueChange={(v) =>
@@ -264,7 +302,7 @@ export default function CallsPage() {
             <TableHeader>
               <TableRow>
                 <SortHead
-                  label="When"
+                  label="When (NPT)"
                   sortKey="call_timestamp"
                   ordering={f.ordering}
                   onSort={f.toggleSort}
@@ -340,7 +378,7 @@ export default function CallsPage() {
                 calls.map((c) => (
                   <TableRow key={c.id}>
                     <TableCell className="whitespace-nowrap">
-                      {formatDateTime(c.call_timestamp)}
+                      {NPT_DATE_TIME.format(new Date(c.call_timestamp))}
                     </TableCell>
                     <TableCell>
                       <Badge
