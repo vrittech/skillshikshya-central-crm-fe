@@ -314,7 +314,10 @@ export default function LeadDetailPage() {
   const additional = lead.courseInterests.filter((c) => !c.isPrimary);
   const dyn = dynamicRows(lead.customData);
   const pay = paymentSummary(lead);
-  const nextFollowUp = lead.followUps.find((f) => f.status === "pending" || f.status === "overdue");
+  // The earliest open follow-up (the list comes newest first).
+  const nextFollowUp = lead.followUps
+    .filter((f) => f.status === "pending" || f.status === "overdue")
+    .sort((a, b) => new Date(a.dueAt).getTime() - new Date(b.dueAt).getTime())[0];
   const calls = lead.activities.filter((a) => a.type === "call");
 
   return (
