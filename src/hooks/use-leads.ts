@@ -596,10 +596,8 @@ export function useConfirmEnrollment() {
   return useMutation({
     mutationFn: ({ leadId, id }: { leadId: number; id: number }) =>
       leadsService.confirmEnrollment(leadId, id),
-    onSuccess: (data) => {
-      toast.success("Enrollment confirmed", {
-        description: data.student_name ? `${data.student_name} is now a student.` : undefined,
-      });
+    onSuccess: () => {
+      toast.success("Enrollment confirmed");
       // Confirm also takes a seat, so batch seat counts change.
       for (const key of ["lead", "leads", "enrollments", "invoices", "students", "course-batches"]) {
         void qc.invalidateQueries({ queryKey: [key] });
@@ -610,10 +608,10 @@ export function useConfirmEnrollment() {
 }
 
 const SEAT_DONE: Record<ApiSeatAction, string> = {
-  join: "Joined the batch",
-  move: "Moved to the new batch",
-  pause: "Paused — the seat is free",
-  resume: "Back in a batch",
+  join: "Added to batch",
+  move: "Batch changed",
+  pause: "Enrollment paused",
+  resume: "Enrollment resumed",
 };
 
 /** Join batch, Move, Pause or Resume. Each needs a reason and adds a seat history row. */

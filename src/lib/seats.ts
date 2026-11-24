@@ -1,4 +1,3 @@
-import { formatDate } from "@/lib/leads-format";
 import type { CourseBatch } from "@/types";
 import type { ApiEnrollment, ApiPlacement } from "@/types/leads-api";
 
@@ -28,26 +27,21 @@ export function localToday() {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
-/**
- * Where the student sits, for an enrollment card. The money batch (where the
- * fees count) is named too when it is not the batch they sit in.
- */
+/** The batch line on an enrollment card: the current batch, "Paused" or "No batch assigned". */
 export function seatText(e: ApiEnrollment) {
-  const money = e.batch_name;
-  const feesNote = money ? ` · fees count on ${money}` : "";
-  if (e.status === "pending") {
-    return money ? `Batch ${money} · seat taken on confirm` : "No batch chosen";
-  }
-  if (!canSit(e)) return money ? `Batch ${money}` : "No batch";
-  if (e.seat_state === "seated" && e.current_batch_name) {
-    const here = `Sits in ${e.current_batch_name}`;
-    return e.batch != null && e.batch !== e.current_batch ? `${here}${feesNote}` : here;
-  }
-  if (e.seat_state === "paused") {
-    const since = e.placements?.[0]?.started_on;
-    return `Paused${since ? ` since ${formatDate(since)}` : ""}${feesNote}`;
-  }
-  return `Not in a batch${feesNote}`;
+  if (!canSit(e)) return e.batch_name ? `Batch ${e.batch_name}` : "No batch assigned";
+  if (e.seat_state === "seated" && e.current_batch_name) return `Batch ${e.current_batch_name}`;
+  if (e.seat_state === "paused") return "Paused";
+  return "No batch assigned";
+}
+
+/**
+ * The batch the student enrolled in (where the fees count), when it is not
+ * the batch they are in now. null when there is nothing to show.
+ */
+export function enrolledBatchIfDifferent(e: ApiEnrollment) {
+  if (!canSit(e) || e.batch == null) return null;
+  return e.batch !== e.current_batch ? (e.batch_name ?? null) : null;
 }
 
 /** One line for a seat history row, e.g. "Moved from Python Nov to Python Dec". */
@@ -60,11 +54,9 @@ export function placementTitle(p: ApiPlacement) {
     case "move":
       return `Moved from ${from} to ${to}`;
     case "pause":
-      return `Paused, left ${from}`;
+      return `Paused from ${from}`;
     case "resume":
-      return p.from_batch != null && p.from_batch !== p.course_batch
-        ? `Resumed in ${to} (paused from ${from})`
-        : `Resumed in ${to}`;
+      return `Resumed in ${to}`;
     case "leave":
       return `Left ${from}`;
     default:

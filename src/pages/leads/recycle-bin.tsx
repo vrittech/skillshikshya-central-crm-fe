@@ -166,7 +166,6 @@ export default function RecycleBinPage() {
             <AlertDialogTitle>Permanently delete “{purgeName}”?</AlertDialogTitle>
             <AlertDialogDescription>
               This cannot be undone. The lead and its history will be removed from the database for good.
-              A lead with enrollments cannot be deleted forever, because its money records are kept.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

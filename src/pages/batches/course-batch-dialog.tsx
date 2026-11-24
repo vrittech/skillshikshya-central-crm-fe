@@ -222,7 +222,7 @@ export function CourseBatchDialog({
             </div>
 
             <div className="grid gap-2">
-              <Label>Online or physical</Label>
+              <Label>Mode</Label>
               <Select value={form.mode} onValueChange={(v) => set("mode", v as CourseBatchMode)}>
                 <SelectTrigger>
                   <SelectValue />
@@ -248,11 +248,6 @@ export function CourseBatchDialog({
                   <SelectItem value="closed">Closed</SelectItem>
                 </SelectContent>
               </Select>
-              {form.status === "closed" && (
-                <p className="text-muted-foreground text-xs">
-                  No one new can join or move into a closed batch.
-                </p>
-              )}
             </div>
 
             <div className="flex items-center gap-2 sm:col-span-2">

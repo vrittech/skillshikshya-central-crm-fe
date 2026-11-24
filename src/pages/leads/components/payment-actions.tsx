@@ -58,7 +58,7 @@ export function PaymentActions({
         open={voidOpen}
         onClose={() => setVoidOpen(false)}
         title="Void payment"
-        description={`${formatNPR(amount)} will stop counting as paid and its receipt will be cancelled. If the amount was wrong, record the correct payment after this.`}
+        description={`Amount: ${formatNPR(amount)}`}
         confirmLabel="Void payment"
         destructive
         pending={mutation.isPending}

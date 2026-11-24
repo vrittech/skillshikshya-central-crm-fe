@@ -89,7 +89,7 @@ export default function StudentsPage() {
           <p className="text-brand font-mono text-[11px] font-bold tracking-wider uppercase">Institute</p>
           <h1 className="font-headline mt-1 text-3xl font-semibold tracking-tight">Students</h1>
           <p className="text-muted-foreground mt-1 text-sm">
-            Enrolled students. A lead becomes a student when their enrollment is confirmed.
+            Enrolled students.
             {!isApi && " Switch the data source to Live to manage students."}
           </p>
         </div>
@@ -159,7 +159,6 @@ export default function StudentsPage() {
                   <TableCell colSpan={6} className="py-12 text-center">
                     <GraduationCap className="text-muted-foreground mx-auto size-6" />
                     <p className="mt-2 text-sm font-semibold">No students yet</p>
-                    <p className="text-muted-foreground text-xs">Confirm a lead's enrollment to create one.</p>
                   </TableCell>
                 </TableRow>
               )}

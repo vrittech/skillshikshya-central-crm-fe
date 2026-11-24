@@ -13,7 +13,7 @@ import { useBatchStudents } from "@/hooks/use-batches";
 import { formatDate } from "@/lib/leads-format";
 import type { BatchStudentRow, CourseBatch } from "@/types";
 
-/** How the student came to sit here: joined, moved in from A, or resumed. */
+/** How the student came into this batch: joined, moved from A, or resumed. */
 function HowBadge({ row }: { row: BatchStudentRow }) {
   if (row.how === "move") {
     return <Badge variant="warning">Moved from {row.from_batch_name ?? "another batch"}</Badge>;
@@ -30,26 +30,21 @@ function StudentRow({ row, paused = false }: { row: BatchStudentRow; paused?: bo
           {row.name}
         </Link>
         <p className="text-muted-foreground text-xs">
-          {row.student_id ? <span className="font-mono">{row.student_id}</span> : "Not a student yet"}
+          {row.student_id ? <span className="font-mono">{row.student_id}</span> : "—"}
           {row.phone ? ` · ${row.phone}` : ""}
         </p>
-        {row.moved_in && row.money_batch_name && (
-          <p className="text-muted-foreground mt-0.5 text-xs">
-            Fees count on {row.money_batch_name}, not this batch.
-          </p>
-        )}
       </div>
       <div className="flex flex-col items-end gap-1">
         {paused ? <Badge variant="outline">Paused</Badge> : <HowBadge row={row} />}
         <span className="text-muted-foreground text-xs">
-          {paused ? "Since" : "From"} {formatDate(row.since ?? undefined)}
+          {formatDate(row.since ?? undefined)}
         </span>
       </div>
     </li>
   );
 }
 
-/** Who sits in a batch now, who moved in from another batch, and who is paused out of it. */
+/** The students in a batch, and the ones paused from it. */
 export function BatchStudentsSheet({
   batch,
   onClose,
@@ -60,7 +55,6 @@ export function BatchStudentsSheet({
   const { data, isLoading } = useBatchStudents(batch?.id ?? null);
   const seated = data?.seated ?? [];
   const paused = data?.paused ?? [];
-  const movedIn = seated.filter((r) => r.moved_in).length;
 
   return (
     <Sheet open={batch != null} onOpenChange={(o) => !o && onClose()}>
@@ -71,9 +65,7 @@ export function BatchStudentsSheet({
             <span className="font-mono">{batch?.coursebatch_id}</span>
             {batch?.course_name ? ` · ${batch.course_name}` : ""}
             {batch
-              ? batch.capacity == null
-                ? ` · ${batch.seats_taken ?? 0} seated, no seat limit`
-                : ` · ${batch.seats_taken ?? 0} of ${batch.capacity} seats taken`
+              ? ` · Seats ${batch.seats_taken ?? 0}${batch.capacity == null ? "" : ` / ${batch.capacity}`}`
               : ""}
           </SheetDescription>
         </SheetHeader>
@@ -86,13 +78,7 @@ export function BatchStudentsSheet({
           ) : (
             <div className="space-y-6">
               <section>
-                <h3 className="text-sm font-semibold">Sitting now ({seated.length})</h3>
-                {movedIn > 0 && (
-                  <p className="text-muted-foreground text-xs">
-                    {movedIn} moved in from another batch. Their fees count on the batch they
-                    first joined, so this batch's revenue leaves them out.
-                  </p>
-                )}
+                <h3 className="text-sm font-semibold">Students ({seated.length})</h3>
                 {seated.length ? (
                   <ul className="divide-border divide-y">
                     {seated.map((r) => (
@@ -100,12 +86,12 @@ export function BatchStudentsSheet({
                     ))}
                   </ul>
                 ) : (
-                  <p className="text-muted-foreground py-3 text-sm">No one sits in this batch.</p>
+                  <p className="text-muted-foreground py-3 text-sm">No students.</p>
                 )}
               </section>
               {paused.length > 0 && (
                 <section>
-                  <h3 className="text-sm font-semibold">Paused from this batch ({paused.length})</h3>
+                  <h3 className="text-sm font-semibold">Paused ({paused.length})</h3>
                   <ul className="divide-border divide-y">
                     {paused.map((r) => (
                       <StudentRow key={r.enrollment} row={r} paused />

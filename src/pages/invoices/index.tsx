@@ -335,7 +335,7 @@ export default function InvoicesPage() {
         title="Cancel invoice"
         description={
           cancelling
-            ? `${cancelling.invoice_number} (${formatNPR(Number(cancelling.amount))}) will be marked cancelled. It stays in the list and is not sent again. No payment changes.`
+            ? `${cancelling.invoice_number} · ${formatNPR(Number(cancelling.amount))}`
             : undefined
         }
         confirmLabel="Cancel invoice"

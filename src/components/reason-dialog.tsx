@@ -64,7 +64,7 @@ export function ReasonDialog({
               rows={3}
               value={reason}
               onChange={(e) => setReason(e.target.value)}
-              placeholder="Why is this needed? It is saved in the history."
+              placeholder="Enter reason"
             />
           </div>
         </div>

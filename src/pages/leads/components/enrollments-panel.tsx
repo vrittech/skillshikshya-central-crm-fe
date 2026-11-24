@@ -39,7 +39,7 @@ import {
   useLeadPayments,
 } from "@/hooks/use-leads";
 import { formatDate, formatDateTime, formatNPR } from "@/lib/leads-format";
-import { canSit, seatText } from "@/lib/seats";
+import { canSit, enrolledBatchIfDifferent, seatText } from "@/lib/seats";
 import { cn } from "@/lib/utils";
 import type {
   ApiEnrollment,
@@ -255,6 +255,7 @@ function EnrollmentCard({
   const due = agreed + extras - discounts - writeOffs;
   const netPaid = paid - refunds;
   const pct = due > 0 ? Math.max(0, Math.min(100, Math.round((netPaid / due) * 100))) : 100;
+  const enrolledBatch = enrolledBatchIfDifferent(enrollment);
 
   return (
     <div className="rounded-2xl border p-4">
@@ -289,10 +290,11 @@ function EnrollmentCard({
           <Fee label="Paid" value={formatNPR(paid)} />
           {refunds > 0 && <Fee label="Refunded" value={`+ ${formatNPR(refunds)}`} />}
           <Fee
-            label={remaining < 0 ? "Credit (we owe)" : "Remaining"}
+            label={remaining < 0 ? "Credit" : "Remaining"}
             value={formatNPR(Math.abs(remaining))}
             strong
           />
+          {enrolledBatch && <Fee label="Enrolled batch" value={enrolledBatch} />}
           {enrollment.student_name && <Fee label="Student" value={enrollment.student_name} />}
           {enrollment.created_by_name && (
             <Fee label="Created by" value={enrollment.created_by_name} />
@@ -306,7 +308,7 @@ function EnrollmentCard({
           style={{ width: `${pct}%` }}
         />
       </div>
-      <p className="text-muted-foreground mt-1 text-xs">{pct}% of the amount due collected</p>
+      <p className="text-muted-foreground mt-1 text-xs">{pct}% collected</p>
 
       {enrollment.remarks && (
         <p className="text-muted-foreground mt-3 text-sm">{enrollment.remarks}</p>
@@ -336,7 +338,7 @@ function EnrollmentCard({
             className="text-muted-foreground"
             onClick={() => setShowSeats((v) => !v)}
           >
-            {showSeats ? <ChevronDown /> : <ChevronRight />} Seat history
+            {showSeats ? <ChevronDown /> : <ChevronRight />} Batch history
           </Button>
         )}
         <div className="grow" />
@@ -419,15 +421,14 @@ function EnrollmentCard({
           <DialogHeader>
             <DialogTitle>Confirm enrollment</DialogTitle>
             <DialogDescription>
-              {enrollment.lead_name ?? "The lead"} becomes a student
-              {enrollment.batch_name ? ` and takes a seat in ${enrollment.batch_name}` : ""}, and
-              the fee invoice for {formatNPR(agreed)} is made and emailed. After this the price,
-              course and batch are fixed.
+              {[enrollment.lead_name, enrollment.course_name, enrollment.batch_name, formatNPR(agreed)]
+                .filter(Boolean)
+                .join(" · ")}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={() => setConfirmOpen(false)}>
-              Not yet
+              Back
             </Button>
             <Button
               variant="brand"
@@ -450,11 +451,6 @@ function EnrollmentCard({
         open={statusAction != null}
         onClose={() => setStatusAction(null)}
         title={statusAction === "reinstate" ? "Reinstate enrollment" : "Cancel enrollment"}
-        description={
-          statusAction === "reinstate"
-            ? "The enrollment goes back to the status it had before it was cancelled."
-            : "The enrollment is marked cancelled and its seat is freed. Its payments stay as they are."
-        }
         confirmLabel={statusAction === "reinstate" ? "Reinstate" : "Cancel enrollment"}
         destructive={statusAction === "cancel"}
         pending={statusMutation.isPending}

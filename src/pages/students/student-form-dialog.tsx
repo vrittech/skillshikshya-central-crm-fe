@@ -77,10 +77,7 @@ export function StudentFormDialog({ open, onClose }: { open: boolean; onClose: (
       <DialogContent>
         <DialogHeader>
           <DialogTitle>New student</DialogTitle>
-          <DialogDescription>
-            Create a student who did not come through a lead. For a lead, confirm their enrollment
-            instead.
-          </DialogDescription>
+          <DialogDescription>Create a student record.</DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-2 sm:grid-cols-2">
           <div className="grid gap-2">

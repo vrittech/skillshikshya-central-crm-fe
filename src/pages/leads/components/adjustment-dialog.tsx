@@ -13,27 +13,11 @@ import { useAddAdjustment } from "@/hooks/use-leads";
 import { formatNPR } from "@/lib/leads-format";
 import type { ApiAdjustmentKind, ApiEnrollment } from "@/types/leads-api";
 
-const KINDS: { value: ApiAdjustmentKind; label: string; hint: string }[] = [
-  {
-    value: "extra_charge",
-    label: "Extra charge",
-    hint: "The student owes more, e.g. an exam fee or a switch to a dearer course.",
-  },
-  {
-    value: "discount",
-    label: "Discount",
-    hint: "The student owes less. It can go below 0, which is a credit to refund.",
-  },
-  {
-    value: "write_off",
-    label: "Write-off",
-    hint: "Money we will not collect. At most what is owed now.",
-  },
-  {
-    value: "refund",
-    label: "Refund",
-    hint: "Money given back. At most what was paid and not refunded yet.",
-  },
+const KINDS: { value: ApiAdjustmentKind; label: string }[] = [
+  { value: "extra_charge", label: "Extra charge" },
+  { value: "discount", label: "Discount" },
+  { value: "write_off", label: "Write-off" },
+  { value: "refund", label: "Refund" },
 ];
 
 /**
@@ -62,18 +46,13 @@ export function AdjustmentDialog({
   }, [open]);
 
   const owes = Number(enrollment.remaining_amount);
-  const hint = KINDS.find((k) => k.value === kind)?.hint;
 
   return (
     <ReasonDialog
       open={open}
       onClose={onClose}
       title="Add money entry"
-      description={
-        owes < 0
-          ? `We owe the student ${formatNPR(-owes)} (credit).`
-          : `The student owes ${formatNPR(owes)} now.`
-      }
+      description={owes < 0 ? `Credit: ${formatNPR(-owes)}` : `Remaining: ${formatNPR(owes)}`}
       confirmLabel="Add entry"
       pending={add.isPending}
       confirmDisabled={!(Number(amount) > 0)}
@@ -105,7 +84,6 @@ export function AdjustmentDialog({
             onChange={(e) => setAmount(e.target.value)}
           />
         </div>
-        {hint && <p className="text-muted-foreground text-xs sm:col-span-2">{hint}</p>}
       </div>
     </ReasonDialog>
   );

@@ -17,7 +17,7 @@ import { formatDate } from "@/lib/leads-format";
 import { canSit, isFull, localToday, placementTitle, seatsLabel } from "@/lib/seats";
 import type { ApiEnrollment, ApiSeatAction } from "@/types/leads-api";
 
-/** Move and Pause for a seated student, Resume for a paused one, Join batch otherwise. */
+/** Change batch and Pause for a seated student, Resume for a paused one, Add to batch otherwise. */
 export function SeatButtons({
   enrollment,
   onAction,
@@ -30,7 +30,7 @@ export function SeatButtons({
     return (
       <>
         <Button size="sm" variant="outline" onClick={() => onAction("move")}>
-          <ArrowRightLeft /> Move
+          <ArrowRightLeft /> Change batch
         </Button>
         <Button size="sm" variant="outline" onClick={() => onAction("pause")}>
           <Pause /> Pause
@@ -47,41 +47,22 @@ export function SeatButtons({
   }
   return (
     <Button size="sm" variant="outline" onClick={() => onAction("join")}>
-      <LogIn /> Join batch
+      <LogIn /> Add to batch
     </Button>
   );
 }
 
 function copy(action: ApiSeatAction, e: ApiEnrollment) {
-  const money = e.batch_name;
+  const current = e.current_batch_name ? `Current batch: ${e.current_batch_name}` : undefined;
   switch (action) {
     case "join":
-      return {
-        title: "Join a batch",
-        description: money
-          ? `The student takes a seat in the batch. The fees stay on ${money}.`
-          : "The student takes a seat in the batch. The fees count on this first batch.",
-        confirm: "Join batch",
-      };
+      return { title: "Add to batch", description: undefined, confirm: "Add to batch" };
     case "move":
-      return {
-        title: "Move to another batch",
-        description: `The student's seat moves from ${e.current_batch_name ?? "their batch"}. The fees stay on ${money ?? "the first batch"}, and the new batch lists the student as moved in.`,
-        confirm: "Move",
-      };
+      return { title: "Change batch", description: current, confirm: "Change batch" };
     case "pause":
-      return {
-        title: "Pause",
-        description: `The student leaves ${e.current_batch_name ?? "their batch"} for now and the seat is freed. Resume brings them back.`,
-        confirm: "Pause",
-      };
+      return { title: "Pause enrollment", description: current, confirm: "Pause" };
     case "resume":
-      return {
-        title: "Resume",
-        description:
-          "The student takes a seat again, in the batch they left or another batch of this course.",
-        confirm: "Resume",
-      };
+      return { title: "Resume enrollment", description: undefined, confirm: "Resume" };
   }
 }
 
@@ -162,16 +143,13 @@ export function SeatDialog({
             </SelectContent>
           </Select>
           {!batchesQ.isLoading && options.length === 0 && (
-            <p className="text-muted-foreground text-xs">
-              No other upcoming or running batch of {enrollment.course_name ?? "this course"}. Add
-              one on the Batches page.
-            </p>
+            <p className="text-muted-foreground text-xs">No batches available.</p>
           )}
         </div>
       )}
       <div className="grid gap-2">
         <Label htmlFor="seat-day" required>
-          From
+          Date
         </Label>
         <Input id="seat-day" type="date" value={day} onChange={(e) => setDay(e.target.value)} />
       </div>
@@ -183,7 +161,7 @@ export function SeatDialog({
 export function SeatHistoryList({ enrollment }: { enrollment: ApiEnrollment }) {
   const rows = enrollment.placements ?? [];
   if (!rows.length) {
-    return <p className="text-muted-foreground py-3 text-sm">No seat changes yet.</p>;
+    return <p className="text-muted-foreground py-3 text-sm">No batch history.</p>;
   }
   return (
     <ul className="divide-border divide-y">
@@ -192,7 +170,7 @@ export function SeatHistoryList({ enrollment }: { enrollment: ApiEnrollment }) {
           <div className="flex flex-wrap items-baseline justify-between gap-2">
             <p className="text-sm font-medium">{placementTitle(p)}</p>
             <p className="text-muted-foreground text-xs">
-              From {formatDate(p.started_on)}
+              {formatDate(p.started_on)}
               {p.created_by_name ? ` · by ${p.created_by_name}` : ""}
             </p>
           </div>

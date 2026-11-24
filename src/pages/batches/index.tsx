@@ -330,7 +330,7 @@ function CourseBatchesTab({ canAdd, canChange, canDelete }: TabPerms) {
 
       <ConfirmDelete
         name={deleting?.name}
-        description="This permanently removes the course batch. A batch that has enrollments can't be deleted; close it instead."
+        description="This cannot be undone."
         onCancel={() => setDeleting(null)}
         onConfirm={() => {
           if (deleting) del.mutate(deleting.id);
@@ -473,7 +473,7 @@ function SlotsTab({ canAdd, canChange, canDelete }: TabPerms) {
   );
 }
 
-/** "12 / 30" with a Full badge, or "12 · no limit"; pending enrollments show as waiting. */
+/** "12 / 30" with a Full badge, or "12 · no limit", and the pending count. */
 function SeatsCell({ batch }: { batch: CourseBatch }) {
   const taken = batch.seats_taken ?? 0;
   const full = batch.capacity != null && batch.seats_left === 0;
@@ -487,7 +487,7 @@ function SeatsCell({ batch }: { batch: CourseBatch }) {
         {full && <Badge variant="warning">Full</Badge>}
       </div>
       {!!batch.waiting_count && (
-        <div className="text-muted-foreground text-xs">{batch.waiting_count} waiting to confirm</div>
+        <div className="text-muted-foreground text-xs">{batch.waiting_count} pending</div>
       )}
     </div>
   );

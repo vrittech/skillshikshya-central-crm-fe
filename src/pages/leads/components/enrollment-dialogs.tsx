@@ -271,19 +271,8 @@ export function EnrollmentDialog({
                 ))}
               </SelectContent>
             </Select>
-            {seatLocked ? (
-              <p className="text-muted-foreground text-xs">
-                The course and batch are fixed once confirmed, because the fees count on this batch.
-                To change where the student sits, use Move on the enrollment card.
-              </p>
-            ) : (
-              chosenBatch?.capacity != null &&
-              chosenBatch.seats_left === 0 && (
-                <p className="text-xs text-amber-600 dark:text-amber-400">
-                  {chosenBatch.name} is full. Confirm is refused until a seat frees up or seats are
-                  added.
-                </p>
-              )
+            {!seatLocked && chosenBatch?.capacity != null && chosenBatch.seats_left === 0 && (
+              <p className="text-xs text-amber-600 dark:text-amber-400">This batch is full.</p>
             )}
           </div>
           <div className="grid gap-2">
@@ -312,12 +301,6 @@ export function EnrollmentDialog({
                   ))}
                 </SelectContent>
               </Select>
-              {wasCancelled && (
-                <p className="text-muted-foreground text-xs">Use Reinstate on the card to reopen it.</p>
-              )}
-              {wasPending && (
-                <p className="text-muted-foreground text-xs">Use Confirm on the card when they join.</p>
-              )}
             </div>
           )}
           {/* The price is fixed once confirmed or paid; later changes are money entries with a reason. */}
@@ -352,16 +335,7 @@ export function EnrollmentDialog({
                 set("agreed_amount", e.target.value);
               }}
             />
-            {!priceLocked && !agreedEdited && (
-              <p className="text-muted-foreground text-xs">Listed fee minus discounts.</p>
-            )}
           </div>
-          {priceLocked && (
-            <p className="text-muted-foreground text-xs sm:col-span-2">
-              The price is fixed once the enrollment is confirmed or paid. Use “Money entry” on the
-              card for an extra charge, discount, write-off or refund.
-            </p>
-          )}
           <div className="grid gap-2 sm:col-span-2">
             <Label>Remarks</Label>
             <Textarea rows={2} value={f.remarks ?? ""} onChange={(e) => set("remarks", e.target.value)} />
@@ -465,10 +439,7 @@ export function PaymentDialog({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Record payment</DialogTitle>
-          <DialogDescription>
-            Totals count successful payments only. A pending payment is confirmed later from
-            its row.
-          </DialogDescription>
+          <DialogDescription>Record a payment for this enrollment.</DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-2 sm:grid-cols-2">
           {needsPickers && (
