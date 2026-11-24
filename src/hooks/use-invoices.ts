@@ -52,6 +52,21 @@ export function useResendInvoice() {
   });
 }
 
+/** Admin only — cancel an invoice with a reason (it also shows in the enrollment history). */
+export function useCancelInvoice() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, reason }: { id: number; reason: string }) =>
+      invoicesService.cancel(id, reason),
+    onSuccess: (data) => {
+      toast.success(`${data.invoice_number} cancelled`);
+      void qc.invalidateQueries({ queryKey: ["invoices"] });
+      void qc.invalidateQueries({ queryKey: ["lead"] });
+    },
+    onError: (e) => toast.error(apiErrorMessage(e, "Could not cancel the invoice")),
+  });
+}
+
 /** Admin only — global invoice-email CC config. */
 export function useInvoiceEmailConfig(enabled = true) {
   return useQuery({

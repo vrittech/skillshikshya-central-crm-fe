@@ -84,7 +84,15 @@ function InvoicesTab({ studentId }: { studentId: number }) {
       {invoices.map((i) => (
         <li key={i.id} className="flex items-center justify-between gap-3 py-3">
           <div className="min-w-0">
-            <p className="font-mono text-xs font-semibold">{i.invoice_number}</p>
+            <p className="font-mono text-xs font-semibold">
+              {i.invoice_number}
+              {i.status === "cancelled" && (
+                <span className="text-destructive ml-2 font-sans">Cancelled</span>
+              )}
+            </p>
+            {i.status === "cancelled" && i.cancel_reason && (
+              <p className="text-muted-foreground truncate text-xs">Reason: {i.cancel_reason}</p>
+            )}
             <p className="text-muted-foreground truncate text-xs">
               {i.type_display ?? i.type} · {i.course_name || "—"} · {formatDate(i.created_at)}
             </p>
@@ -93,7 +101,15 @@ function InvoicesTab({ studentId }: { studentId: number }) {
             </p>
           </div>
           <div className="flex shrink-0 items-center gap-1.5">
-            <span className="text-sm font-medium tabular-nums">{formatNPR(Number(i.amount))}</span>
+            <span
+              className={
+                i.status === "cancelled"
+                  ? "text-muted-foreground text-sm font-medium tabular-nums line-through"
+                  : "text-sm font-medium tabular-nums"
+              }
+            >
+              {formatNPR(Number(i.amount))}
+            </span>
             {i.pdf_url && (
               <Button
                 variant="ghost"
@@ -105,7 +121,7 @@ function InvoicesTab({ studentId }: { studentId: number }) {
                 <ExternalLink />
               </Button>
             )}
-            {user?.is_staff && (
+            {user?.is_staff && i.status !== "cancelled" && (
               <Button
                 variant="ghost"
                 size="icon"

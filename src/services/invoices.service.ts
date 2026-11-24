@@ -29,6 +29,12 @@ export const invoicesService = {
     return data;
   },
 
+  /** Admin only — cancel a wrong invoice. The reason is required and kept. */
+  async cancel(id: number, reason: string) {
+    const { data } = await api.post<ApiInvoice>(`/invoices/${id}/cancel/`, { reason });
+    return data;
+  },
+
   /** Admin only — global CC list applied to every invoice email. */
   async emailConfig() {
     const { data } = await api.get<InvoiceEmailConfig>("/invoices/email-config/");
