@@ -25,6 +25,8 @@ import { CALL_OUTCOMES, COUNSELORS, counselorName } from "@/data/lead-lookups";
 import { formatDateToNepalIso, toNepalIso } from "@/lib/leads-format";
 import { useAddCall, useAddFollowup, useAssignLead } from "@/hooks/use-leads";
 import { useCounselors } from "@/hooks/use-users";
+import { parseDuration, formatDurationPreview } from "@/lib/duration";
+import { apiErrorMessage } from "@/lib/api";
 
 export type LeadAction = "log_call" | "follow_up" | "assign" | null;
 
@@ -95,6 +97,7 @@ export function LeadActionDialogs({ action, lead, onClose }: Props) {
   const [call, setCall] = useState<CallForm>(EMPTY_CALL);
   const [fu, setFu] = useState<FollowUpForm>(EMPTY_FU);
   const [assignTo, setAssignTo] = useState("");
+  const [durationError, setDurationError] = useState<string | null>(null);
 
   // Pre-select the current owner when the Assign dialog opens.
   useEffect(() => {
@@ -111,6 +114,8 @@ export function LeadActionDialogs({ action, lead, onClose }: Props) {
     : (counselorsQ.data?.results ?? []).map((u) => ({ value: String(u.id), label: u.name }));
   // Default the follow-up owner to the lead's counsellor, else the current user.
   const fuAssigned = fu.assignedTo || lead?.assignedTo || (user?.id != null ? String(user.id) : "");
+  const parsed = call.duration.trim() ? parseDuration(call.duration) : undefined;
+
 
   function done(message: string) {
     toast.success(message, { description: "Static prototype — no data was changed." });
@@ -124,13 +129,14 @@ export function LeadActionDialogs({ action, lead, onClose }: Props) {
       setCall(EMPTY_CALL);
       return;
     }
+    if (parsed === null) return; // the message is already shown under the field
     addCall.mutate(
       {
         call_timestamp: new Date().toISOString(),
         caller: user?.id ?? null,
         direction: call.direction,
         outcome: call.outcome || null,
-        duration_seconds: call.duration ? Math.round(Number(call.duration) * 60) : null,
+        duration_input: call.duration.trim() || null,
         recording_url: call.recording.trim() || null,
         notes: call.notes.trim() || null,
         next_followup_at: call.nextFollowUp ? toNepalIso(call.nextFollowUp) : null,
@@ -140,8 +146,10 @@ export function LeadActionDialogs({ action, lead, onClose }: Props) {
       {
         onSuccess: () => {
           setCall(EMPTY_CALL);
+          setDurationError(null);
           onClose();
         },
+        onError: (e) => setDurationError(apiErrorMessage(e, "Could not log call")),
       },
     );
   }
@@ -215,14 +223,26 @@ export function LeadActionDialogs({ action, lead, onClose }: Props) {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
-                <Label>Duration (minutes)</Label>
+                <Label htmlFor="call-duration">Duration</Label>
                 <Input
-                  type="number"
-                  min={0}
-                  placeholder="e.g. 4"
+                  id="call-duration"
+                  type="text"
+                  inputMode="text"
+                  placeholder="MM:SS, e.g. 4:19"
                   value={call.duration}
-                  onChange={(e) => setC("duration", e.target.value)}
+                  onChange={(e) => {
+                    setC("duration", e.target.value);
+                    setDurationError(null);
+                  }}
+                  aria-invalid={parsed === null || durationError != null}
                 />
+                {parsed != null && (
+                  <p className="text-xs text-muted-foreground">{formatDurationPreview(parsed)}</p>
+                )}
+                {parsed === null && (
+                  <p className="text-xs text-destructive">Use MM:SS, e.g. 4:19 (or 4m19s, or seconds)</p>
+                )}
+                {durationError && <p className="text-xs text-destructive">{durationError}</p>}
               </div>
               <div className="grid gap-2">
                 <Label>Recording link</Label>

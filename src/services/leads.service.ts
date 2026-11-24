@@ -14,6 +14,7 @@ import type {
   ApiLeadPayload,
   ApiPayment,
   ApiPaymentPayload,
+  ApiLeadCallCreated,
 } from "@/types/leads-api";
 
 /** Query params accepted by GET /api/leads/ (see be-mds/lead_app_lead_api_guide.md). */
@@ -73,6 +74,8 @@ export interface CallListParams {
   /** e.g. "-call_timestamp" for newest first. */
   ordering?: string;
 }
+
+export type AddCallPayload = Partial<ApiLeadCall> & { duration_input?: string | null };
 
 export const leadsService = {
   async list(params: LeadListParams = {}) {
@@ -186,11 +189,11 @@ export const leadsService = {
     const { data } = await api.get<Paginated<ApiLeadCall>>(`/leads/${leadId}/calls/`, { params });
     return data;
   },
-  async addCall(leadId: number, payload: Partial<ApiLeadCall>) {
-    const { data } = await api.post<ApiLeadCall>(`/leads/${leadId}/calls/`, payload);
+  async addCall(leadId: number, payload: AddCallPayload) {
+    const { data } = await api.post<ApiLeadCallCreated>(`/leads/${leadId}/calls/`, payload);
     return data;
   },
-  /** PATCH a call — backend silently ignores duration_seconds/caller changes. */
+ 
   async updateCall(leadId: number, callId: number, payload: Partial<ApiLeadCall>) {
     const { data } = await api.patch<ApiLeadCall>(`/leads/${leadId}/calls/${callId}/`, payload);
     return data;
