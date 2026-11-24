@@ -69,8 +69,7 @@ export default function BatchesPage({ defaultTab = "course-batches" }: { default
       <div className="space-y-6">
         <PageHeading />
         <div className="text-muted-foreground rounded-2xl border border-dashed py-16 text-center text-sm">
-          Batches are a live-backend feature. Toggle to <span className="font-semibold">Live</span>{" "}
-          in the header.
+          Switch to Live data to see batches.
         </div>
       </div>
     );
@@ -81,7 +80,7 @@ export default function BatchesPage({ defaultTab = "course-batches" }: { default
       <PageHeading />
       <Tabs value={tab} onValueChange={(v) => setTab(v as "course-batches" | "slots")}>
         <TabsList>
-          <TabsTrigger value="course-batches">Course Batches</TabsTrigger>
+          <TabsTrigger value="course-batches">Batches</TabsTrigger>
           <TabsTrigger value="slots">Time slots</TabsTrigger>
         </TabsList>
         <TabsContent value="course-batches" className="mt-6">
@@ -163,7 +162,7 @@ function CourseBatchesTab({ canAdd, canChange, canDelete }: TabPerms) {
           <div className="relative max-w-sm min-w-[16rem]">
             <Search className="text-muted-foreground absolute top-2.5 left-3 size-4" />
             <Input
-              placeholder="Search name or cohort ID…"
+              placeholder="Search name or batch ID…"
               className="rounded-full pl-9"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -214,7 +213,7 @@ function CourseBatchesTab({ canAdd, canChange, canDelete }: TabPerms) {
               setFormOpen(true);
             }}
           >
-            <Plus /> New Course Batch
+            <Plus /> New batch
           </Button>
         )}
       </div>
@@ -223,8 +222,8 @@ function CourseBatchesTab({ canAdd, canChange, canDelete }: TabPerms) {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Cohort</TableHead>
-              <TableHead>Cohort ID</TableHead>
+              <TableHead>Batch</TableHead>
+              <TableHead>Batch ID</TableHead>
               <TableHead>Course</TableHead>
               <TableHead>Time slot</TableHead>
               <TableHead>Runs</TableHead>
@@ -245,7 +244,7 @@ function CourseBatchesTab({ canAdd, canChange, canDelete }: TabPerms) {
             {!isLoading && rows.length === 0 && (
               <TableRow>
                 <TableCell colSpan={8} className="text-muted-foreground py-10 text-center">
-                  No course batches found.
+                  No batches found.
                 </TableCell>
               </TableRow>
             )}
@@ -301,7 +300,7 @@ function CourseBatchesTab({ canAdd, canChange, canDelete }: TabPerms) {
           page={page}
           count={data?.count ?? 0}
           shown={rows.length}
-          noun="course batches"
+          noun="batches"
           onPage={setPage}
         />
       </div>
@@ -383,7 +382,7 @@ function SlotsTab({ canAdd, canChange, canDelete }: TabPerms) {
           <TableHeader>
             <TableRow>
               <TableHead>Name</TableHead>
-              <TableHead>Description</TableHead>
+              <TableHead>Time</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="w-10" />
             </TableRow>
@@ -446,7 +445,7 @@ function SlotsTab({ canAdd, canChange, canDelete }: TabPerms) {
 
       <ConfirmDelete
         name={deleting?.name}
-        description="Course batches using this time slot keep running but lose the slot reference."
+        description="This cannot be undone."
         onCancel={() => setDeleting(null)}
         onConfirm={() => {
           if (deleting) del.mutate(deleting.id);

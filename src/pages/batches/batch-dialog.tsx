@@ -3,7 +3,6 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -70,9 +69,6 @@ export function BatchDialog({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>{batch ? `Edit ${batch.name}` : "New time slot"}</DialogTitle>
-          <DialogDescription>
-            Time slots are shared across courses — a cohort picks one of these.
-          </DialogDescription>
         </DialogHeader>
         <form onSubmit={submit} className="space-y-4">
           <div className="grid gap-2">
@@ -86,7 +82,7 @@ export function BatchDialog({
             />
           </div>
           <div className="grid gap-2">
-            <Label htmlFor="batch-description">Description</Label>
+            <Label htmlFor="batch-description">Time</Label>
             <Input
               id="batch-description"
               placeholder="6:00 AM – 8:00 AM"

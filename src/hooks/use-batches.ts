@@ -81,10 +81,10 @@ export function useCreateCourseBatch() {
     mutationFn: (payload: CourseBatchPayload) => courseBatchesService.create(payload),
     onSuccess: (cb) => {
       // coursebatch_id is generated server-side — show it so it can be quoted to the lead.
-      toast.success(`Course batch "${cb.name}" created`, { description: cb.coursebatch_id });
+      toast.success(`Batch "${cb.name}" created`, { description: cb.coursebatch_id });
       void qc.invalidateQueries({ queryKey: ["course-batches"] });
     },
-    onError: (e) => toast.error(apiErrorMessage(e, "Could not create course batch")),
+    onError: (e) => toast.error(apiErrorMessage(e, "Could not create batch")),
   });
 }
 
@@ -94,10 +94,10 @@ export function useUpdateCourseBatch() {
     mutationFn: ({ id, payload }: { id: number; payload: CourseBatchPayload }) =>
       courseBatchesService.update(id, payload),
     onSuccess: () => {
-      toast.success("Course batch updated");
+      toast.success("Batch updated");
       void qc.invalidateQueries({ queryKey: ["course-batches"] });
     },
-    onError: (e) => toast.error(apiErrorMessage(e, "Could not update course batch")),
+    onError: (e) => toast.error(apiErrorMessage(e, "Could not update batch")),
   });
 }
 
@@ -106,10 +106,10 @@ export function useDeleteCourseBatch() {
   return useMutation({
     mutationFn: (id: number) => courseBatchesService.remove(id),
     onSuccess: () => {
-      toast.success("Course batch deleted");
+      toast.success("Batch deleted");
       void qc.invalidateQueries({ queryKey: ["course-batches"] });
     },
-    onError: (e) => toast.error(apiErrorMessage(e, "Could not delete course batch")),
+    onError: (e) => toast.error(apiErrorMessage(e, "Could not delete batch")),
   });
 }
 
