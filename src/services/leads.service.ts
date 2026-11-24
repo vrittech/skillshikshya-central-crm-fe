@@ -1,6 +1,8 @@
 import { api } from "@/lib/api";
 import type { Paginated } from "@/types";
 import type {
+  ApiAdjustment,
+  ApiAdjustmentKind,
   ApiCourseInterest,
   ApiEnrollment,
   ApiEnrollmentHistory,
@@ -153,6 +155,18 @@ export const leadsService = {
     const { data } = await api.post<ApiEnrollment>(
       `/leads/${leadId}/enrollments/${id}/reinstate/`,
       { reason },
+    );
+    return data;
+  },
+  /** Add an extra charge, discount, write-off or refund (needs a reason). */
+  async addAdjustment(
+    leadId: number,
+    enrollmentId: number,
+    payload: { kind: ApiAdjustmentKind; amount: string; reason: string },
+  ) {
+    const { data } = await api.post<ApiAdjustment>(
+      `/leads/${leadId}/enrollments/${enrollmentId}/adjustments/`,
+      payload,
     );
     return data;
   },

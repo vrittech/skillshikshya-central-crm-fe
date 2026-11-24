@@ -301,6 +301,12 @@ export interface ApiEnrollment {
   branch?: number | null;
   branch_name?: string | null;
   total_paid: string;
+  /** Sums of the money entries (see ApiAdjustment). */
+  extra_charges_total?: string;
+  discounts_total?: string;
+  write_offs_total?: string;
+  refunds_total?: string;
+  /** agreed + extra charges - discounts - write-offs - paid + refunds. Below 0 = credit. */
   remaining_amount: string;
   is_full_paid: boolean;
   created_by?: number | null;
@@ -361,6 +367,22 @@ export interface ApiPayment {
   voided_by_name?: string | null;
   voided_at?: string | null;
   created_at?: string;
+}
+
+export type ApiAdjustmentKind = "extra_charge" | "discount" | "write_off" | "refund";
+
+/** A money entry on an enrollment besides payments. Only ever added, always with a reason. */
+export interface ApiAdjustment {
+  id: number;
+  enrollment: number;
+  kind: ApiAdjustmentKind;
+  kind_display: string;
+  amount: string;
+  reason: string;
+  branch: number | null;
+  created_by: number;
+  created_by_name: string | null;
+  created_at: string;
 }
 
 /** What a reason-trail row records — mirrors EnrollmentHistory.Action. */

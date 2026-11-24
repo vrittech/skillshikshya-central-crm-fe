@@ -23,6 +23,7 @@ import { getLeadById, LEAD_LIST } from "@/data/mock-leads";
 import { isOverdue } from "@/lib/leads-format";
 import { leadsService, type LeadListParams } from "@/services/leads.service";
 import type {
+  ApiAdjustmentKind,
   ApiEnrollment,
   ApiEnrollmentHistory,
   ApiEnrollmentPayload,
@@ -567,6 +568,21 @@ export function useEnrollmentHistory(leadId?: number, enrollmentId?: number, loa
     history: (query.data?.results ?? []) as ApiEnrollmentHistory[],
     isLoading: enabled && query.isLoading,
   };
+}
+
+/** Add a money entry (extra charge, discount, write-off, refund) with a reason. */
+export function useAddAdjustment(leadId?: number, enrollmentId?: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: { kind: ApiAdjustmentKind; amount: string; reason: string }) =>
+      leadsService.addAdjustment(leadId as number, enrollmentId as number, payload),
+    onSuccess: (data) => {
+      toast.success(`${data.kind_display} added`);
+      void qc.invalidateQueries({ queryKey: ["lead"] });
+      void qc.invalidateQueries({ queryKey: ["enrollments"] });
+    },
+    onError: (e) => toast.error(apiErrorMessage(e, "Could not add the money entry")),
+  });
 }
 
 /** Cancel or reinstate an enrollment. Both need a reason and add a history row. */

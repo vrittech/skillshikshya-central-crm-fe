@@ -2,6 +2,7 @@ import {
   Ban,
   ChevronDown,
   ChevronRight,
+  Coins,
   PencilLine,
   Plus,
   Receipt,
@@ -43,6 +44,7 @@ import type {
   ApiPayment,
   ApiPaymentStatus,
 } from "@/types/leads-api";
+import { AdjustmentDialog } from "./adjustment-dialog";
 import { EnrollmentDialog, PaymentDialog } from "./enrollment-dialogs";
 import { PaymentActions } from "./payment-actions";
 
@@ -231,10 +233,18 @@ function EnrollmentCard({
   const [statusAction, setStatusAction] = useState<"cancel" | "reinstate" | null>(null);
   const statusMutation = useEnrollmentStatusAction(leadId);
   const isCancelled = enrollment.status === "cancelled";
+  const [adjustOpen, setAdjustOpen] = useState(false);
   const agreed = Number(enrollment.agreed_amount);
   const paid = Number(enrollment.total_paid);
+  const extras = Number(enrollment.extra_charges_total ?? 0);
+  const discounts = Number(enrollment.discounts_total ?? 0);
+  const writeOffs = Number(enrollment.write_offs_total ?? 0);
+  const refunds = Number(enrollment.refunds_total ?? 0);
   const remaining = Number(enrollment.remaining_amount);
-  const pct = agreed > 0 ? Math.min(100, Math.round((paid / agreed) * 100)) : 0;
+  // What the student must pay in the end, and what they have paid net of refunds.
+  const due = agreed + extras - discounts - writeOffs;
+  const netPaid = paid - refunds;
+  const pct = due > 0 ? Math.max(0, Math.min(100, Math.round((netPaid / due) * 100))) : 100;
 
   return (
     <div className="rounded-2xl border p-4">
@@ -264,8 +274,16 @@ function EnrollmentCard({
           <Fee label="Agreed amount" value={formatNPR(agreed)} strong />
         </div>
         <div>
+          {extras > 0 && <Fee label="Extra charges" value={`+ ${formatNPR(extras)}`} />}
+          {discounts > 0 && <Fee label="Later discounts" value={`− ${formatNPR(discounts)}`} />}
+          {writeOffs > 0 && <Fee label="Written off" value={`− ${formatNPR(writeOffs)}`} />}
           <Fee label="Paid" value={formatNPR(paid)} />
-          <Fee label="Remaining" value={formatNPR(remaining)} strong />
+          {refunds > 0 && <Fee label="Refunded" value={`+ ${formatNPR(refunds)}`} />}
+          <Fee
+            label={remaining < 0 ? "Credit (we owe)" : "Remaining"}
+            value={formatNPR(Math.abs(remaining))}
+            strong
+          />
           {enrollment.student_name && <Fee label="Student" value={enrollment.student_name} />}
           {enrollment.created_by_name && (
             <Fee label="Created by" value={enrollment.created_by_name} />
@@ -279,7 +297,7 @@ function EnrollmentCard({
           style={{ width: `${pct}%` }}
         />
       </div>
-      <p className="text-muted-foreground mt-1 text-xs">{pct}% of the agreed amount collected</p>
+      <p className="text-muted-foreground mt-1 text-xs">{pct}% of the amount due collected</p>
 
       {enrollment.remarks && (
         <p className="text-muted-foreground mt-3 text-sm">{enrollment.remarks}</p>
@@ -307,6 +325,9 @@ function EnrollmentCard({
           <>
             <Button size="sm" variant="outline" onClick={() => setPayOpen(true)}>
               <Receipt /> Add Payment
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => setAdjustOpen(true)}>
+              <Coins /> Money entry
             </Button>
             <Button size="sm" variant="outline" onClick={onEdit}>
               <PencilLine /> Edit
@@ -346,6 +367,13 @@ function EnrollmentCard({
         onClose={() => setPayOpen(false)}
         leadId={leadId}
         enrollmentApiId={enrollment.id}
+      />
+
+      <AdjustmentDialog
+        open={adjustOpen}
+        onClose={() => setAdjustOpen(false)}
+        leadId={leadId}
+        enrollment={enrollment}
       />
 
       <ReasonDialog

@@ -252,27 +252,35 @@ export function EnrollmentDialog({
               <p className="text-muted-foreground text-xs">Use Reinstate on the card to reopen it.</p>
             )}
           </div>
+          {/* The price is fixed once saved; later changes are money entries with a reason. */}
           <div className="grid gap-2">
             <Label>Listed fee</Label>
-            <Input type="number" value={f.listed_fee ?? ""} onChange={(e) => set("listed_fee", e.target.value)} />
+            <Input type="number" value={f.listed_fee ?? ""} disabled={isEdit} onChange={(e) => set("listed_fee", e.target.value)} />
           </div>
           <div className="grid gap-2">
             <Label>Standard discount</Label>
-            <Input type="number" value={f.standard_discount ?? ""} onChange={(e) => set("standard_discount", e.target.value)} />
+            <Input type="number" value={f.standard_discount ?? ""} disabled={isEdit} onChange={(e) => set("standard_discount", e.target.value)} />
           </div>
           <div className="grid gap-2">
             <Label>Additional discount</Label>
-            <Input type="number" value={f.additional_discount ?? ""} onChange={(e) => set("additional_discount", e.target.value)} />
+            <Input type="number" value={f.additional_discount ?? ""} disabled={isEdit} onChange={(e) => set("additional_discount", e.target.value)} />
           </div>
           <div className="grid gap-2">
             <Label>Agreed amount</Label>
             <Input
               type="number"
               value={f.agreed_amount ?? ""}
+              disabled={isEdit}
               onChange={(e) => set("agreed_amount", e.target.value)}
               placeholder={agreedAuto}
             />
           </div>
+          {isEdit && (
+            <p className="text-muted-foreground text-xs sm:col-span-2">
+              The price is fixed after saving. Use “Money entry” on the card for an extra charge,
+              discount, write-off or refund.
+            </p>
+          )}
           <div className="grid gap-2 sm:col-span-2">
             <Label>Remarks</Label>
             <Textarea rows={2} value={f.remarks ?? ""} onChange={(e) => set("remarks", e.target.value)} />
