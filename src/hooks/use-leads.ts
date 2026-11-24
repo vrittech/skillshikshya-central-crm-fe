@@ -8,6 +8,8 @@ import {
 import { toast } from "sonner";
 import { useDataSource } from "@/context/data-source";
 import { apiErrorMessage } from "@/lib/api";
+import { phoneMatchOf } from "@/lib/phone-match";
+import { useDebouncedValue } from "@/lib/use-debounced-value";
 import {
   adaptApiCall,
   adaptApiActivity,
@@ -229,7 +231,24 @@ export function useCreateLead() {
       toast.success(`Lead "${lead.full_name}" created`);
       void qc.invalidateQueries({ queryKey: ["leads"] });
     },
-    onError: (e) => toast.error(apiErrorMessage(e, "Could not create lead")),
+    onError: (e) => {
+      // A phone match is shown on the form itself.
+      if (phoneMatchOf(e)) return;
+      toast.error(apiErrorMessage(e, "Could not create lead"));
+    },
+  });
+}
+
+/** Leads in any branch with the typed phone number (7 digits or more). */
+export function usePhoneMatch(phone: string, exclude?: number) {
+  const { isMock } = useDataSource();
+  const debounced = useDebouncedValue(phone.trim(), 400);
+  const digits = debounced.replace(/\D/g, "");
+  return useQuery({
+    queryKey: ["leads", "phone-match", debounced, exclude],
+    queryFn: () => leadsService.phoneMatch(debounced, exclude),
+    enabled: !isMock && digits.length >= 7,
+    staleTime: 30_000,
   });
 }
 

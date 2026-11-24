@@ -4,6 +4,7 @@ import type {
   ApiAdjustment,
   ApiAdjustmentKind,
   ApiCourseInterest,
+  ApiPhoneMatch,
   ApiEnrollment,
   ApiEnrollmentHistory,
   ApiEnrollmentPayload,
@@ -93,6 +94,13 @@ export const leadsService = {
   },
   async create(payload: ApiLeadPayload) {
     const { data } = await api.post<ApiLead>("/leads/", payload);
+    return data;
+  },
+  /** Leads in any branch with this phone number. */
+  async phoneMatch(phone: string, exclude?: number) {
+    const { data } = await api.get<ApiPhoneMatch[]>("/leads/phone-match/", {
+      params: { phone, exclude },
+    });
     return data;
   },
   async update(id: number, payload: ApiLeadPayload) {

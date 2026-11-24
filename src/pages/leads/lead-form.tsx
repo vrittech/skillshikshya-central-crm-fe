@@ -52,11 +52,13 @@ import {
   useLeadStatuses,
   useLeadTypes,
 } from "@/hooks/use-lead-config";
-import { useCreateLead, useLead, useUpdateLead } from "@/hooks/use-leads";
+import { useCreateLead, useLead, usePhoneMatch, useUpdateLead } from "@/hooks/use-leads";
 import { useCounselors } from "@/hooks/use-users";
 import { leadsService } from "@/services/leads.service";
 import { BranchDialog } from "@/pages/branches/branch-dialog";
-import type { ApiBranch, ApiLeadPayload } from "@/types/leads-api";
+import { phoneMatchOf } from "@/lib/phone-match";
+import type { ApiBranch, ApiLeadPayload, ApiPhoneMatch } from "@/types/leads-api";
+import { PhoneMatchBox } from "./components/phone-match";
 import type { EducationLevel, LeadCustomData, LeadTypeCode, LearningMode, Shift } from "@/types/leads";
 
 interface Option {
@@ -518,7 +520,27 @@ export default function LeadFormPage() {
 
   const num = (v: string) => (v ? Number(v) : null);
 
-  function save() {
+  // Leads with the same phone number, from any branch.
+  const phoneQ = usePhoneMatch(form.phone, editing ? existing?.apiId : undefined);
+  const secondPhoneQ = usePhoneMatch(form.secondary_phone, editing ? existing?.apiId : undefined);
+  const [refusedMatches, setRefusedMatches] = useState<ApiPhoneMatch[]>([]);
+  useEffect(() => setRefusedMatches([]), [form.phone, form.secondary_phone]);
+  const phoneMatches = useMemo(() => {
+    const byId = new Map<number, ApiPhoneMatch>();
+    for (const m of [...(phoneQ.data ?? []), ...(secondPhoneQ.data ?? []), ...refusedMatches]) {
+      byId.set(m.id, m);
+    }
+    return [...byId.values()];
+  }, [phoneQ.data, secondPhoneQ.data, refusedMatches]);
+  const pickedCourses = useMemo(
+    () =>
+      [...new Set([form.primary_course, ...form.additional_courses].filter(Boolean).map(Number))].filter(
+        Number.isFinite,
+      ),
+    [form.primary_course, form.additional_courses],
+  );
+
+  function save(allowDuplicatePhone = false) {
     if (!form.full_name.trim() || !form.phone.trim()) {
       toast.error("Full name and phone are required.");
       return;
@@ -576,7 +598,18 @@ export default function LeadFormPage() {
       // mock edit — no persistence
       updateLead.mutate({ id: 0, payload }, { onSuccess: () => done(id) });
     } else {
-      createLead.mutate(payload, { onSuccess: (lead) => syncThenDone(lead?.id, lead?.id) });
+      createLead.mutate(
+        allowDuplicatePhone ? { ...payload, allow_duplicate_phone: true } : payload,
+        {
+          onSuccess: (lead) => syncThenDone(lead?.id, lead?.id),
+          onError: (e) => {
+            const matches = phoneMatchOf(e);
+            if (!matches) return;
+            setRefusedMatches(matches);
+            toast.error("A lead with this phone number already exists.");
+          },
+        },
+      );
     }
   }
 
@@ -612,6 +645,17 @@ export default function LeadFormPage() {
         <Field label="Secondary Phone">
           <Input value={form.secondary_phone} onChange={(e) => set("secondary_phone", e.target.value)} placeholder="Optional" />
         </Field>
+        {apiEnabled && phoneMatches.length > 0 && (
+          <div className="sm:col-span-2">
+            <PhoneMatchBox
+              matches={phoneMatches}
+              courses={pickedCourses}
+              creating={!editing}
+              saving={saving}
+              onSaveAnyway={() => save(true)}
+            />
+          </div>
+        )}
         <Field label="Email Address">
           <Input type="email" value={form.email} onChange={(e) => set("email", e.target.value)} placeholder="name@example.com" />
         </Field>
@@ -890,7 +934,7 @@ export default function LeadFormPage() {
           <Button variant="outline" onClick={() => navigate(editing ? `/leads/${id}` : "/leads")}>
             Cancel
           </Button>
-          <Button variant="brand" onClick={save} disabled={saving}>
+          <Button variant="brand" onClick={() => save()} disabled={saving}>
             {saving ? "Saving…" : editing ? "Save Changes" : "Save Lead"}
           </Button>
         </div>

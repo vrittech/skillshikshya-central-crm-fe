@@ -168,6 +168,8 @@ export interface ApiLead {
 export interface ApiLeadPayload {
   full_name?: string;
   phone?: string;
+  /** Save even when another lead has this phone number. */
+  allow_duplicate_phone?: boolean;
   secondary_phone?: string | null;
   email?: string | null;
   address?: string | null;
@@ -860,3 +862,29 @@ export interface ApiTeamsLicenceParams {
   batch?: number;
   branch_id?: number;
 }
+
+/** A lead found by phone number, from any branch. */
+export interface ApiPhoneMatch {
+  id: number;
+  reference_number: string;
+  full_name: string;
+  phone: string | null;
+  secondary_phone: string | null;
+  email: string | null;
+  branch: number | null;
+  branch_name: string | null;
+  counselor_name: string | null;
+  status_name: string | null;
+  is_converted: boolean;
+  is_archived: boolean;
+  created_at: string;
+  enquiries: {
+    id: number;
+    course: number | null;
+    course_name: string | null;
+    stage: ApiEnquiryStage;
+    stage_display: string;
+    branch_name: string | null;
+  }[];
+}
+
