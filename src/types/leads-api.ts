@@ -244,6 +244,9 @@ export interface ApiFollowup {
   assigned_to_name?: string;
   scheduled_at: string;
   purpose: string | null;
+  /** Set on payment follow-ups made by the reminder job. */
+  enrollment?: number | null;
+  enrollment_course_name?: string | null;
   reminder_at: string | null;
   status: ApiFollowupStatus;
   completed_at?: string | null;
@@ -331,6 +334,23 @@ export interface ApiEnrollment {
 export type ApiSeatState = "seated" | "paused" | "none";
 
 export type ApiDueStatus = "paid" | "part_paid" | "due" | "late";
+
+/** One payment reminder sent for an enrollment (lead.ReminderLog). */
+export interface ApiReminderLog {
+  id: number;
+  due_on: string;
+  amount: string;
+  step: "before_due" | "due_today" | "late" | "call";
+  step_display: string;
+  channel: "email" | "sms" | "follow_up";
+  channel_display: string;
+  sent_to: string;
+  status: "sending" | "sent" | "failed" | "skipped";
+  status_display: string;
+  error: string;
+  followup: number | null;
+  created_at: string;
+}
 
 /** One row of services.due_rows(): a part of the plan, or an extra charge. */
 export interface ApiDueRow {
@@ -535,6 +555,8 @@ export interface ApiFollowupListRow {
   scheduled_at: string;
   purpose: string | null;
   status: ApiFollowupStatus;
+  enrollment?: number | null;
+  enrollment_course_name?: string | null;
   branch?: number | null;
   branch_name?: string;
 }

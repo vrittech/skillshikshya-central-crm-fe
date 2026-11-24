@@ -54,7 +54,7 @@ import type {
   ApiSeatAction,
 } from "@/types/leads-api";
 import { AdjustmentDialog } from "./adjustment-dialog";
-import { ChangeDueDatesDialog, DueDatesList, DuePartsEditor } from "./due-dates";
+import { ChangeDueDatesDialog, DueDatesList, DuePartsEditor, ReminderList } from "./due-dates";
 import { EnrollmentDialog, PaymentDialog } from "./enrollment-dialogs";
 import { PaymentActions } from "./payment-actions";
 import { SeatButtons, SeatDialog, SeatHistoryList } from "./seat-actions";
@@ -251,6 +251,7 @@ function EnrollmentCard({
   const [showHistory, setShowHistory] = useState(false);
   const [showSeats, setShowSeats] = useState(false);
   const [showDue, setShowDue] = useState(false);
+  const [showReminders, setShowReminders] = useState(false);
   const [dueOpen, setDueOpen] = useState(false);
   const [confirmParts, setConfirmParts] = useState<ApiDuePart[]>([]);
   const feeInvoice = useMakeFeeInvoice(leadId);
@@ -369,6 +370,16 @@ function EnrollmentCard({
             {showDue ? <ChevronDown /> : <ChevronRight />} Due dates
           </Button>
         )}
+        {canSit(enrollment) && (
+          <Button
+            size="sm"
+            variant="ghost"
+            className="text-muted-foreground"
+            onClick={() => setShowReminders((v) => !v)}
+          >
+            {showReminders ? <ChevronDown /> : <ChevronRight />} Reminders
+          </Button>
+        )}
         <Button
           size="sm"
           variant="ghost"
@@ -449,6 +460,12 @@ function EnrollmentCard({
               </Button>
             </div>
           )}
+        </div>
+      )}
+
+      {showReminders && (
+        <div className="mt-1 border-t pt-2">
+          <ReminderList leadId={leadId} enrollmentId={enrollment.id} />
         </div>
       )}
 

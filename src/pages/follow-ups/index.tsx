@@ -2,7 +2,15 @@ import { CalendarClock, Check, Plus, Search } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useDataSource } from "@/context/data-source";
@@ -29,7 +37,10 @@ function FollowUpItem({ row, canComplete }: { row: FollowUpRow; canComplete: boo
           {initialsOf(row.leadName)}
         </span>
         <div className="min-w-0 flex-1">
-          <p className="font-semibold">{row.leadName}</p>
+          <p className="flex items-center gap-2 font-semibold">
+            {row.leadName}
+            {row.payment && <Badge variant="warning">Payment</Badge>}
+          </p>
           <p className="text-muted-foreground truncate text-xs">
             {row.purpose ?? "Follow-up"}
             {row.phone && <> · {formatPhone(row.phone)}</>}
@@ -70,15 +81,20 @@ export default function FollowUpsPage() {
   const { rows, isLoading } = useFollowUps();
   const [search, setSearch] = useState("");
   const [view, setView] = useState<"all" | "overdue" | "today" | "upcoming">("all");
+  const [kind, setKind] = useState<"all" | "payment" | "other">("all");
   const [pickerOpen, setPickerOpen] = useState(false);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return rows;
-    return rows.filter((r) =>
-      `${r.leadName} ${r.phone} ${r.purpose ?? ""} ${r.assignedToName ?? ""}`.toLowerCase().includes(q),
+    return rows.filter(
+      (r) =>
+        (kind === "all" || (kind === "payment") === !!r.payment) &&
+        (!q ||
+          `${r.leadName} ${r.phone} ${r.purpose ?? ""} ${r.assignedToName ?? ""}`
+            .toLowerCase()
+            .includes(q)),
     );
-  }, [rows, search]);
+  }, [rows, search, kind]);
 
   const grouped = useMemo(
     () => ({
@@ -113,6 +129,18 @@ export default function FollowUpsPage() {
               <TabsTrigger value="upcoming">Upcoming ({grouped.upcoming.length})</TabsTrigger>
             </TabsList>
           </Tabs>
+          {!isMock && (
+            <Select value={kind} onValueChange={(v) => setKind(v as typeof kind)}>
+              <SelectTrigger className="h-9 w-36">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All types</SelectItem>
+                <SelectItem value="payment">Payment</SelectItem>
+                <SelectItem value="other">Other</SelectItem>
+              </SelectContent>
+            </Select>
+          )}
           {!isMock && canComplete && (
             <Button size="sm" variant="outline" onClick={() => setPickerOpen(true)}>
               <Plus /> Add Follow-up

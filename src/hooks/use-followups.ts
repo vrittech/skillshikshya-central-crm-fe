@@ -19,6 +19,9 @@ export interface FollowUpRow {
   purpose?: string;
   dueAt: string;
   assignedToName?: string;
+  /** A payment follow-up made by the reminder job, and its course. */
+  payment?: boolean;
+  courseName?: string;
   bucket: FollowUpBucket;
 }
 
@@ -55,6 +58,8 @@ export function useFollowUps() {
         purpose: f.purpose ?? undefined,
         dueAt: f.scheduled_at,
         assignedToName: f.assigned_to_name,
+        payment: f.enrollment != null,
+        courseName: f.enrollment_course_name ?? undefined,
         bucket: bucketOf(f.scheduled_at),
       }));
   } else {

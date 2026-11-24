@@ -561,6 +561,17 @@ export function useUpdateEnrollment(leadId?: number) {
 }
 
 /** Reason trail of one enrollment (who, when, what, from → to, why). */
+export function useEnrollmentReminders(leadId?: number, enrollmentId?: number, load = true) {
+  const { source } = useDataSource();
+  const enabled = source === "api" && leadId != null && enrollmentId != null && load;
+  const query = useQuery({
+    queryKey: ["lead", "reminders", leadId, enrollmentId],
+    enabled,
+    queryFn: () => leadsService.enrollmentReminders(leadId as number, enrollmentId as number),
+  });
+  return { reminders: query.data?.results ?? [], isLoading: enabled && query.isLoading };
+}
+
 export function useEnrollmentHistory(leadId?: number, enrollmentId?: number, load = true) {
   const { source } = useDataSource();
   const enabled = source === "api" && leadId != null && enrollmentId != null && load;

@@ -11,7 +11,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useSetDueDates } from "@/hooks/use-leads";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useEnrollmentReminders, useSetDueDates } from "@/hooks/use-leads";
 import {
   addMonths,
   currentParts,
@@ -20,10 +21,16 @@ import {
   splitEvenly,
   sumParts,
 } from "@/lib/due-dates";
-import { formatDate, formatNPR } from "@/lib/leads-format";
+import { formatDate, formatDateTime, formatNPR } from "@/lib/leads-format";
 import { localToday } from "@/lib/seats";
 import { cn } from "@/lib/utils";
-import type { ApiDuePart, ApiDueRow, ApiDueStatus, ApiEnrollment } from "@/types/leads-api";
+import type {
+  ApiDuePart,
+  ApiDueRow,
+  ApiDueStatus,
+  ApiEnrollment,
+  ApiReminderLog,
+} from "@/types/leads-api";
 
 /* ------------------------------------------------------------ the list */
 
@@ -86,6 +93,48 @@ export function DueDatesList({ rows }: { rows: ApiDueRow[] }) {
         ))}
       </tbody>
     </table>
+  );
+}
+
+/* ------------------------------------------------------------ reminders */
+
+const REMINDER_TONE: Record<ApiReminderLog["status"], string> = {
+  sent: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
+  sending: "bg-muted text-muted-foreground",
+  failed: "bg-destructive/10 text-destructive",
+  skipped: "bg-amber-500/15 text-amber-700 dark:text-amber-300",
+};
+
+/** Payment reminders sent for an enrollment, newest first. */
+export function ReminderList({ leadId, enrollmentId }: { leadId?: number; enrollmentId: number }) {
+  const { reminders, isLoading } = useEnrollmentReminders(leadId, enrollmentId);
+  if (isLoading) return <Skeleton className="h-12 w-full rounded-xl" />;
+  if (!reminders.length) return <p className="text-muted-foreground py-3 text-sm">No reminders.</p>;
+  return (
+    <ul className="divide-border divide-y">
+      {reminders.map((r) => (
+        <li key={r.id} className="flex flex-wrap items-start justify-between gap-2 py-2.5">
+          <div className="min-w-0">
+            <p className="text-sm font-medium">
+              {r.step_display} · {formatDate(r.due_on)} · {formatNPR(Number(r.amount))}
+            </p>
+            <p className="text-muted-foreground text-xs">
+              {formatDateTime(r.created_at)} · {r.channel_display}
+              {r.sent_to ? ` · ${r.sent_to}` : ""}
+              {r.error ? ` · ${r.error}` : ""}
+            </p>
+          </div>
+          <span
+            className={cn(
+              "rounded-full px-2.5 py-0.5 text-xs font-medium",
+              REMINDER_TONE[r.status],
+            )}
+          >
+            {r.status_display}
+          </span>
+        </li>
+      ))}
+    </ul>
   );
 }
 

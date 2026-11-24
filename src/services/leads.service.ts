@@ -20,6 +20,7 @@ import type {
   ApiSeatAction,
   ApiSeatActionBody,
   ApiDuePart,
+  ApiReminderLog,
 } from "@/types/leads-api";
 import type { ApiInvoice } from "@/types/invoices";
 
@@ -205,6 +206,14 @@ export const leadsService = {
     const { data } = await api.post<ApiAdjustment>(
       `/leads/${leadId}/enrollments/${enrollmentId}/adjustments/`,
       payload,
+    );
+    return data;
+  },
+  /** Payment reminders sent for one enrollment, newest first. */
+  async enrollmentReminders(leadId: number, enrollmentId: number) {
+    const { data } = await api.get<Paginated<ApiReminderLog>>(
+      `/leads/${leadId}/enrollments/${enrollmentId}/reminders/`,
+      { params: { page_size: 100 } },
     );
     return data;
   },
