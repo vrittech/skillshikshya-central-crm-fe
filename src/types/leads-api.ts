@@ -299,6 +299,10 @@ export interface ApiEnrollment {
   seat_state?: ApiSeatState;
   /** Seat history, newest first. */
   placements?: ApiPlacement[];
+  /** What is due, oldest first, with what is paid on each. Empty while pending. */
+  due_dates?: ApiDueRow[];
+  /** An active course-fee invoice exists. */
+  has_fee_invoice?: boolean;
   enrollment_date: string | null;
   status: ApiEnrollmentStatus;
   listed_fee: string;
@@ -325,6 +329,26 @@ export interface ApiEnrollment {
 }
 
 export type ApiSeatState = "seated" | "paused" | "none";
+
+export type ApiDueStatus = "paid" | "part_paid" | "due" | "late";
+
+/** One row of services.due_rows(): a part of the plan, or an extra charge. */
+export interface ApiDueRow {
+  kind: "part" | "extra_charge";
+  /** null = no due date set (enrollments confirmed before due dates existed). */
+  due_on: string | null;
+  amount: string;
+  paid: string;
+  left: string;
+  status: ApiDueStatus;
+  days_late: number;
+}
+
+/** One due date sent to Confirm or Change due dates. */
+export interface ApiDuePart {
+  due_on: string;
+  amount: string;
+}
 
 /** One seat change — mirrors lead.Placement.Kind. */
 export type ApiPlacementKind = "join" | "move" | "pause" | "resume" | "leave";

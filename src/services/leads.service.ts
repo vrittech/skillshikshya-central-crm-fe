@@ -19,7 +19,9 @@ import type {
   ApiPaymentPayload,
   ApiSeatAction,
   ApiSeatActionBody,
+  ApiDuePart,
 } from "@/types/leads-api";
+import type { ApiInvoice } from "@/types/invoices";
 
 /** Query params accepted by GET /api/leads/ (see be-mds/lead_app_lead_api_guide.md). */
 export interface LeadListParams {
@@ -146,8 +148,26 @@ export const leadsService = {
   },
   /** Cancel with a reason — the only way to cancel; PATCH refuses it. */
   /** Confirm a pending enrollment. This makes the lead a student and sends the fee invoice. */
-  async confirmEnrollment(leadId: number, id: number) {
-    const { data } = await api.post<ApiEnrollment>(`/leads/${leadId}/enrollments/${id}/confirm/`, {});
+  async confirmEnrollment(leadId: number, id: number, dueDates?: ApiDuePart[]) {
+    const { data } = await api.post<ApiEnrollment>(
+      `/leads/${leadId}/enrollments/${id}/confirm/`,
+      dueDates?.length ? { due_dates: dueDates } : {},
+    );
+    return data;
+  },
+
+  /** Change the due dates, with a reason. The parts must add up to the agreed amount. */
+  async setDueDates(leadId: number, id: number, dueDates: ApiDuePart[], reason: string) {
+    const { data } = await api.post<ApiEnrollment>(
+      `/leads/${leadId}/enrollments/${id}/due-dates/`,
+      { due_dates: dueDates, reason },
+    );
+    return data;
+  },
+
+  /** Make a new fee invoice when the old one was cancelled. */
+  async makeFeeInvoice(leadId: number, id: number) {
+    const { data } = await api.post<ApiInvoice>(`/leads/${leadId}/enrollments/${id}/fee-invoice/`, {});
     return data;
   },
 

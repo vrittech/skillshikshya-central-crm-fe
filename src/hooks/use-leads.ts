@@ -35,6 +35,7 @@ import type {
   ApiPaymentPayload,
   ApiSeatAction,
   ApiSeatActionBody,
+  ApiDuePart,
   EnrollmentListParams,
   PaymentListParams,
 } from "@/types/leads-api";
@@ -594,8 +595,8 @@ export function useAddAdjustment(leadId?: number, enrollmentId?: number) {
 export function useConfirmEnrollment() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ leadId, id }: { leadId: number; id: number }) =>
-      leadsService.confirmEnrollment(leadId, id),
+    mutationFn: ({ leadId, id, dueDates }: { leadId: number; id: number; dueDates?: ApiDuePart[] }) =>
+      leadsService.confirmEnrollment(leadId, id, dueDates),
     onSuccess: () => {
       toast.success("Enrollment confirmed");
       // Confirm also takes a seat, so batch seat counts change.
@@ -604,6 +605,37 @@ export function useConfirmEnrollment() {
       }
     },
     onError: (e) => toast.error(apiErrorMessage(e, "Could not confirm the enrollment")),
+  });
+}
+
+/** Change the due dates of an enrollment, with a reason. */
+export function useSetDueDates(leadId?: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, dueDates, reason }: { id: number; dueDates: ApiDuePart[]; reason: string }) =>
+      leadsService.setDueDates(leadId as number, id, dueDates, reason),
+    onSuccess: () => {
+      toast.success("Due dates changed");
+      for (const key of ["lead", "enrollments", "reports"]) {
+        void qc.invalidateQueries({ queryKey: [key] });
+      }
+    },
+    onError: (e) => toast.error(apiErrorMessage(e, "Could not change the due dates")),
+  });
+}
+
+/** Make a new fee invoice after the old one was cancelled. */
+export function useMakeFeeInvoice(leadId?: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => leadsService.makeFeeInvoice(leadId as number, id),
+    onSuccess: (invoice) => {
+      toast.success("Fee invoice created", { description: invoice.invoice_number });
+      for (const key of ["lead", "enrollments", "invoices"]) {
+        void qc.invalidateQueries({ queryKey: [key] });
+      }
+    },
+    onError: (e) => toast.error(apiErrorMessage(e, "Could not create the fee invoice")),
   });
 }
 

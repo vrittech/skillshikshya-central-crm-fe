@@ -1,15 +1,17 @@
 import {
   Ban,
   BadgeCheck,
+  CalendarClock,
   ChevronDown,
   ChevronRight,
   Coins,
+  FileText,
   PencilLine,
   Plus,
   Receipt,
   RotateCcw,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { ReasonDialog } from "@/components/reason-dialog";
 import { Badge } from "@/components/ui/badge";
@@ -37,11 +39,14 @@ import {
   useEnrollmentStatusAction,
   useLeadEnrollments,
   useLeadPayments,
+  useMakeFeeInvoice,
 } from "@/hooks/use-leads";
+import { daysText, dueSummary, partsAreValid, splitEvenly } from "@/lib/due-dates";
 import { formatDate, formatDateTime, formatNPR } from "@/lib/leads-format";
-import { canSit, enrolledBatchIfDifferent, seatText } from "@/lib/seats";
+import { canSit, enrolledBatchIfDifferent, localToday, seatText } from "@/lib/seats";
 import { cn } from "@/lib/utils";
 import type {
+  ApiDuePart,
   ApiEnrollment,
   ApiEnrollmentStatus,
   ApiPayment,
@@ -49,6 +54,7 @@ import type {
   ApiSeatAction,
 } from "@/types/leads-api";
 import { AdjustmentDialog } from "./adjustment-dialog";
+import { ChangeDueDatesDialog, DueDatesList, DuePartsEditor } from "./due-dates";
 import { EnrollmentDialog, PaymentDialog } from "./enrollment-dialogs";
 import { PaymentActions } from "./payment-actions";
 import { SeatButtons, SeatDialog, SeatHistoryList } from "./seat-actions";
@@ -179,7 +185,15 @@ function EnrollmentPayments({
 /** "status: active → cancelled · amount: 10000.00" — unchanged values are shown once. */
 function changeText(before: Record<string, unknown>, after: Record<string, unknown>) {
   const keys = [...new Set([...Object.keys(before ?? {}), ...Object.keys(after ?? {})])];
-  const show = (v: unknown) => (v == null || v === "" ? "—" : label(String(v)));
+  const show = (v: unknown) => {
+    if (Array.isArray(v)) {
+      if (!v.length) return "—";
+      return (v as ApiDuePart[])
+        .map((p) => `${formatDate(p.due_on)} ${formatNPR(Number(p.amount))}`)
+        .join(", ");
+    }
+    return v == null || v === "" ? "—" : label(String(v));
+  };
   return keys
     .map((k) =>
       show(before?.[k]) === show(after?.[k])
@@ -236,6 +250,10 @@ function EnrollmentCard({
   const [showPayments, setShowPayments] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [showSeats, setShowSeats] = useState(false);
+  const [showDue, setShowDue] = useState(false);
+  const [dueOpen, setDueOpen] = useState(false);
+  const [confirmParts, setConfirmParts] = useState<ApiDuePart[]>([]);
+  const feeInvoice = useMakeFeeInvoice(leadId);
   const [seatAction, setSeatAction] = useState<ApiSeatAction | null>(null);
   const [statusAction, setStatusAction] = useState<"cancel" | "reinstate" | null>(null);
   const statusMutation = useEnrollmentStatusAction(leadId);
@@ -256,6 +274,12 @@ function EnrollmentCard({
   const netPaid = paid - refunds;
   const pct = due > 0 ? Math.max(0, Math.min(100, Math.round((netPaid / due) * 100))) : 100;
   const enrolledBatch = enrolledBatchIfDifferent(enrollment);
+  const dueRows = enrollment.due_dates ?? [];
+  const { lateAmount, daysLate, next } = dueSummary(dueRows);
+
+  useEffect(() => {
+    if (confirmOpen) setConfirmParts(splitEvenly(agreed, 1, localToday()));
+  }, [confirmOpen, agreed]);
 
   return (
     <div className="rounded-2xl border p-4">
@@ -308,7 +332,19 @@ function EnrollmentCard({
           style={{ width: `${pct}%` }}
         />
       </div>
-      <p className="text-muted-foreground mt-1 text-xs">{pct}% collected</p>
+      <p className="text-muted-foreground mt-1 text-xs">
+        {pct}% collected
+        {lateAmount > 0 ? (
+          <span className="text-destructive">
+            {" "}
+            · Late {formatNPR(lateAmount)} · {daysText(daysLate)}
+          </span>
+        ) : next?.due_on ? (
+          ` · Next due ${formatDate(next.due_on)}: ${formatNPR(Number(next.left))}`
+        ) : (
+          ""
+        )}
+      </p>
 
       {enrollment.remarks && (
         <p className="text-muted-foreground mt-3 text-sm">{enrollment.remarks}</p>
@@ -323,6 +359,16 @@ function EnrollmentCard({
         >
           {showPayments ? <ChevronDown /> : <ChevronRight />} Payments
         </Button>
+        {canSit(enrollment) && (
+          <Button
+            size="sm"
+            variant="ghost"
+            className="text-muted-foreground"
+            onClick={() => setShowDue((v) => !v)}
+          >
+            {showDue ? <ChevronDown /> : <ChevronRight />} Due dates
+          </Button>
+        )}
         <Button
           size="sm"
           variant="ghost"
@@ -356,6 +402,16 @@ function EnrollmentCard({
             <Button size="sm" variant="outline" onClick={() => setAdjustOpen(true)}>
               <Coins /> Money entry
             </Button>
+            {leadId != null && canSit(enrollment) && enrollment.has_fee_invoice === false && (
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={feeInvoice.isPending}
+                onClick={() => feeInvoice.mutate(enrollment.id)}
+              >
+                <FileText /> Create fee invoice
+              </Button>
+            )}
             <Button size="sm" variant="outline" onClick={onEdit}>
               <PencilLine /> Edit
             </Button>
@@ -380,6 +436,19 @@ function EnrollmentCard({
       {showPayments && (
         <div className="mt-1 border-t pt-2">
           <EnrollmentPayments leadId={leadId} enrollment={enrollment} canManage={canManage} />
+        </div>
+      )}
+
+      {showDue && (
+        <div className="mt-1 border-t pt-2">
+          <DueDatesList rows={dueRows} />
+          {canManage && leadId != null && (
+            <div className="mt-2 flex justify-end">
+              <Button size="sm" variant="outline" onClick={() => setDueOpen(true)}>
+                <CalendarClock /> Change due dates
+              </Button>
+            </div>
+          )}
         </div>
       )}
 
@@ -409,6 +478,13 @@ function EnrollmentCard({
         enrollmentApiId={enrollment.id}
       />
 
+      <ChangeDueDatesDialog
+        leadId={leadId}
+        enrollment={enrollment}
+        open={dueOpen}
+        onClose={() => setDueOpen(false)}
+      />
+
       <AdjustmentDialog
         open={adjustOpen}
         onClose={() => setAdjustOpen(false)}
@@ -426,17 +502,22 @@ function EnrollmentCard({
                 .join(" · ")}
             </DialogDescription>
           </DialogHeader>
+          {agreed > 0 && (
+            <div className="py-2">
+              <DuePartsEditor total={agreed} parts={confirmParts} onChange={setConfirmParts} />
+            </div>
+          )}
           <DialogFooter>
             <Button variant="outline" onClick={() => setConfirmOpen(false)}>
               Back
             </Button>
             <Button
               variant="brand"
-              disabled={confirm.isPending}
+              disabled={confirm.isPending || (agreed > 0 && !partsAreValid(confirmParts, agreed))}
               onClick={() =>
                 leadId != null &&
                 confirm.mutate(
-                  { leadId, id: enrollment.id },
+                  { leadId, id: enrollment.id, dueDates: agreed > 0 ? confirmParts : undefined },
                   { onSuccess: () => setConfirmOpen(false) },
                 )
               }
