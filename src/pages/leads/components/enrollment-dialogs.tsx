@@ -27,16 +27,13 @@ import { useLeadOptions } from "@/hooks/use-lead-options";
 import {
   useAddEnrollment,
   useAddPayment,
-  usePayment,
   useUpdateEnrollment,
-  useUpdatePayment,
   useLeadEnrollments,
 } from "@/hooks/use-leads";
 import type {
   ApiEnrollment,
   ApiEnrollmentPayload,
   ApiEnrollmentStatus,
-  ApiPayment,
   ApiPaymentMethod,
   ApiPaymentPayload,
   ApiPaymentStatus,
@@ -53,7 +50,8 @@ const ENR_STATUS: ApiEnrollmentStatus[] = [
   "transferred",
 ];
 const PAY_METHODS: ApiPaymentMethod[] = ["cash", "esewa", "khalti", "bank_transfer", "card", "connectips"];
-const PAY_STATUS: ApiPaymentStatus[] = ["pending", "successful", "failed", "refunded", "voided"];
+/** A new payment is pending or successful; Confirm and Void change it later. */
+const PAY_STATUS: ApiPaymentStatus[] = ["successful", "pending"];
 
 function num(a: string, b: string) {
   return String((Number(a || "0") - Number(b || "0") - 0).toFixed(2));
@@ -293,26 +291,26 @@ export function EnrollmentDialog({
   );
 }
 
+/**
+ * Record a payment. Payments are never edited: a wrong one is voided (with a
+ * reason) from its row, and the right one recorded again here.
+ */
 export function PaymentDialog({
   open,
   onClose,
   leadId,
   enrollmentApiId,
-  payment,
   allowLeadPick = false,
 }: {
   open: boolean;
   onClose: () => void;
   leadId?: number;
   enrollmentApiId?: number;
-  /** Pass an existing payment to correct it (PATCH) instead of recording a new one. */
-  payment?: ApiPayment | null;
   /** Inline Lead + Enrollment pickers (global flow) when not preset from context. */
   allowLeadPick?: boolean;
 }) {
   const [f, setF] = useState<ApiPaymentPayload>({});
-  const isEdit = !!payment;
-  const needsPickers = allowLeadPick && !isEdit;
+  const needsPickers = allowLeadPick;
   const [pickedLeadId, setPickedLeadId] = useState("");
   const [pickedEnrollmentId, setPickedEnrollmentId] = useState("");
   const [leadSearch, setLeadSearch] = useState("");
@@ -326,8 +324,7 @@ export function PaymentDialog({
   const enrollmentsQ = useLeadEnrollments(needsPickers ? effectiveLeadId : undefined);
   const enrollments = enrollmentsQ.enrollments;
   const addPayment = useAddPayment(effectiveLeadId, effectiveEnrollmentId);
-  const updatePayment = useUpdatePayment(effectiveLeadId, effectiveEnrollmentId);
-  const saving = addPayment.isPending || updatePayment.isPending;
+  const saving = addPayment.isPending;
 
   useEffect(() => {
     if (!open) return;
@@ -335,17 +332,6 @@ export function PaymentDialog({
     setPickedEnrollmentId("");
     setLeadSearch("");
     setEnrollOpen(false);
-    if (payment) {
-      setF({
-        amount: payment.amount,
-        payment_date: payment.payment_date,
-        payment_method: payment.payment_method,
-        status: payment.status,
-        transaction_reference: payment.transaction_reference ?? "",
-        notes: payment.notes ?? "",
-      });
-      return;
-    }
     setF({
       amount: "",
       payment_date: new Date().toISOString(),
@@ -354,7 +340,7 @@ export function PaymentDialog({
       transaction_reference: "",
       notes: "",
     });
-  }, [open, payment]);
+  }, [open]);
 
   // Pre-select when the chosen lead has exactly one enrollment.
   useEffect(() => {
@@ -371,10 +357,6 @@ export function PaymentDialog({
       return;
     }
     if (!f.amount) return;
-    if (payment) {
-      updatePayment.mutate({ id: payment.id, payload: f }, { onSuccess: () => onClose() });
-      return;
-    }
     addPayment.mutate(f, { onSuccess: () => onClose() });
   }
 
@@ -382,11 +364,10 @@ export function PaymentDialog({
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{isEdit ? "Correct payment" : "Record payment"}</DialogTitle>
+          <DialogTitle>Record payment</DialogTitle>
           <DialogDescription>
-            {isEdit
-              ? "Marking a pending payment successful issues its receipt now. Editing an already-successful payment does not reissue one."
-              : "Totals recalculate from successful payments."}
+            Totals count successful payments only. A pending payment is confirmed later from
+            its row.
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-2 sm:grid-cols-2">
@@ -516,7 +497,7 @@ export function PaymentDialog({
             Cancel
           </Button>
           <Button variant="brand" onClick={submit} disabled={saving}>
-            {saving ? "Saving…" : isEdit ? "Save Changes" : "Record Payment"}
+            {saving ? "Saving…" : "Record Payment"}
           </Button>
         </DialogFooter>
 
@@ -529,40 +510,5 @@ export function PaymentDialog({
         />
       </DialogContent>
     </Dialog>
-  );
-}
-
-/**
- * Correct a payment when only its ids are known (the flat `/api/payments/`
- * register). Fetches the full record first so `notes` survives the PATCH.
- */
-export function EditPaymentDialog({
-  open,
-  onClose,
-  leadId,
-  enrollmentId,
-  paymentId,
-}: {
-  open: boolean;
-  onClose: () => void;
-  leadId?: number;
-  enrollmentId?: number;
-  paymentId?: number;
-}) {
-  const { payment } = usePayment(
-    open ? leadId : undefined,
-    open ? enrollmentId : undefined,
-    open ? paymentId : undefined,
-  );
-  if (!open || !payment) return null;
-  return (
-    <PaymentDialog
-      key={payment.id}
-      open
-      onClose={onClose}
-      leadId={leadId}
-      enrollmentApiId={enrollmentId}
-      payment={payment}
-    />
   );
 }

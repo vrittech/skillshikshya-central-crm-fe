@@ -171,12 +171,6 @@ export const leadsService = {
     );
     return data;
   },
-  async payment(leadId: number, enrollmentId: number, id: number) {
-    const { data } = await api.get<ApiPayment>(
-      `/leads/${leadId}/enrollments/${enrollmentId}/payments/${id}/`,
-    );
-    return data;
-  },
   async addPayment(leadId: number, enrollmentId: number, payload: ApiPaymentPayload) {
     const { data } = await api.post<ApiPayment>(
       `/leads/${leadId}/enrollments/${enrollmentId}/payments/`,
@@ -184,20 +178,19 @@ export const leadsService = {
     );
     return data;
   },
-  /**
-   * Correct a recorded payment (amount, method, reference, status…).
-   * Flipping a `pending` payment to `successful` issues its receipt at that moment;
-   * editing an already-successful payment does not regenerate the issued receipt.
-   */
-  async updatePayment(
-    leadId: number,
-    enrollmentId: number,
-    id: number,
-    payload: ApiPaymentPayload,
-  ) {
-    const { data } = await api.patch<ApiPayment>(
-      `/leads/${leadId}/enrollments/${enrollmentId}/payments/${id}/`,
-      payload,
+  /** Pending -> successful (money received). Issues the receipt. */
+  async confirmPayment(leadId: number, enrollmentId: number, id: number) {
+    const { data } = await api.post<ApiPayment>(
+      `/leads/${leadId}/enrollments/${enrollmentId}/payments/${id}/confirm/`,
+      {},
+    );
+    return data;
+  },
+  /** Payments are never edited: a wrong one is voided with a reason. */
+  async voidPayment(leadId: number, enrollmentId: number, id: number, reason: string) {
+    const { data } = await api.post<ApiPayment>(
+      `/leads/${leadId}/enrollments/${enrollmentId}/payments/${id}/void/`,
+      { reason },
     );
     return data;
   },

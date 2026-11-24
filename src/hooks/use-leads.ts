@@ -493,21 +493,6 @@ export function useEnrollmentPayments(
 }
 
 /**
- * One payment by id — used where only the flat `/api/payments/` row is at hand
- * (it omits `notes`), so corrections start from the full record.
- */
-export function usePayment(leadId?: number, enrollmentId?: number, id?: number) {
-  const { source } = useDataSource();
-  const enabled = source === "api" && leadId != null && enrollmentId != null && id != null;
-  const query = useQuery({
-    queryKey: ["lead", "payment", leadId, enrollmentId, id],
-    enabled,
-    queryFn: () => leadsService.payment(leadId as number, enrollmentId as number, id as number),
-  });
-  return { payment: query.data ?? null, isLoading: enabled && query.isLoading };
-}
-
-/**
  * Every payment of a lead, across all of its enrollments (newest first).
  * Shares the cache with `useEnrollmentPayments` (same query keys).
  */
@@ -628,22 +613,36 @@ export function useAddPayment(leadId?: number, enrollmentId?: number) {
 }
 
 /**
- * Correct an existing payment. Marking a pending payment `successful` triggers
- * its receipt email, so invoices are invalidated alongside the billing caches.
+ * Confirm a pending payment (issues its receipt) or void one with a reason.
+ * Payments are never edited — a wrong one is voided and a new one recorded.
  */
-export function useUpdatePayment(leadId?: number, enrollmentId?: number) {
+export function usePaymentAction() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, payload }: { id: number; payload: ApiPaymentPayload }) =>
-      leadsService.updatePayment(leadId as number, enrollmentId as number, id, payload),
-    onSuccess: () => {
-      toast.success("Payment updated");
+    mutationFn: ({
+      leadId,
+      enrollmentId,
+      id,
+      action,
+      reason,
+    }: {
+      leadId: number;
+      enrollmentId: number;
+      id: number;
+      action: "confirm" | "void";
+      reason?: string;
+    }) =>
+      action === "confirm"
+        ? leadsService.confirmPayment(leadId, enrollmentId, id)
+        : leadsService.voidPayment(leadId, enrollmentId, id, reason ?? ""),
+    onSuccess: (_data, vars) => {
+      toast.success(vars.action === "confirm" ? "Payment confirmed" : "Payment voided");
       void qc.invalidateQueries({ queryKey: ["lead"] });
       void qc.invalidateQueries({ queryKey: ["enrollments"] });
       void qc.invalidateQueries({ queryKey: ["payments"] });
       void qc.invalidateQueries({ queryKey: ["invoices"] });
     },
-    onError: (e) => toast.error(apiErrorMessage(e, "Could not update payment")),
+    onError: (e) => toast.error(apiErrorMessage(e, "Could not update the payment")),
   });
 }
 

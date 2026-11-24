@@ -44,6 +44,7 @@ import type {
   ApiPaymentStatus,
 } from "@/types/leads-api";
 import { EnrollmentDialog, PaymentDialog } from "./enrollment-dialogs";
+import { PaymentActions } from "./payment-actions";
 
 /* ------------------------------------------------------------ status tones */
 
@@ -82,6 +83,30 @@ function StatusPill({ status }: { status: ApiEnrollmentStatus }) {
   );
 }
 
+function PaymentPill({ status }: { status: ApiPaymentStatus }) {
+  return (
+    <span
+      className={cn(
+        "rounded-full px-2.5 py-0.5 text-xs font-medium capitalize",
+        PAYMENT_TONE[status] ?? "bg-muted text-muted-foreground",
+      )}
+    >
+      {status}
+    </span>
+  );
+}
+
+/** Why and by whom a payment was voided. */
+function VoidNote({ payment: p }: { payment: ApiPayment }) {
+  if (p.status !== "voided" || !p.void_reason) return null;
+  return (
+    <p className="text-muted-foreground mt-0.5 text-xs">
+      Voided{p.voided_by_name ? ` by ${p.voided_by_name}` : ""}
+      {p.voided_at ? ` on ${formatDateTime(p.voided_at)}` : ""}: “{p.void_reason}”
+    </p>
+  );
+}
+
 function Fee({ label: l, value, strong }: { label: string; value: string; strong?: boolean }) {
   return (
     <div className="flex items-center justify-between gap-4 border-b border-dashed py-1.5 last:border-0">
@@ -103,69 +128,58 @@ function EnrollmentPayments({
   canManage: boolean;
 }) {
   const { payments, isLoading } = useEnrollmentPayments(leadId, enrollment.id);
-  const [editing, setEditing] = useState<ApiPayment | null>(null);
 
   if (isLoading) return <Skeleton className="h-16 w-full rounded-xl" />;
   if (!payments.length)
     return <p className="text-muted-foreground py-3 text-sm">No payments recorded yet.</p>;
 
   return (
-    <>
-      <ul className="divide-border divide-y">
-        {payments.map((p) => (
-          <li key={p.id} className="flex items-center justify-between gap-3 py-2.5">
-            <div className="min-w-0">
-              <p className="text-sm font-medium">{formatNPR(Number(p.amount))}</p>
-              <p className="text-muted-foreground truncate text-xs">
-                {formatDateTime(p.payment_date)} · {label(p.payment_method)} ·{" "}
-                {p.transaction_reference || "no ref"}
-                {p.received_by_name ? ` · by ${p.received_by_name}` : ""}
-              </p>
-              {p.notes && <p className="text-muted-foreground mt-0.5 text-xs italic">{p.notes}</p>}
-            </div>
-            <div className="flex shrink-0 items-center gap-1.5">
-              <span
-                className={cn(
-                  "rounded-full px-2.5 py-0.5 text-xs font-medium capitalize",
-                  PAYMENT_TONE[p.status] ?? "bg-muted text-muted-foreground",
-                )}
-              >
-                {p.status}
-              </span>
-              {canManage && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="text-muted-foreground size-8"
-                  title="Correct payment"
-                  onClick={() => setEditing(p)}
-                >
-                  <PencilLine />
-                </Button>
-              )}
-            </div>
-          </li>
-        ))}
-      </ul>
-
-      <PaymentDialog
-        key={editing?.id ?? "new"}
-        open={editing != null}
-        onClose={() => setEditing(null)}
-        leadId={leadId}
-        enrollmentApiId={enrollment.id}
-        payment={editing}
-      />
-    </>
+    <ul className="divide-border divide-y">
+      {payments.map((p) => (
+        <li key={p.id} className="flex items-center justify-between gap-3 py-2.5">
+          <div className="min-w-0">
+            <p className={cn("text-sm font-medium", p.status === "voided" && "line-through")}>
+              {formatNPR(Number(p.amount))}
+            </p>
+            <p className="text-muted-foreground truncate text-xs">
+              {formatDateTime(p.payment_date)} · {label(p.payment_method)} ·{" "}
+              {p.transaction_reference || "no ref"}
+              {p.received_by_name ? ` · by ${p.received_by_name}` : ""}
+            </p>
+            {p.notes && <p className="text-muted-foreground mt-0.5 text-xs italic">{p.notes}</p>}
+            <VoidNote payment={p} />
+          </div>
+          <div className="flex shrink-0 items-center gap-1.5">
+            <PaymentPill status={p.status} />
+            {canManage && leadId != null && (
+              <PaymentActions
+                leadId={leadId}
+                enrollmentId={enrollment.id}
+                paymentId={p.id}
+                status={p.status}
+                amount={Number(p.amount)}
+              />
+            )}
+          </div>
+        </li>
+      ))}
+    </ul>
   );
 }
 
 /* --------------------------------------------- reason trail of enrollment */
 
+/** "status: active → cancelled · amount: 10000.00" — unchanged values are shown once. */
 function changeText(before: Record<string, unknown>, after: Record<string, unknown>) {
   const keys = [...new Set([...Object.keys(before ?? {}), ...Object.keys(after ?? {})])];
   const show = (v: unknown) => (v == null || v === "" ? "—" : label(String(v)));
-  return keys.map((k) => `${label(k)}: ${show(before?.[k])} → ${show(after?.[k])}`).join(" · ");
+  return keys
+    .map((k) =>
+      show(before?.[k]) === show(after?.[k])
+        ? `${label(k)}: ${show(after?.[k])}`
+        : `${label(k)}: ${show(before?.[k])} → ${show(after?.[k])}`,
+    )
+    .join(" · ");
 }
 
 function EnrollmentHistoryList({ leadId, enrollment }: { leadId?: number; enrollment: ApiEnrollment }) {
@@ -449,7 +463,6 @@ export function LeadPaymentsPanel({
   const [payOpen, setPayOpen] = useState(false);
   const [pickOpen, setPickOpen] = useState(false);
   const [targetEnrollment, setTargetEnrollment] = useState<ApiEnrollment | null>(null);
-  const [editing, setEditing] = useState<{ payment: ApiPayment; enrollmentId: number } | null>(null);
 
   if (isLoading) return <Skeleton className="h-32 w-full rounded-2xl" />;
   if (!rows.length)
@@ -493,7 +506,7 @@ export function LeadPaymentsPanel({
         {rows.map(({ payment: p, enrollment: e }) => (
           <li key={p.id} className="flex items-center justify-between gap-4 py-3">
             <div className="min-w-0">
-              <p className="text-sm font-medium">
+              <p className={cn("text-sm font-medium", p.status === "voided" && "line-through")}>
                 {formatNPR(Number(p.amount))}
                 {e?.course_name && (
                   <span className="text-muted-foreground font-normal"> · {e.course_name}</span>
@@ -504,42 +517,23 @@ export function LeadPaymentsPanel({
                 {p.transaction_reference || "no ref"}
                 {p.received_by_name ? ` · by ${p.received_by_name}` : ""}
               </p>
+              <VoidNote payment={p} />
             </div>
             <div className="flex shrink-0 items-center gap-1.5">
-              <span
-                className={cn(
-                  "rounded-full px-2.5 py-0.5 text-xs font-medium capitalize",
-                  PAYMENT_TONE[p.status] ?? "bg-muted text-muted-foreground",
-                )}
-              >
-                {p.status}
-              </span>
-              {canManage && e && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="text-muted-foreground size-8"
-                  title="Correct payment"
-                  onClick={() => setEditing({ payment: p, enrollmentId: e.id })}
-                >
-                  <PencilLine />
-                </Button>
+              <PaymentPill status={p.status} />
+              {canManage && e && leadId != null && (
+                <PaymentActions
+                  leadId={leadId}
+                  enrollmentId={e.id}
+                  paymentId={p.id}
+                  status={p.status}
+                  amount={Number(p.amount)}
+                />
               )}
             </div>
           </li>
         ))}
       </ul>
-
-      {editing && (
-        <PaymentDialog
-          key={editing.payment.id}
-          open
-          onClose={() => setEditing(null)}
-          leadId={leadId}
-          enrollmentApiId={editing.enrollmentId}
-          payment={editing.payment}
-        />
-      )}
 
       <Dialog open={pickOpen} onOpenChange={(o) => !o && setPickOpen(false)}>
         <DialogContent className="max-w-md">

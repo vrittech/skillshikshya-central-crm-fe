@@ -1,4 +1,4 @@
-import { CreditCard, PencilLine, Search } from "lucide-react";
+import { CreditCard, Search } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
@@ -18,7 +18,8 @@ import { useRole } from "@/context/role";
 import { usePayments } from "@/hooks/use-billing";
 import { formatDateTime, formatNPR } from "@/lib/leads-format";
 import { cn } from "@/lib/utils";
-import { EditPaymentDialog, PaymentDialog } from "@/pages/leads/components/enrollment-dialogs";
+import { PaymentDialog } from "@/pages/leads/components/enrollment-dialogs";
+import { PaymentActions } from "@/pages/leads/components/payment-actions";
 
 const STATUS_TONE: Record<string, string> = {
   successful: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
@@ -37,9 +38,6 @@ export default function PaymentsPage() {
   const [status, setStatus] = useState("all");
   const [method, setMethod] = useState("all");
   const [payOpen, setPayOpen] = useState(false);
-  const [editing, setEditing] = useState<{ leadId: number; enrollmentId: number; id: number } | null>(
-    null,
-  );
   const canEdit = source === "api" && can("payment.manage");
 
   const statuses = useMemo(() => [...new Set(rows.map((r) => r.status))].sort(), [rows]);
@@ -134,7 +132,7 @@ export default function PaymentsPage() {
                 <TableHead>Status</TableHead>
                 <TableHead>Received by</TableHead>
                 <TableHead>Date</TableHead>
-                {canEdit && <TableHead className="w-12" />}
+                {canEdit && <TableHead className="w-20" />}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -180,21 +178,15 @@ export default function PaymentsPage() {
                   {canEdit && (
                     <TableCell onClick={(e) => e.stopPropagation()}>
                       {p.leadId && p.enrollmentId && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="text-muted-foreground size-8"
-                          title="Correct payment"
-                          onClick={() =>
-                            setEditing({
-                              leadId: Number(p.leadId),
-                              enrollmentId: Number(p.enrollmentId),
-                              id: Number(p.id),
-                            })
-                          }
-                        >
-                          <PencilLine />
-                        </Button>
+                        <div className="flex items-center gap-1">
+                          <PaymentActions
+                            leadId={Number(p.leadId)}
+                            enrollmentId={Number(p.enrollmentId)}
+                            paymentId={Number(p.id)}
+                            status={p.status}
+                            amount={p.amount}
+                          />
+                        </div>
                       )}
                     </TableCell>
                   )}
@@ -206,14 +198,6 @@ export default function PaymentsPage() {
       </div>
 
       <PaymentDialog open={payOpen} onClose={() => setPayOpen(false)} allowLeadPick />
-
-      <EditPaymentDialog
-        open={editing != null}
-        onClose={() => setEditing(null)}
-        leadId={editing?.leadId}
-        enrollmentId={editing?.enrollmentId}
-        paymentId={editing?.id}
-      />
     </div>
   );
 }

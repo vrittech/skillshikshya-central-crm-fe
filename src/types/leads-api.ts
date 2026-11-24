@@ -355,6 +355,11 @@ export interface ApiPayment {
   branch?: number | null;
   received_by?: number | null;
   received_by_name?: string;
+  /** Set when the payment was voided (with a required reason). */
+  void_reason?: string | null;
+  voided_by?: number | null;
+  voided_by_name?: string | null;
+  voided_at?: string | null;
   created_at?: string;
 }
 
