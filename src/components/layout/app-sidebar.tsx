@@ -14,6 +14,7 @@ import {
   TrendingUp,
   UserRound,
   Users,
+  Wallet,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { NavLink } from "react-router-dom";
@@ -37,6 +38,7 @@ const navItems: NavItem[] = [
   { to: "/enrollments", label: "Enrollments", icon: GraduationCap, cap: "enrollment.manage" },
   { to: "/payments", label: "Payments", icon: CreditCard, cap: "payment.manage" },
   { to: "/invoices", label: "Invoices", icon: FileText, cap: "payment.manage" },
+  { to: "/dues", label: "Dues", icon: Wallet, cap: "reports.view" },
   { to: "/students", label: "Students", icon: GraduationCap },
   { to: "/reports", label: "Reports", icon: TrendingUp, cap: "reports.view" },
   { to: "/calls", label: "Calls", icon: PhoneCall },

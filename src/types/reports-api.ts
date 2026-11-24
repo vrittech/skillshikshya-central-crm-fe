@@ -210,3 +210,75 @@ export interface CounselorPerformanceReport {
 export interface CounselorPerformanceParams extends ReportBaseParams {
   sort_by?: CounselorSortBy;
 }
+
+/* ------------------------------------------------------------ money owed */
+
+/** Who a dues row is about — shared by Who owes and Due in month. */
+export interface DuesPerson {
+  enrollment: number;
+  lead: number;
+  name: string;
+  phone: string | null;
+  student_id: string | null;
+  course_name: string;
+  /** The money batch. */
+  batch_name: string | null;
+  branch_name: string | null;
+}
+
+export interface WhoOwesRow extends DuesPerson {
+  owed: string;
+  late: string;
+  /** Days since the oldest late part was due; 0 when nothing is late. */
+  days_late: number;
+  next_due_on: string | null;
+  next_due_amount: string | null;
+}
+
+export interface WhoOwesReport {
+  as_of: string;
+  summary: {
+    students: number;
+    total_owed: string;
+    total_late: string;
+    not_late: string;
+    days_1_30: string;
+    days_31_60: string;
+    days_61_90: string;
+    over_90: string;
+  };
+  results: WhoOwesRow[];
+  error?: string;
+}
+
+export interface WhoOwesParams {
+  branch_id?: number;
+  course?: number;
+  batch?: number;
+  late_only?: boolean;
+}
+
+export interface DueInMonthRow extends DuesPerson {
+  kind: "part" | "extra_charge";
+  due_on: string;
+  amount: string;
+  paid: string;
+  left: string;
+}
+
+export interface DueInMonthReport {
+  month: string;
+  start_date: string;
+  end_date: string;
+  summary: { total_due: string; parts: number; students: number };
+  results: DueInMonthRow[];
+  error?: string;
+}
+
+export interface DueInMonthParams {
+  branch_id?: number;
+  /** YYYY-MM; next month when left out. */
+  month?: string;
+  course?: number;
+  batch?: number;
+}

@@ -2,9 +2,11 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { reportsService } from "@/services/reports.service";
 import type {
   CounselorPerformanceParams,
+  DueInMonthParams,
   EnrollmentsReportParams,
   LeadTrendParams,
   ReportBaseParams,
+  WhoOwesParams,
 } from "@/types/reports-api";
 
 /** Shared staleTime — report aggregates don't need to be real-time. */
@@ -89,5 +91,23 @@ export function useCounselorPerformance(params: CounselorPerformanceParams, enab
     enabled,
     placeholderData: keepPreviousData,
     staleTime: STALE,
+  });
+}
+
+export function useWhoOwes(params: WhoOwesParams, enabled = true) {
+  return useQuery({
+    queryKey: ["reports", "who-owes", params],
+    queryFn: () => reportsService.whoOwes(params),
+    enabled,
+    placeholderData: keepPreviousData,
+  });
+}
+
+export function useDueInMonth(params: DueInMonthParams, enabled = true) {
+  return useQuery({
+    queryKey: ["reports", "due-in-month", params],
+    queryFn: () => reportsService.dueInMonth(params),
+    enabled,
+    placeholderData: keepPreviousData,
   });
 }

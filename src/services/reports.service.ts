@@ -4,6 +4,8 @@ import type {
   CounselorPerformanceParams,
   CounselorPerformanceReport,
   DimensionReport,
+  DueInMonthParams,
+  DueInMonthReport,
   EnrollmentsReport,
   EnrollmentsReportParams,
   LeadTrendParams,
@@ -13,6 +15,8 @@ import type {
   OverviewReport,
   ReportBaseParams,
   RevenueReport,
+  WhoOwesParams,
+  WhoOwesReport,
 } from "@/types/reports-api";
 
 /** Serializes report params, dropping empty values. */
@@ -23,6 +27,18 @@ function clean(params: object) {
 }
 
 export const reportsService = {
+  /** Every student who owes money, most late first. */
+  async whoOwes(params: WhoOwesParams) {
+    const { data } = await api.get<WhoOwesReport>("/reports/who-owes/", { params: clean(params) });
+    return data;
+  },
+  /** Unpaid parts due in a month (next month by default). */
+  async dueInMonth(params: DueInMonthParams) {
+    const { data } = await api.get<DueInMonthReport>("/reports/due-in-month/", {
+      params: clean(params),
+    });
+    return data;
+  },
   async names() {
     const { data } = await api.get<{ available_reports: string[] }>("/reports/");
     return data.available_reports;

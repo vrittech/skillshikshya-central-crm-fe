@@ -8,6 +8,7 @@ import CallMinutesPage from "@/pages/call-minutes";
 import ComingSoonPage from "@/pages/coming-soon";
 import CoursesPage from "@/pages/courses";
 import DashboardPage from "@/pages/dashboard";
+import DuesPage from "@/pages/dues";
 import EnrollmentsPage from "@/pages/enrollments";
 import FollowUpsPage from "@/pages/follow-ups";
 import InvoicesPage from "@/pages/invoices";
@@ -50,6 +51,7 @@ export default function App() {
           <Route path="/enrollments" element={<EnrollmentsPage />} />
           <Route path="/payments" element={<PaymentsPage />} />
           <Route path="/invoices" element={<InvoicesPage />} />
+          <Route path="/dues" element={<DuesPage />} />
           <Route path="/reports" element={<ReportsPage />} />
           <Route path="/settings" element={<SettingsPage />} />
 
