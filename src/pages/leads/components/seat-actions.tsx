@@ -14,7 +14,7 @@ import {
 import { useCourseBatches } from "@/hooks/use-batches";
 import { useSeatAction } from "@/hooks/use-leads";
 import { formatDate } from "@/lib/leads-format";
-import { canSit, isFull, localToday, placementTitle, seatsLabel } from "@/lib/seats";
+import { batchOption, canSit, localToday, placementTitle, takesNoOne } from "@/lib/seats";
 import type { ApiEnrollment, ApiSeatAction } from "@/types/leads-api";
 
 /** Change batch and Pause for a seated student, Resume for a paused one, Add to batch otherwise. */
@@ -128,16 +128,16 @@ export function SeatDialog({
       }
     >
       {needsBatch && (
-        <div className="grid gap-2">
+        <div className="grid min-w-0 gap-2">
           <Label required>Batch</Label>
           <Select value={batch || undefined} onValueChange={setBatch} disabled={batchesQ.isLoading}>
-            <SelectTrigger>
+            <SelectTrigger className="min-w-0 [&>span]:text-ellipsis">
               <SelectValue placeholder={batchesQ.isLoading ? "Loading batches…" : "Select batch"} />
             </SelectTrigger>
             <SelectContent>
               {options.map((b) => (
-                <SelectItem key={b.id} value={String(b.id)} disabled={isFull(b)}>
-                  {b.coursebatch_id} — {b.name} · {seatsLabel(b)}
+                <SelectItem key={b.id} value={String(b.id)} disabled={takesNoOne(b)}>
+                  {batchOption(b)}
                 </SelectItem>
               ))}
             </SelectContent>

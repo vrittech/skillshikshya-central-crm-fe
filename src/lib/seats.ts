@@ -1,3 +1,4 @@
+import { batchShift } from "@/lib/time-slots";
 import type { CourseBatch } from "@/types";
 import type { ApiEnrollment, ApiPlacement } from "@/types/leads-api";
 
@@ -8,16 +9,21 @@ export function canSit(e: ApiEnrollment) {
   return SEAT_STATUSES.has(e.status);
 }
 
-/** A batch with a seat limit and no seat left. */
-export function isFull(b: CourseBatch) {
-  return b.capacity != null && !b.seats_left;
+/** The seat count decides: a batch with no seats set, or no seat left, takes no one. */
+export function takesNoOne(b: CourseBatch) {
+  return b.capacity == null || !b.seats_left;
 }
 
-/** "12 seats left", "full" or "no seat limit" for a batch picker. */
+/** "12 of 25 seats left", "full" or "no seats set" for a batch picker. */
 export function seatsLabel(b: CourseBatch) {
-  if (b.capacity == null) return "no seat limit";
+  if (b.capacity == null) return "no seats set";
   if (!b.seats_left) return "full";
-  return `${b.seats_left} ${b.seats_left === 1 ? "seat" : "seats"} left`;
+  return `${b.seats_left} of ${b.capacity} seats left`;
+}
+
+/** One line for a batch in a picker: "PY-2026-001 — Python Nov · Morning · 6:00 AM – 8:00 AM · 5 of 25 seats left". */
+export function batchOption(b: CourseBatch) {
+  return [`${b.coursebatch_id} — ${b.name}`, batchShift(b), seatsLabel(b)].filter(Boolean).join(" · ");
 }
 
 /** Today in the browser's own time zone, as YYYY-MM-DD. */

@@ -218,9 +218,12 @@ export interface CourseBatch {
   course_name?: string;
   batch: number | null;
   batch_name?: string | null;
+  /** The time slot's times, "HH:MM" (read-only). */
+  batch_start_time?: string | null;
+  batch_end_time?: string | null;
   start_date: string | null;
   end_date: string | null;
-  /** Number of seats. null = no limit. */
+  /** Number of seats. Required; null only on older batches made before that, which take no one. */
   capacity: number | null;
   mode: CourseBatchMode;
   mode_display?: string;
@@ -229,7 +232,7 @@ export interface CourseBatch {
   trainer: string | null;
   /** Students sitting in the batch now (read-only). */
   seats_taken?: number;
-  /** capacity - seats_taken, never below 0. null = no limit. */
+  /** capacity - seats_taken, never below 0. null when no seats are set. */
   seats_left?: number | null;
   /** Pending enrollments that chose this batch; they take a seat on confirm. */
   waiting_count?: number;

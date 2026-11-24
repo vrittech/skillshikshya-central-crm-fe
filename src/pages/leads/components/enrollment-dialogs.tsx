@@ -6,7 +6,6 @@ import { Combobox } from "@/components/ui/combobox";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -40,7 +39,7 @@ import type {
   ApiPaymentStatus,
 } from "@/types/leads-api";
 import { toNepalIso } from "@/lib/leads-format";
-import { seatsLabel } from "@/lib/seats";
+import { batchOption, takesNoOne } from "@/lib/seats";
 
 const ENR_STATUS: ApiEnrollmentStatus[] = [
   "pending",
@@ -198,7 +197,6 @@ export function EnrollmentDialog({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>{isEdit ? "Edit enrollment" : "Create enrollment"}</DialogTitle>
-          <DialogDescription>Record the lead, course, batch, and agreed fee.</DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-2 sm:grid-cols-2">
           {needsLead && (
@@ -243,7 +241,7 @@ export function EnrollmentDialog({
               </SelectContent>
             </Select>
           </div>
-          <div className="grid gap-2 sm:col-span-2">
+          <div className="grid min-w-0 gap-2 sm:col-span-2">
             <Label>Course Batch</Label>
             <Select
               value={f.batch != null ? String(f.batch) : undefined}
@@ -255,7 +253,7 @@ export function EnrollmentDialog({
               }}
               disabled={seatLocked || !f.course || batchesQ.isLoading}
             >
-              <SelectTrigger>
+              <SelectTrigger className="min-w-0 [&>span]:text-ellipsis">
                 <SelectValue placeholder={f.course ? "Select course batch" : "Select a course first"} />
               </SelectTrigger>
               <SelectContent>
@@ -265,14 +263,20 @@ export function EnrollmentDialog({
                   </SelectItem>
                 )}
                 {batches.map((b) => (
-                  <SelectItem key={b.id} value={String(b.id)}>
-                    {b.coursebatch_id} — {b.name} · {seatsLabel(b)}
+                  <SelectItem
+                    key={b.id}
+                    value={String(b.id)}
+                    disabled={takesNoOne(b) && b.id !== enrollment?.batch}
+                  >
+                    {batchOption(b)}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
-            {!seatLocked && chosenBatch?.capacity != null && chosenBatch.seats_left === 0 && (
-              <p className="text-xs text-amber-600 dark:text-amber-400">This batch is full.</p>
+            {!seatLocked && chosenBatch && takesNoOne(chosenBatch) && (
+              <p className="text-xs text-amber-600 dark:text-amber-400">
+                {chosenBatch.capacity == null ? "This batch has no seats set." : "This batch is full."}
+              </p>
             )}
           </div>
           <div className="grid gap-2">
@@ -439,7 +443,6 @@ export function PaymentDialog({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Record payment</DialogTitle>
-          <DialogDescription>Record a payment for this enrollment.</DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-2 sm:grid-cols-2">
           {needsPickers && (

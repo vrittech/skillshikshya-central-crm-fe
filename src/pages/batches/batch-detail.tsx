@@ -10,6 +10,7 @@ import { useAuth } from "@/context/auth";
 import { useDataSource } from "@/context/data-source";
 import { useCourseBatch } from "@/hooks/use-batches";
 import { formatDate } from "@/lib/leads-format";
+import { batchShift } from "@/lib/time-slots";
 import type { CourseBatch } from "@/types";
 import { BatchMoneyPanel } from "./batch-money-panel";
 import { BatchStudentsPanel } from "./batch-students-panel";
@@ -32,7 +33,8 @@ function Seats({ batch }: { batch: CourseBatch }) {
   const full = batch.capacity != null && batch.seats_left === 0;
   return (
     <span className="inline-flex items-center gap-1.5 tabular-nums">
-      {batch.capacity == null ? `${taken} · no limit` : `${taken} / ${batch.capacity}`}
+      {batch.capacity == null ? taken : `${taken} / ${batch.capacity}`}
+      {batch.capacity == null && <Badge variant="warning">No seats set</Badge>}
       {full && <Badge variant="warning">Full</Badge>}
     </span>
   );
@@ -112,7 +114,7 @@ export default function BatchDetailPage() {
         </div>
         <div className="grid gap-4 sm:grid-cols-3 lg:grid-cols-5">
           <Fact label="Course">{batch.course_name ?? "—"}</Fact>
-          <Fact label="Time slot">{batch.batch_name || "—"}</Fact>
+          <Fact label="Time slot">{batchShift(batch) ?? "—"}</Fact>
           <Fact label="Starts">{batch.start_date ? formatDate(batch.start_date) : "—"}</Fact>
           <Fact label="Ends">{batch.end_date ? formatDate(batch.end_date) : "—"}</Fact>
           <Fact label="Mode">{batch.mode_display ?? batch.mode}</Fact>

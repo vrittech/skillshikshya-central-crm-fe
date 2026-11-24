@@ -47,7 +47,7 @@ import {
 } from "@/hooks/use-batches";
 import { formatDate } from "@/lib/leads-format";
 import type { Batch, CourseBatch, CourseBatchStatus } from "@/types";
-import { durationText, slotTimes } from "@/lib/time-slots";
+import { durationText, slotTimes, timeLabel } from "@/lib/time-slots";
 import { BatchDialog } from "./batch-dialog";
 import { CourseBatchDialog } from "./course-batch-dialog";
 import { STATUS_BADGE, STATUS_LABEL } from "./status";
@@ -262,7 +262,14 @@ function CourseBatchesTab({ canAdd, canChange, canDelete }: TabPerms) {
                 </TableCell>
                 <TableCell className="font-mono text-sm">{cb.coursebatch_id}</TableCell>
                 <TableCell>{cb.course_name ?? "—"}</TableCell>
-                <TableCell className="text-muted-foreground">{cb.batch_name || "—"}</TableCell>
+                <TableCell className="text-sm">
+                  {cb.batch_name || "—"}
+                  {cb.batch_start_time && cb.batch_end_time && (
+                    <div className="text-muted-foreground text-xs">
+                      {timeLabel(cb.batch_start_time)} – {timeLabel(cb.batch_end_time)}
+                    </div>
+                  )}
+                </TableCell>
                 <TableCell className="text-muted-foreground text-sm">
                   {cb.start_date ? formatDate(cb.start_date) : "—"}
                   {cb.end_date ? ` → ${formatDate(cb.end_date)}` : ""}
@@ -459,7 +466,7 @@ function SlotsTab({ canAdd, canChange, canDelete }: TabPerms) {
   );
 }
 
-/** "12 / 30" with a Full badge, or "12 · no limit", and the pending count. */
+/** "12 / 30" with a Full badge, or "No seats set" on an older batch, and the pending count. */
 function SeatsCell({ batch }: { batch: CourseBatch }) {
   const taken = batch.seats_taken ?? 0;
   const full = batch.capacity != null && batch.seats_left === 0;
@@ -469,7 +476,7 @@ function SeatsCell({ batch }: { batch: CourseBatch }) {
         <span className="font-medium tabular-nums">
           {batch.capacity == null ? taken : `${taken} / ${batch.capacity}`}
         </span>
-        {batch.capacity == null && <span className="text-muted-foreground">· no limit</span>}
+        {batch.capacity == null && <Badge variant="warning">No seats set</Badge>}
         {full && <Badge variant="warning">Full</Badge>}
       </div>
       {!!batch.waiting_count && (

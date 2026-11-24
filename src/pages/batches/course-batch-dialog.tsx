@@ -33,7 +33,7 @@ interface FormState {
   batch: string;
   start_date: string;
   end_date: string;
-  /** Seats as typed; "" = no limit. */
+  /** Seats as typed. Required, 1 or more. */
   capacity: string;
   mode: CourseBatchMode;
   status: CourseBatchStatus;
@@ -109,14 +109,14 @@ export function CourseBatchDialog({
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!form.name.trim() || !form.course || !form.batch) return;
+    if (!form.name.trim() || !form.course || !form.batch || !seatsValid) return;
     const payload: CourseBatchPayload = {
       name: form.name.trim(),
       course: Number(form.course),
       batch: Number(form.batch),
       start_date: form.start_date || null,
       end_date: form.end_date || null,
-      capacity: form.capacity === "" ? null : Number(form.capacity),
+      capacity: Number(form.capacity),
       mode: form.mode,
       status: form.status,
       trainer: form.trainer.trim() || null,
@@ -132,8 +132,11 @@ export function CourseBatchDialog({
 
   const dateRangeInvalid =
     !!form.start_date && !!form.end_date && form.end_date < form.start_date;
-  const capacityInvalid =
-    form.capacity !== "" && !(Number.isInteger(Number(form.capacity)) && Number(form.capacity) >= 0);
+  const seats = Number(form.capacity);
+  const seatsTaken = courseBatch?.seats_taken ?? 0;
+  const seatsNotWhole = form.capacity !== "" && !(Number.isInteger(seats) && seats >= 1);
+  const seatsBelowTaken = !seatsNotWhole && form.capacity !== "" && seats < seatsTaken;
+  const seatsValid = form.capacity !== "" && !seatsNotWhole && !seatsBelowTaken;
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
@@ -172,7 +175,7 @@ export function CourseBatchDialog({
               />
             </div>
 
-            <div className="grid gap-2">
+            <div className="grid min-w-0 gap-2">
               <div className="flex items-center justify-between gap-2">
                 <Label required>Time slot</Label>
                 {canAddSlot && (
@@ -188,7 +191,7 @@ export function CourseBatchDialog({
                 )}
               </div>
               <Select value={form.batch} onValueChange={(v) => set("batch", v)}>
-                <SelectTrigger>
+                <SelectTrigger className="min-w-0 [&>span]:text-ellipsis">
                   <SelectValue placeholder="Select time slot" />
                 </SelectTrigger>
                 <SelectContent>
@@ -233,14 +236,15 @@ export function CourseBatchDialog({
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="cohort-capacity">Seats</Label>
+              <Label htmlFor="cohort-capacity" required>Seats</Label>
               <Input
                 id="cohort-capacity"
                 type="number"
-                min={0}
+                required
+                min={Math.max(1, seatsTaken)}
                 step={1}
                 inputMode="numeric"
-                placeholder="No limit"
+                placeholder="25"
                 value={form.capacity}
                 onChange={(e) => set("capacity", e.target.value)}
               />
@@ -317,8 +321,13 @@ export function CourseBatchDialog({
           {dateRangeInvalid && (
             <p className="text-destructive text-xs">End date cannot be before the start date.</p>
           )}
-          {capacityInvalid && (
-            <p className="text-destructive text-xs">Seats must be a whole number, 0 or more.</p>
+          {seatsNotWhole && (
+            <p className="text-destructive text-xs">Seats must be a whole number, 1 or more.</p>
+          )}
+          {seatsBelowTaken && (
+            <p className="text-destructive text-xs">
+              {seatsTaken} students sit in this batch now, so it needs at least {seatsTaken} seats.
+            </p>
           )}
           {/* unique_together on (course, batch, start_date) — surfaced via the error toast. */}
 
@@ -330,7 +339,7 @@ export function CourseBatchDialog({
               type="submit"
               variant="brand"
               disabled={
-                saving || !form.course || !form.batch || dateRangeInvalid || capacityInvalid
+                saving || !form.course || !form.batch || dateRangeInvalid || !seatsValid
               }
             >
               {saving ? "Saving…" : courseBatch ? "Save changes" : "Create batch"}
