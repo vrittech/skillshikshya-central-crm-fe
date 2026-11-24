@@ -1,4 +1,4 @@
-import { ArrowRight, History, Plus } from "lucide-react";
+import { ArrowRight, History, Mic, Plus } from "lucide-react";
 import { useEffect, useState } from "react";
 import { ReasonDialog } from "@/components/reason-dialog";
 import { Badge } from "@/components/ui/badge";
@@ -30,6 +30,7 @@ import {
   useLoseEnquiry,
   useMoveEnquiry,
 } from "@/hooks/use-enquiries";
+import { useVoiceNotes } from "@/hooks/use-voice-notes";
 import {
   LOST_REASONS,
   OPEN_STAGES,
@@ -40,7 +41,13 @@ import {
 } from "@/lib/enquiries";
 import { formatDate, formatDateTime } from "@/lib/leads-format";
 import { cn } from "@/lib/utils";
-import type { ApiCourseInterest, ApiEnquiryStage, ApiLostReason } from "@/types/leads-api";
+import type {
+  ApiCourseInterest,
+  ApiEnquiryStage,
+  ApiLostReason,
+  ApiVoiceNote,
+} from "@/types/leads-api";
+import { RecordVoiceNoteDialog, VoiceNoteRow } from "./voice-notes";
 
 function courseOf(e: ApiCourseInterest) {
   return e.course_name ?? "—";
@@ -83,14 +90,18 @@ function EnquiryCard({
   leadId,
   enquiry,
   canChange,
+  voiceNotes,
   onLose,
   onReopen,
+  onRecord,
 }: {
   leadId: number;
   enquiry: ApiCourseInterest;
   canChange: boolean;
+  voiceNotes: ApiVoiceNote[];
   onLose: () => void;
   onReopen: () => void;
+  onRecord: () => void;
 }) {
   const [showHistory, setShowHistory] = useState(false);
   const move = useMoveEnquiry(leadId);
@@ -141,6 +152,11 @@ function EnquiryCard({
               Reopen
             </Button>
           )}
+          {canChange && (
+            <Button size="sm" variant="ghost" onClick={onRecord}>
+              <Mic /> Voice note
+            </Button>
+          )}
           <Button
             size="sm"
             variant="ghost"
@@ -151,6 +167,13 @@ function EnquiryCard({
           </Button>
         </div>
       </div>
+      {voiceNotes.length > 0 && (
+        <div className="mt-3 space-y-2 border-t pt-3">
+          {voiceNotes.map((n) => (
+            <VoiceNoteRow key={n.id} leadId={leadId} note={n} />
+          ))}
+        </div>
+      )}
       {showHistory && <EnquiryHistory leadId={leadId} enquiry={enquiry} />}
     </div>
   );
@@ -342,6 +365,9 @@ export function EnquiriesPanel({ leadId }: { leadId: number }) {
   const [adding, setAdding] = useState(false);
   const [losing, setLosing] = useState<ApiCourseInterest | null>(null);
   const [reopening, setReopening] = useState<ApiCourseInterest | null>(null);
+  const [recording, setRecording] = useState<ApiCourseInterest | null>(null);
+  const voiceQ = useVoiceNotes(leadId);
+  const voiceNotes = voiceQ.data?.results ?? [];
   const rows = data?.results ?? [];
 
   return (
@@ -366,13 +392,22 @@ export function EnquiriesPanel({ leadId }: { leadId: number }) {
           leadId={leadId}
           enquiry={e}
           canChange={canChange}
+          voiceNotes={voiceNotes.filter((n) => n.enquiry === e.id)}
           onLose={() => setLosing(e)}
           onReopen={() => setReopening(e)}
+          onRecord={() => setRecording(e)}
         />
       ))}
       <AddEnquiryDialog leadId={leadId} open={adding} onClose={() => setAdding(false)} />
       <LostDialog leadId={leadId} enquiry={losing} onClose={() => setLosing(null)} />
       <ReopenDialog leadId={leadId} enquiry={reopening} onClose={() => setReopening(null)} />
+      <RecordVoiceNoteDialog
+        leadId={leadId}
+        enquiryId={recording?.id ?? null}
+        title={recording ? courseOf(recording) : undefined}
+        open={recording != null}
+        onClose={() => setRecording(null)}
+      />
     </div>
   );
 }

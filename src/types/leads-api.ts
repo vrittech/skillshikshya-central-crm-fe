@@ -902,3 +902,51 @@ export interface ApiPhoneMatch {
   }[];
 }
 
+
+/** A voice note on an enquiry. The recording plays from voice-notes/{id}/audio/. */
+export interface ApiVoiceNote {
+  id: number;
+  lead: number;
+  enquiry: number | null;
+  course_name: string | null;
+  content_type: string;
+  size_bytes: number;
+  duration_seconds: number;
+  note: string;
+  branch: number | null;
+  created_by: number | null;
+  created_by_name: string | null;
+  created_at: string;
+}
+
+export type ApiTimelineKind =
+  | "lead"
+  | "enquiry"
+  | "call"
+  | "note"
+  | "follow_up"
+  | "voice_note"
+  | "enrollment"
+  | "batch"
+  | "money"
+  | "teams"
+  | "reminder"
+  | "document";
+
+/** One row of a lead's full history (GET /leads/{id}/timeline/). */
+export interface ApiTimelineItem {
+  id: string;
+  kind: ApiTimelineKind;
+  at: string;
+  title: string;
+  detail: string;
+  by: string | null;
+  course: string | null;
+  enrollment: number | null;
+  enquiry: number | null;
+  voice_note: number | null;
+  amount: string | null;
+  duration_seconds: number | null;
+  before: Record<string, unknown> | null;
+  after: Record<string, unknown> | null;
+}
