@@ -223,7 +223,20 @@ function EnrollmentHistoryList({ leadId, enrollment }: { leadId?: number; enroll
 
 /* -------------------------------------------------------- enrollment card */
 
-/** One enrollment with its money, sections and actions. On its own page (`page`) every section starts open. */
+type Section = "payments" | "due" | "reminders" | "history" | "seats";
+
+const SECTION_LABEL: Record<Section, string> = {
+  payments: "Payments",
+  due: "Due dates",
+  reminders: "Reminders",
+  history: "History",
+  seats: "Batch history",
+};
+
+/**
+ * One enrollment with its money, sections and actions. The last section
+ * opened shows first. On its own page (`page`) every section starts open.
+ */
 export function EnrollmentCard({
   leadId,
   enrollment,
@@ -238,11 +251,16 @@ export function EnrollmentCard({
   page?: boolean;
 }) {
   const [payOpen, setPayOpen] = useState(false);
-  const [showPayments, setShowPayments] = useState(page);
-  const [showHistory, setShowHistory] = useState(page);
-  const [showSeats, setShowSeats] = useState(page);
-  const [showDue, setShowDue] = useState(page);
-  const [showReminders, setShowReminders] = useState(page);
+  const sections: Section[] = [
+    "payments",
+    ...(canSit(enrollment) ? (["due", "reminders"] as const) : []),
+    "history",
+    ...(canSit(enrollment) || !!enrollment.placements?.length ? (["seats"] as const) : []),
+  ];
+  const [openSections, setOpenSections] = useState<Section[]>(page ? sections : []);
+  const isOpen = (s: Section) => openSections.includes(s);
+  const toggle = (s: Section) =>
+    setOpenSections((open) => (open.includes(s) ? open.filter((x) => x !== s) : [s, ...open]));
   const [dueOpen, setDueOpen] = useState(false);
   const [confirmParts, setConfirmParts] = useState<ApiDuePart[]>([]);
   const feeInvoice = useMakeFeeInvoice(leadId);
@@ -354,52 +372,18 @@ export function EnrollmentCard({
       )}
 
       <div className="mt-4 flex flex-wrap items-center gap-2">
-        <Button
-          size="sm"
-          variant="ghost"
-          className="text-muted-foreground -ml-2"
-          onClick={() => setShowPayments((v) => !v)}
-        >
-          {showPayments ? <ChevronDown /> : <ChevronRight />} Payments
-        </Button>
-        {canSit(enrollment) && (
+        {sections.map((s, i) => (
           <Button
+            key={s}
             size="sm"
             variant="ghost"
-            className="text-muted-foreground"
-            onClick={() => setShowDue((v) => !v)}
+            aria-expanded={isOpen(s)}
+            className={cn("text-muted-foreground", i === 0 && "-ml-2", isOpen(s) && "text-foreground")}
+            onClick={() => toggle(s)}
           >
-            {showDue ? <ChevronDown /> : <ChevronRight />} Due dates
+            {isOpen(s) ? <ChevronDown /> : <ChevronRight />} {SECTION_LABEL[s]}
           </Button>
-        )}
-        {canSit(enrollment) && (
-          <Button
-            size="sm"
-            variant="ghost"
-            className="text-muted-foreground"
-            onClick={() => setShowReminders((v) => !v)}
-          >
-            {showReminders ? <ChevronDown /> : <ChevronRight />} Reminders
-          </Button>
-        )}
-        <Button
-          size="sm"
-          variant="ghost"
-          className="text-muted-foreground"
-          onClick={() => setShowHistory((v) => !v)}
-        >
-          {showHistory ? <ChevronDown /> : <ChevronRight />} History
-        </Button>
-        {(canSit(enrollment) || !!enrollment.placements?.length) && (
-          <Button
-            size="sm"
-            variant="ghost"
-            className="text-muted-foreground"
-            onClick={() => setShowSeats((v) => !v)}
-          >
-            {showSeats ? <ChevronDown /> : <ChevronRight />} Batch history
-          </Button>
-        )}
+        ))}
         <div className="grow" />
         {canManage && (
           <>
@@ -446,42 +430,33 @@ export function EnrollmentCard({
         )}
       </div>
 
-      {showPayments && (
-        <div className="mt-1 border-t pt-2">
-          <EnrollmentPayments leadId={leadId} enrollment={enrollment} canManage={canManage} />
-        </div>
-      )}
-
-      {showDue && (
-        <div className="mt-1 border-t pt-2">
-          <DueDatesList rows={dueRows} />
-          {canManage && leadId != null && (
-            <div className="mt-2 flex justify-end">
-              <Button size="sm" variant="outline" onClick={() => setDueOpen(true)}>
-                <CalendarClock /> Change due dates
-              </Button>
-            </div>
-          )}
-        </div>
-      )}
-
-      {showReminders && (
-        <div className="mt-1 border-t pt-2">
-          <ReminderList leadId={leadId} enrollmentId={enrollment.id} />
-        </div>
-      )}
-
-      {showHistory && (
-        <div className="mt-1 border-t pt-2">
-          <EnrollmentHistoryList leadId={leadId} enrollment={enrollment} />
-        </div>
-      )}
-
-      {showSeats && (
-        <div className="mt-1 border-t pt-2">
-          <SeatHistoryList enrollment={enrollment} />
-        </div>
-      )}
+      {openSections
+        .filter((s) => sections.includes(s))
+        .map((s) => (
+          <div key={s} className="mt-1 border-t pt-3">
+            <p className="text-muted-foreground mb-1 text-xs font-semibold tracking-wide uppercase">
+              {SECTION_LABEL[s]}
+            </p>
+            {s === "payments" && (
+              <EnrollmentPayments leadId={leadId} enrollment={enrollment} canManage={canManage} />
+            )}
+            {s === "due" && (
+              <>
+                <DueDatesList rows={dueRows} />
+                {canManage && leadId != null && (
+                  <div className="mt-2 flex justify-end">
+                    <Button size="sm" variant="outline" onClick={() => setDueOpen(true)}>
+                      <CalendarClock /> Change due dates
+                    </Button>
+                  </div>
+                )}
+              </>
+            )}
+            {s === "reminders" && <ReminderList leadId={leadId} enrollmentId={enrollment.id} />}
+            {s === "history" && <EnrollmentHistoryList leadId={leadId} enrollment={enrollment} />}
+            {s === "seats" && <SeatHistoryList enrollment={enrollment} />}
+          </div>
+        ))}
 
       <SeatDialog
         leadId={leadId}
