@@ -22,7 +22,3 @@ export function figureText(figures: BatchFigures, key: keyof BatchFigures) {
   const value = figures[key];
   return key === "students" ? String(value) : formatNPR(Number(value));
 }
-
-export function isLoss(figures: BatchFigures | null | undefined) {
-  return !!figures && Number(figures.profit) < 0;
-}

@@ -282,3 +282,41 @@ export interface DueInMonthParams {
   course?: number;
   batch?: number;
 }
+
+/* ------------------------------------------------------------ batch profit */
+
+/** Money of a batch, counted on the batch the student first joined. */
+export interface BatchProfitFigures {
+  students: number;
+  fees: string;
+  collected: string;
+  owed: string;
+  costs: string;
+  profit: string;
+}
+
+export interface BatchProfitRow extends BatchProfitFigures {
+  batch: number;
+  coursebatch_id: string;
+  name: string;
+  course_name: string;
+  status: "upcoming" | "running" | "closed";
+  status_display: string;
+  start_date: string | null;
+  end_date: string | null;
+  /** Closed batches only. */
+  closed_at: string | null;
+  at_close: BatchProfitFigures | null;
+}
+
+export interface BatchProfitReport {
+  summary: BatchProfitFigures & { batches: number };
+  results: BatchProfitRow[];
+  error?: string;
+}
+
+export interface BatchProfitParams {
+  branch_id?: number;
+  course?: number;
+  status?: "upcoming" | "running" | "closed";
+}

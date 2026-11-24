@@ -1,6 +1,7 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { reportsService } from "@/services/reports.service";
 import type {
+  BatchProfitParams,
   CounselorPerformanceParams,
   DueInMonthParams,
   EnrollmentsReportParams,
@@ -107,6 +108,15 @@ export function useDueInMonth(params: DueInMonthParams, enabled = true) {
   return useQuery({
     queryKey: ["reports", "due-in-month", params],
     queryFn: () => reportsService.dueInMonth(params),
+    enabled,
+    placeholderData: keepPreviousData,
+  });
+}
+
+export function useBatchProfit(params: BatchProfitParams, enabled = true) {
+  return useQuery({
+    queryKey: ["reports", "batch-profit", params],
+    queryFn: () => reportsService.batchProfit(params),
     enabled,
     placeholderData: keepPreviousData,
   });

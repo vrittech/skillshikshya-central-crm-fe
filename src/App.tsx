@@ -2,6 +2,7 @@ import { Route, Routes } from "react-router-dom";
 import { AppLayout } from "@/components/layout/app-layout";
 import { DataSourceProvider } from "@/context/data-source";
 import { RoleProvider } from "@/context/role";
+import BatchProfitPage from "@/pages/batch-profit";
 import BatchesPage from "@/pages/batches";
 import BranchesPage from "@/pages/branches";
 import CallMinutesPage from "@/pages/call-minutes";
@@ -52,6 +53,7 @@ export default function App() {
           <Route path="/payments" element={<PaymentsPage />} />
           <Route path="/invoices" element={<InvoicesPage />} />
           <Route path="/dues" element={<DuesPage />} />
+          <Route path="/batch-profit" element={<BatchProfitPage />} />
           <Route path="/reports" element={<ReportsPage />} />
           <Route path="/settings" element={<SettingsPage />} />
 

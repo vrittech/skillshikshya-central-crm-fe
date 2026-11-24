@@ -1,5 +1,7 @@
 import { api } from "@/lib/api";
 import type {
+  BatchProfitParams,
+  BatchProfitReport,
   ConversionReport,
   CounselorPerformanceParams,
   CounselorPerformanceReport,
@@ -27,6 +29,13 @@ function clean(params: object) {
 }
 
 export const reportsService = {
+  /** Each batch's fees, collected, owed, costs and profit, newest first. */
+  async batchProfit(params: BatchProfitParams) {
+    const { data } = await api.get<BatchProfitReport>("/reports/batch-profit/", {
+      params: clean(params),
+    });
+    return data;
+  },
   /** Every student who owes money, most late first. */
   async whoOwes(params: WhoOwesParams) {
     const { data } = await api.get<WhoOwesReport>("/reports/who-owes/", { params: clean(params) });
