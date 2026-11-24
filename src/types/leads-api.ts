@@ -265,6 +265,17 @@ export interface ApiLeadDocument {
 
 export type ApiInterestLevel = "high" | "medium" | "low";
 
+export type ApiEnquiryStage = "new" | "contacted" | "interested" | "won" | "lost";
+
+export type ApiLostReason =
+  | "too_expensive"
+  | "other_institute"
+  | "timing"
+  | "not_reachable"
+  | "not_interested"
+  | "other";
+
+/** An enquiry: one person asking about one course, with its own stage. */
 export interface ApiCourseInterest {
   id: number;
   lead: number;
@@ -273,6 +284,36 @@ export interface ApiCourseInterest {
   is_primary: boolean;
   interest_level: ApiInterestLevel;
   created_at?: string;
+  updated_at?: string;
+  stage?: ApiEnquiryStage;
+  stage_display?: string;
+  stage_changed_at?: string;
+  counselor?: number | null;
+  counselor_name?: string | null;
+  source?: number | null;
+  source_name?: string | null;
+  branch?: number | null;
+  branch_name?: string | null;
+  lost_reason?: ApiLostReason | null;
+  lost_reason_display?: string | null;
+  lost_note?: string;
+  lost_at_stage?: ApiEnquiryStage | null;
+  lost_at_stage_display?: string | null;
+  enrollment?: number | null;
+  created_by?: number | null;
+  created_by_name?: string | null;
+}
+
+export interface ApiEnquiryStageChange {
+  id: number;
+  from_stage: ApiEnquiryStage;
+  from_stage_display: string;
+  to_stage: ApiEnquiryStage;
+  to_stage_display: string;
+  note: string;
+  changed_by: number | null;
+  changed_by_name: string | null;
+  created_at: string;
 }
 
 export type ApiEnrollmentStatus =

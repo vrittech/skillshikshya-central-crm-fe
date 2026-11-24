@@ -49,6 +49,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useDataSource } from "@/context/data-source";
 import { useCompleteFollowup } from "@/hooks/use-followups";
 import { useDeleteLead, useLead } from "@/hooks/use-leads";
+import { EnquiriesPanel } from "@/pages/leads/components/enquiries-panel";
 import { EnrollmentsPanel, LeadPaymentsPanel } from "@/pages/leads/components/enrollments-panel";
 import {
   formatDate,
@@ -426,6 +427,9 @@ export default function LeadDetailPage() {
         <Tabs defaultValue="overview">
           <TabsList className="h-auto w-full flex-wrap justify-start gap-1 rounded-none border-b bg-transparent p-2">
             <TabsTrigger value="overview" className={TAB_ACTIVE}>Overview</TabsTrigger>
+            {source === "api" && lead.apiId != null && (
+              <TabsTrigger value="enquiries" className={TAB_ACTIVE}>Enquiries</TabsTrigger>
+            )}
             <TabsTrigger value="activity" className={TAB_ACTIVE}>Activity</TabsTrigger>
             <TabsTrigger value="calls" className={TAB_ACTIVE}>Calls</TabsTrigger>
             <TabsTrigger value="followups" className={TAB_ACTIVE}>Follow-ups</TabsTrigger>
@@ -647,6 +651,13 @@ export default function LeadDetailPage() {
                 <p className="text-muted-foreground py-8 text-center text-sm">No follow-ups scheduled.</p>
               )}
             </TabsContent>
+
+            {/* Enquiries */}
+            {source === "api" && lead.apiId != null && (
+              <TabsContent value="enquiries">
+                <EnquiriesPanel leadId={lead.apiId} />
+              </TabsContent>
+            )}
 
             {/* Enrollment */}
             <TabsContent value="enrollment">

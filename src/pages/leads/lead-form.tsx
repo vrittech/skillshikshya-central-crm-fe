@@ -2,6 +2,7 @@ import { ArrowLeft, Plus } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
+import { apiErrorMessage } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Combobox } from "@/components/ui/combobox";
@@ -410,11 +411,8 @@ export default function LeadFormPage() {
       ),
       ...toRemove.map((r) => leadsService.removeCourseInterest(leadApiId, r.id)),
     ]);
-    const failed = results.filter((r) => r.status === "rejected").length;
-    if (failed) {
-      toast.error(
-        `Lead saved, but ${failed} course interest${failed === 1 ? "" : "s"} could not be updated.`,
-      );
+    for (const r of results) {
+      if (r.status === "rejected") toast.error(apiErrorMessage(r.reason, "Course not updated"));
     }
   }
   const onPickCampaign = (v: string) => {
