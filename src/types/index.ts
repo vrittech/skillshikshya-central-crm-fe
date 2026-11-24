@@ -198,6 +198,10 @@ export interface BatchListParams {
 }
 
 /** A specific run of a course — named cohort + time slot + dates. */
+/** Upcoming and running batches take students; a closed one takes no one new. */
+export type CourseBatchStatus = "upcoming" | "running" | "closed";
+export type CourseBatchMode = "physical" | "online";
+
 export interface CourseBatch {
   id: number;
   name: string;
@@ -209,6 +213,13 @@ export interface CourseBatch {
   batch_name?: string | null;
   start_date: string | null;
   end_date: string | null;
+  /** Number of seats. null = no limit. */
+  capacity: number | null;
+  mode: CourseBatchMode;
+  mode_display?: string;
+  status: CourseBatchStatus;
+  status_display?: string;
+  trainer: string | null;
   is_active: boolean;
   branch: number | null;
   created_by: number | null;
@@ -217,7 +228,19 @@ export interface CourseBatch {
 }
 
 export type CourseBatchPayload = Partial<
-  Pick<CourseBatch, "name" | "course" | "start_date" | "end_date" | "is_active" | "branch">
+  Pick<
+    CourseBatch,
+    | "name"
+    | "course"
+    | "start_date"
+    | "end_date"
+    | "capacity"
+    | "mode"
+    | "status"
+    | "trainer"
+    | "is_active"
+    | "branch"
+  >
 > &
   Required<Pick<CourseBatch, "batch">>;
 
@@ -232,6 +255,9 @@ export interface CourseBatchListParams {
   start_date?: string;
   end_date?: string;
   is_active?: boolean;
+  /** One status, or several (sent as repeated `status=` params). */
+  status?: CourseBatchStatus | CourseBatchStatus[];
+  mode?: CourseBatchMode;
   ordering?: string;
   branch_id?: number;
 }

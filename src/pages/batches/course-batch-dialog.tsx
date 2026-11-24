@@ -21,7 +21,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { useBatches, useCreateCourseBatch, useUpdateCourseBatch } from "@/hooks/use-batches";
 import { useCourses } from "@/hooks/use-courses";
-import type { CourseBatch, CourseBatchPayload } from "@/types";
+import type { CourseBatch, CourseBatchMode, CourseBatchPayload, CourseBatchStatus } from "@/types";
 
 interface FormState {
   name: string;
@@ -29,6 +29,11 @@ interface FormState {
   batch: string;
   start_date: string;
   end_date: string;
+  /** Seats as typed; "" = no limit. */
+  capacity: string;
+  mode: CourseBatchMode;
+  status: CourseBatchStatus;
+  trainer: string;
   is_active: boolean;
 }
 
@@ -38,6 +43,10 @@ const EMPTY: FormState = {
   batch: "",
   start_date: "",
   end_date: "",
+  capacity: "",
+  mode: "physical",
+  status: "upcoming",
+  trainer: "",
   is_active: true,
 };
 
@@ -71,6 +80,10 @@ export function CourseBatchDialog({
             batch: courseBatch.batch == null ? "" : String(courseBatch.batch),
             start_date: courseBatch.start_date ?? "",
             end_date: courseBatch.end_date ?? "",
+            capacity: courseBatch.capacity == null ? "" : String(courseBatch.capacity),
+            mode: courseBatch.mode,
+            status: courseBatch.status,
+            trainer: courseBatch.trainer ?? "",
             is_active: courseBatch.is_active,
           }
         : EMPTY,
@@ -89,6 +102,10 @@ export function CourseBatchDialog({
       batch: Number(form.batch),
       start_date: form.start_date || null,
       end_date: form.end_date || null,
+      capacity: form.capacity === "" ? null : Number(form.capacity),
+      mode: form.mode,
+      status: form.status,
+      trainer: form.trainer.trim() || null,
       is_active: form.is_active,
     };
     if (courseBatch) {
@@ -100,6 +117,8 @@ export function CourseBatchDialog({
 
   const dateRangeInvalid =
     !!form.start_date && !!form.end_date && form.end_date < form.start_date;
+  const capacityInvalid =
+    form.capacity !== "" && !(Number.isInteger(Number(form.capacity)) && Number(form.capacity) >= 0);
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
@@ -179,6 +198,63 @@ export function CourseBatchDialog({
               />
             </div>
 
+            <div className="grid gap-2">
+              <Label htmlFor="cohort-capacity">Seats</Label>
+              <Input
+                id="cohort-capacity"
+                type="number"
+                min={0}
+                step={1}
+                inputMode="numeric"
+                placeholder="No limit"
+                value={form.capacity}
+                onChange={(e) => set("capacity", e.target.value)}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="cohort-trainer">Trainer</Label>
+              <Input
+                id="cohort-trainer"
+                placeholder="Trainer's name"
+                value={form.trainer}
+                onChange={(e) => set("trainer", e.target.value)}
+              />
+            </div>
+
+            <div className="grid gap-2">
+              <Label>Online or physical</Label>
+              <Select value={form.mode} onValueChange={(v) => set("mode", v as CourseBatchMode)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="physical">Physical</SelectItem>
+                  <SelectItem value="online">Online</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-2">
+              <Label>Status</Label>
+              <Select
+                value={form.status}
+                onValueChange={(v) => set("status", v as CourseBatchStatus)}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="upcoming">Upcoming</SelectItem>
+                  <SelectItem value="running">Running</SelectItem>
+                  <SelectItem value="closed">Closed</SelectItem>
+                </SelectContent>
+              </Select>
+              {form.status === "closed" && (
+                <p className="text-muted-foreground text-xs">
+                  No one new can join or move into a closed batch.
+                </p>
+              )}
+            </div>
+
             <div className="flex items-center gap-2 sm:col-span-2">
               <Switch
                 id="cohort-active"
@@ -192,6 +268,9 @@ export function CourseBatchDialog({
           {dateRangeInvalid && (
             <p className="text-destructive text-xs">End date cannot be before the start date.</p>
           )}
+          {capacityInvalid && (
+            <p className="text-destructive text-xs">Seats must be a whole number, 0 or more.</p>
+          )}
           {/* unique_together on (course, batch, start_date) — surfaced via the error toast. */}
 
           <DialogFooter>
@@ -201,7 +280,9 @@ export function CourseBatchDialog({
             <Button
               type="submit"
               variant="brand"
-              disabled={saving || !form.course || !form.batch || dateRangeInvalid}
+              disabled={
+                saving || !form.course || !form.batch || dateRangeInvalid || capacityInvalid
+              }
             >
               {saving ? "Saving…" : courseBatch ? "Save changes" : "Create course batch"}
             </Button>

@@ -45,12 +45,25 @@ import {
   useDeleteCourseBatch,
 } from "@/hooks/use-batches";
 import { formatDate } from "@/lib/leads-format";
-import type { Batch, CourseBatch } from "@/types";
+import type { Batch, CourseBatch, CourseBatchStatus } from "@/types";
 import { BatchDialog } from "./batch-dialog";
 import { CourseBatchDialog } from "./course-batch-dialog";
 
 const PAGE_SIZE = 20;
 const ALL_SLOTS = "all";
+const ALL_STATUSES = "all";
+
+const STATUS_BADGE: Record<CourseBatchStatus, "brand" | "outline" | "secondary"> = {
+  upcoming: "outline",
+  running: "brand",
+  closed: "secondary",
+};
+
+const STATUS_LABEL: Record<CourseBatchStatus, string> = {
+  upcoming: "Upcoming",
+  running: "Running",
+  closed: "Closed",
+};
 
 export default function BatchesPage({ defaultTab = "course-batches" }: { defaultTab?: "course-batches" | "slots" }) {
   const { hasPerm } = useAuth();
@@ -129,6 +142,9 @@ function CourseBatchesTab({ canAdd, canChange, canDelete }: TabPerms) {
   const [search, setSearch] = useState("");
   const [debounced, setDebounced] = useState("");
   const [slot, setSlot] = useState(ALL_SLOTS);
+  const [batchStatus, setBatchStatus] = useState<CourseBatchStatus | typeof ALL_STATUSES>(
+    ALL_STATUSES,
+  );
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<CourseBatch | null>(null);
   const [deleting, setDeleting] = useState<CourseBatch | null>(null);
@@ -147,6 +163,7 @@ function CourseBatchesTab({ canAdd, canChange, canDelete }: TabPerms) {
     page_size: PAGE_SIZE,
     search: debounced || undefined,
     batch: slot === ALL_SLOTS ? undefined : Number(slot),
+    status: batchStatus === ALL_STATUSES ? undefined : batchStatus,
     ordering: "-start_date",
   });
   const del = useDeleteCourseBatch();
@@ -183,6 +200,23 @@ function CourseBatchesTab({ canAdd, canChange, canDelete }: TabPerms) {
                   {b.name}
                 </SelectItem>
               ))}
+            </SelectContent>
+          </Select>
+          <Select
+            value={batchStatus}
+            onValueChange={(v) => {
+              setBatchStatus(v as CourseBatchStatus | typeof ALL_STATUSES);
+              setPage(1);
+            }}
+          >
+            <SelectTrigger className="w-[10rem]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL_STATUSES}>All statuses</SelectItem>
+              <SelectItem value="upcoming">Upcoming</SelectItem>
+              <SelectItem value="running">Running</SelectItem>
+              <SelectItem value="closed">Closed</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -230,7 +264,13 @@ function CourseBatchesTab({ canAdd, canChange, canDelete }: TabPerms) {
             )}
             {rows.map((cb) => (
               <TableRow key={cb.id}>
-                <TableCell className="font-semibold">{cb.name}</TableCell>
+                <TableCell>
+                  <div className="font-semibold">{cb.name}</div>
+                  <div className="text-muted-foreground text-xs">
+                    {cb.mode === "online" ? "Online" : "Physical"}
+                    {cb.trainer ? ` · ${cb.trainer}` : ""}
+                  </div>
+                </TableCell>
                 <TableCell className="font-mono text-sm">{cb.coursebatch_id}</TableCell>
                 <TableCell>{cb.course_name ?? "—"}</TableCell>
                 <TableCell className="text-muted-foreground">{cb.batch_name || "—"}</TableCell>
@@ -239,9 +279,12 @@ function CourseBatchesTab({ canAdd, canChange, canDelete }: TabPerms) {
                   {cb.end_date ? ` → ${formatDate(cb.end_date)}` : ""}
                 </TableCell>
                 <TableCell>
-                  <Badge variant={cb.is_active ? "brand" : "secondary"}>
-                    {cb.is_active ? "Active" : "Inactive"}
-                  </Badge>
+                  <div className="flex flex-wrap gap-1">
+                    <Badge variant={STATUS_BADGE[cb.status] ?? "outline"}>
+                      {STATUS_LABEL[cb.status] ?? cb.status}
+                    </Badge>
+                    {!cb.is_active && <Badge variant="secondary">Inactive</Badge>}
+                  </div>
                 </TableCell>
                 <TableCell>
                   {(canChange || canDelete) && (

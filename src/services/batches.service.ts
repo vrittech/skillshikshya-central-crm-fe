@@ -39,7 +39,11 @@ export const batchesService = {
 /** Course batches — see course_app_apis_guide.md §Course Batch. */
 export const courseBatchesService = {
   async list(params: CourseBatchListParams = {}) {
-    const { data } = await api.get<Paginated<CourseBatch>>("/course-batches/", { params });
+    // indexes: null sends an array as status=a&status=b, which django-filter reads.
+    const { data } = await api.get<Paginated<CourseBatch>>("/course-batches/", {
+      params,
+      paramsSerializer: { indexes: null },
+    });
     return data;
   },
 
