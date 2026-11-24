@@ -123,8 +123,8 @@ export default function CoursesPage() {
               <DropdownMenuItem onSelect={() => setCategoriesOpen(true)}>
                 Manage Categories
               </DropdownMenuItem>
-              <NavLink to="/batches/slots">
-                <DropdownMenuItem>Manage Time Slots</DropdownMenuItem>
+              <NavLink to="/batches/shifts">
+                <DropdownMenuItem>Manage Shifts</DropdownMenuItem>
               </NavLink>
               <NavLink to="/batches">
                 <DropdownMenuItem>Manage Course Batches</DropdownMenuItem>

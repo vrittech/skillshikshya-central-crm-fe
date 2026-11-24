@@ -1,6 +1,6 @@
 import type { Batch, CourseBatch } from "@/types";
 
-/** Times offered when picking a time slot: every 15 minutes, 5:00 AM to 11:00 PM. */
+/** Times offered when picking a shift: every 15 minutes, 5:00 AM to 11:00 PM. */
 export const TIME_STEP = 15;
 const FIRST = 5 * 60;
 const LAST = 23 * 60;
@@ -48,7 +48,7 @@ export function slotMinutes(start: string, end: string) {
   return toMinutes(end) - toMinutes(start);
 }
 
-/** A batch's time slot: "Morning · 6:00 AM – 8:00 AM", or the name alone, or null. */
+/** A batch's shift: "Morning · 6:00 AM – 8:00 AM", or the name alone, or null. */
 export function batchShift(
   b: Pick<CourseBatch, "batch_name" | "batch_start_time" | "batch_end_time">,
 ) {

@@ -12,7 +12,7 @@ import type {
   Paginated,
 } from "@/types";
 
-/** Time slots (Morning / Day / Evening) — see course_app_apis_guide.md §Batch. */
+/** Shifts (Morning / Day / Evening) — see course_app_apis_guide.md §Batch. */
 export const batchesService = {
   async list(params: BatchListParams = {}) {
     const { data } = await api.get<Paginated<Batch>>("/batches/", { params });

@@ -67,9 +67,10 @@ export default function App() {
           {/* Existing API-wired modules */}
           <Route path="/courses" element={<CoursesPage />} />
           <Route path="/batches" element={<BatchesPage defaultTab="course-batches" />} />
-          <Route path="/batches/slots" element={<BatchesPage defaultTab="slots" />} />
+          <Route path="/batches/shifts" element={<BatchesPage defaultTab="slots" />} />
+          <Route path="/batches/slots" element={<Navigate to="/batches/shifts" replace />} />
           <Route path="/batches/:id" element={<BatchDetailPage />} />
-          <Route path="/courses/batches" element={<Navigate to="/batches/slots" replace />} />
+          <Route path="/courses/batches" element={<Navigate to="/batches/shifts" replace />} />
           <Route path="/courses/course-batches" element={<Navigate to="/batches" replace />} />
           <Route path="/users" element={<UsersPage />} />
           <Route path="/roles" element={<RolesPage />} />

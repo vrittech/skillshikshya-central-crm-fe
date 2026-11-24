@@ -63,7 +63,7 @@ export default function BatchesPage({ defaultTab = "course-batches" }: { default
   const navigate = useNavigate();
   const tab = defaultTab;
   const setTab = (next: "course-batches" | "slots") =>
-    navigate(next === "slots" ? "/batches/slots" : "/batches");
+    navigate(next === "slots" ? "/batches/shifts" : "/batches");
 
   if (!isApi) {
     return (
@@ -82,7 +82,7 @@ export default function BatchesPage({ defaultTab = "course-batches" }: { default
       <Tabs value={tab} onValueChange={(v) => setTab(v as "course-batches" | "slots")}>
         <TabsList>
           <TabsTrigger value="course-batches">Batches</TabsTrigger>
-          <TabsTrigger value="slots">Time slots</TabsTrigger>
+          <TabsTrigger value="slots">Shifts</TabsTrigger>
         </TabsList>
         <TabsContent value="course-batches" className="mt-6">
           <CourseBatchesTab
@@ -180,7 +180,7 @@ function CourseBatchesTab({ canAdd, canChange, canDelete }: TabPerms) {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value={ALL_SLOTS}>All time slots</SelectItem>
+              <SelectItem value={ALL_SLOTS}>All shifts</SelectItem>
               {(slotsQ.data?.results ?? []).map((b) => (
                 <SelectItem key={b.id} value={String(b.id)}>
                   {b.name}
@@ -226,7 +226,7 @@ function CourseBatchesTab({ canAdd, canChange, canDelete }: TabPerms) {
               <TableHead>Batch</TableHead>
               <TableHead>Batch ID</TableHead>
               <TableHead>Course</TableHead>
-              <TableHead>Time slot</TableHead>
+              <TableHead>Shift</TableHead>
               <TableHead>Runs</TableHead>
               <TableHead>Seats</TableHead>
               <TableHead>Status</TableHead>
@@ -332,7 +332,7 @@ function CourseBatchesTab({ canAdd, canChange, canDelete }: TabPerms) {
   );
 }
 
-/* ---------------------------------------------------------------- time slots */
+/* -------------------------------------------------------------------- shifts */
 
 function SlotsTab({ canAdd, canChange, canDelete }: TabPerms) {
   const [page, setPage] = useState(1);
@@ -366,7 +366,7 @@ function SlotsTab({ canAdd, canChange, canDelete }: TabPerms) {
         <div className="relative max-w-sm min-w-[16rem]">
           <Search className="text-muted-foreground absolute top-2.5 left-3 size-4" />
           <Input
-            placeholder="Search time slots…"
+            placeholder="Search shifts…"
             className="rounded-full pl-9"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -380,7 +380,7 @@ function SlotsTab({ canAdd, canChange, canDelete }: TabPerms) {
               setFormOpen(true);
             }}
           >
-            <Plus /> New Time Slot
+            <Plus /> New Shift
           </Button>
         )}
       </div>
@@ -408,7 +408,7 @@ function SlotsTab({ canAdd, canChange, canDelete }: TabPerms) {
             {!isLoading && rows.length === 0 && (
               <TableRow>
                 <TableCell colSpan={5} className="text-muted-foreground py-10 text-center">
-                  No time slots found.
+                  No shifts found.
                 </TableCell>
               </TableRow>
             )}
@@ -446,7 +446,7 @@ function SlotsTab({ canAdd, canChange, canDelete }: TabPerms) {
           page={page}
           count={data?.count ?? 0}
           shown={rows.length}
-          noun="time slots"
+          noun="shifts"
           onPage={setPage}
         />
       </div>

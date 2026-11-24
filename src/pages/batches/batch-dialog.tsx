@@ -27,7 +27,7 @@ const EMPTY: FormState = { name: "", start_time: "", end_time: "", is_active: tr
 const DEFAULT_LENGTH = 60;
 const LATEST = toMinutes("23:00");
 
-/** Create/edit a time slot (Morning, Day, Evening…). */
+/** Create/edit a shift (Morning, Day, Evening…). */
 export function BatchDialog({
   open,
   onClose,
@@ -97,7 +97,7 @@ export function BatchDialog({
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{batch ? `Edit ${batch.name}` : "New time slot"}</DialogTitle>
+          <DialogTitle>{batch ? `Edit ${batch.name}` : "New shift"}</DialogTitle>
         </DialogHeader>
         <form onSubmit={submit} className="space-y-4">
           <div className="grid gap-2">
@@ -142,7 +142,7 @@ export function BatchDialog({
               Cancel
             </Button>
             <Button type="submit" variant="brand" disabled={saving || !valid}>
-              {saving ? "Saving…" : batch ? "Save changes" : "Create time slot"}
+              {saving ? "Saving…" : batch ? "Save changes" : "Create shift"}
             </Button>
           </DialogFooter>
         </form>

@@ -12,7 +12,7 @@ import type {
   CourseBatchPayload,
 } from "@/types";
 
-/* ------------------------------------------------------- time slots (Batch) */
+/* ----------------------------------------------------------- shifts (Batch) */
 
 export function useBatches(params: BatchListParams = {}, enabled = true) {
   return useQuery({
@@ -29,10 +29,10 @@ export function useCreateBatch() {
   return useMutation({
     mutationFn: (payload: BatchPayload) => batchesService.create(payload),
     onSuccess: (b) => {
-      toast.success(`Time slot "${b.name}" created`);
+      toast.success(`Shift "${b.name}" created`);
       void qc.invalidateQueries({ queryKey: ["batches"] });
     },
-    onError: (e) => toast.error(apiErrorMessage(e, "Could not create time slot")),
+    onError: (e) => toast.error(apiErrorMessage(e, "Could not create shift")),
   });
 }
 
@@ -42,12 +42,12 @@ export function useUpdateBatch() {
     mutationFn: ({ id, payload }: { id: number; payload: BatchPayload }) =>
       batchesService.update(id, payload),
     onSuccess: () => {
-      toast.success("Time slot updated");
+      toast.success("Shift updated");
       void qc.invalidateQueries({ queryKey: ["batches"] });
       // Cohort rows carry a denormalized batch_name.
       void qc.invalidateQueries({ queryKey: ["course-batches"] });
     },
-    onError: (e) => toast.error(apiErrorMessage(e, "Could not update time slot")),
+    onError: (e) => toast.error(apiErrorMessage(e, "Could not update shift")),
   });
 }
 
@@ -56,11 +56,11 @@ export function useDeleteBatch() {
   return useMutation({
     mutationFn: (id: number) => batchesService.remove(id),
     onSuccess: () => {
-      toast.success("Time slot deleted");
+      toast.success("Shift deleted");
       void qc.invalidateQueries({ queryKey: ["batches"] });
       void qc.invalidateQueries({ queryKey: ["course-batches"] });
     },
-    onError: (e) => toast.error(apiErrorMessage(e, "Could not delete time slot")),
+    onError: (e) => toast.error(apiErrorMessage(e, "Could not delete shift")),
   });
 }
 

@@ -171,7 +171,7 @@ export interface CourseListParams {
 /* ------------------------------------------------------------------ batches */
 
 /**
- * A recurring time slot (Morning / Day / Evening) — `/api/batches/`.
+ * A shift (Morning / Day / Evening) — `/api/batches/`.
  * Not a cohort: a cohort is a `CourseBatch`, which points at one of these.
  */
 export interface Batch {
@@ -204,7 +204,7 @@ export interface BatchListParams {
   branch_id?: number;
 }
 
-/** A specific run of a course — named cohort + time slot + dates. */
+/** A specific run of a course — named cohort + shift + dates. */
 /** Upcoming and running batches take students; a closed one takes no one new. */
 export type CourseBatchStatus = "upcoming" | "running" | "closed";
 export type CourseBatchMode = "physical" | "online";
@@ -218,7 +218,7 @@ export interface CourseBatch {
   course_name?: string;
   batch: number | null;
   batch_name?: string | null;
-  /** The time slot's times, "HH:MM" (read-only). */
+  /** The shift's times, "HH:MM" (read-only). */
   batch_start_time?: string | null;
   batch_end_time?: string | null;
   start_date: string | null;

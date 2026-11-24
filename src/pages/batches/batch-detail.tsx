@@ -114,7 +114,7 @@ export default function BatchDetailPage() {
         </div>
         <div className="grid gap-4 sm:grid-cols-3 lg:grid-cols-5">
           <Fact label="Course">{batch.course_name ?? "—"}</Fact>
-          <Fact label="Time slot">{batchShift(batch) ?? "—"}</Fact>
+          <Fact label="Shift">{batchShift(batch) ?? "—"}</Fact>
           <Fact label="Starts">{batch.start_date ? formatDate(batch.start_date) : "—"}</Fact>
           <Fact label="Ends">{batch.end_date ? formatDate(batch.end_date) : "—"}</Fact>
           <Fact label="Mode">{batch.mode_display ?? batch.mode}</Fact>

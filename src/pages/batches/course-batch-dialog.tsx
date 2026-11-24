@@ -57,7 +57,7 @@ const EMPTY: FormState = {
   branch: "",
 };
 
-/** Create/edit a course batch — a course run tied to a time slot and date range. */
+/** Create/edit a course batch — a course run tied to a shift and date range. */
 export function CourseBatchDialog({
   open,
   onClose,
@@ -177,7 +177,7 @@ export function CourseBatchDialog({
 
             <div className="grid min-w-0 gap-2">
               <div className="flex items-center justify-between gap-2">
-                <Label required>Time slot</Label>
+                <Label required>Shift</Label>
                 {canAddSlot && (
                   <Button
                     type="button"
@@ -186,13 +186,13 @@ export function CourseBatchDialog({
                     className="h-auto p-0 text-xs"
                     onClick={() => setAddingSlot(true)}
                   >
-                    <Plus className="size-3" /> New time slot
+                    <Plus className="size-3" /> New shift
                   </Button>
                 )}
               </div>
               <Select value={form.batch} onValueChange={(v) => set("batch", v)}>
                 <SelectTrigger className="min-w-0 [&>span]:text-ellipsis">
-                  <SelectValue placeholder="Select time slot" />
+                  <SelectValue placeholder="Select shift" />
                 </SelectTrigger>
                 <SelectContent>
                   {slots.map((b) => (
@@ -203,12 +203,12 @@ export function CourseBatchDialog({
                   {courseBatch?.batch != null &&
                     !slots.some((b) => b.id === courseBatch.batch) && (
                       <SelectItem value={String(courseBatch.batch)}>
-                        {courseBatch.batch_name ?? "Current time slot"}
+                        {courseBatch.batch_name ?? "Current shift"}
                       </SelectItem>
                     )}
                   {slots.length === 0 && courseBatch?.batch == null && (
                     <p className="text-muted-foreground px-2 py-1.5 text-sm">
-                      {batchesQ.isLoading ? "Loading…" : "No time slots."}
+                      {batchesQ.isLoading ? "Loading…" : "No shifts."}
                     </p>
                   )}
                 </SelectContent>
