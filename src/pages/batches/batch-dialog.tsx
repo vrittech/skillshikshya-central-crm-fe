@@ -43,9 +43,12 @@ export function BatchDialog({
   const create = useCreateBatch();
   const update = useUpdateBatch();
   const saving = create.isPending || update.isPending;
+  /** Save was pressed: show what is missing. */
+  const [tried, setTried] = useState(false);
 
   useEffect(() => {
     if (!open) return;
+    setTried(false);
     setForm(
       batch
         ? {
@@ -70,11 +73,21 @@ export function BatchDialog({
   }
 
   const minutes = form.start_time && form.end_time ? slotMinutes(form.start_time, form.end_time) : 0;
-  const valid = !!form.name.trim() && !!form.start_time && !!form.end_time && minutes >= 15;
+  const errors = {
+    name: tried && !form.name.trim() ? "Enter a name." : null,
+    start: tried && !form.start_time ? "Select a start time." : null,
+    end:
+      tried && !form.end_time
+        ? "Select an end time."
+        : minutes > 0 && minutes < 15
+          ? "A shift must be at least 15 minutes."
+          : null,
+  };
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!valid) return;
+    setTried(true);
+    if (!form.name.trim() || !form.start_time || !form.end_time || minutes < 15) return;
     const payload = {
       name: form.name.trim(),
       start_time: form.start_time,
@@ -99,21 +112,24 @@ export function BatchDialog({
         <DialogHeader>
           <DialogTitle>{batch ? `Edit ${batch.name}` : "New shift"}</DialogTitle>
         </DialogHeader>
-        <form onSubmit={submit} className="space-y-4">
+        <form onSubmit={submit} noValidate className="space-y-4">
           <div className="grid gap-2">
             <Label htmlFor="batch-name" required>Name</Label>
             <Input
               id="batch-name"
               required
+              aria-invalid={!!errors.name}
               placeholder="Morning"
               value={form.name}
               onChange={(e) => set("name", e.target.value)}
             />
+            <FieldError text={errors.name} />
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="grid gap-2">
               <Label htmlFor="slot-start" required>Start time</Label>
               <TimeSelect id="slot-start" value={form.start_time} onChange={setStart} />
+              <FieldError text={errors.start} />
             </div>
             <div className="grid gap-2">
               <Label htmlFor="slot-end" required>End time</Label>
@@ -123,6 +139,7 @@ export function BatchDialog({
                 after={form.start_time || undefined}
                 onChange={(v) => set("end_time", v)}
               />
+              <FieldError text={errors.end} />
             </div>
           </div>
           <div className="flex items-baseline justify-between rounded-lg border px-3 py-2 text-sm">
@@ -141,7 +158,7 @@ export function BatchDialog({
             <Button type="button" variant="outline" onClick={onClose}>
               Cancel
             </Button>
-            <Button type="submit" variant="brand" disabled={saving || !valid}>
+            <Button type="submit" variant="brand" disabled={saving}>
               {saving ? "Saving…" : batch ? "Save changes" : "Create shift"}
             </Button>
           </DialogFooter>
@@ -149,4 +166,8 @@ export function BatchDialog({
       </DialogContent>
     </Dialog>
   );
+}
+
+function FieldError({ text }: { text: string | null }) {
+  return text ? <p className="text-destructive text-xs">{text}</p> : null;
 }

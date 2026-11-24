@@ -1,9 +1,9 @@
 import { X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import { MonthPicker } from "@/components/month-picker";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -392,13 +392,7 @@ function DueInMonth({ branchId }: { branchId?: number }) {
       <div className="bg-card overflow-hidden rounded-2xl border">
         <div className="flex items-center justify-end gap-2 border-b p-4">
           <Label htmlFor="due-month">Month</Label>
-          <Input
-            id="due-month"
-            type="month"
-            className="w-44"
-            value={month}
-            onChange={(e) => setMonth(e.target.value)}
-          />
+          <MonthPicker id="due-month" className="w-48" value={month} onChange={setMonth} />
         </div>
         <Table>
           <TableHeader>

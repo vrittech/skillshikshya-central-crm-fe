@@ -21,9 +21,12 @@ export function seatsLabel(b: CourseBatch) {
   return `${b.seats_left} of ${b.capacity} seats left`;
 }
 
-/** One line for a batch in a picker: "PY-2026-001 — Python Nov · Morning · 6:00 AM – 8:00 AM · 5 of 25 seats left". */
+/**
+ * One line for a batch in a picker: "Python Nov · Morning · 6:00 AM – 8:00 AM".
+ * Says "full" or "no seats set" only when the batch can't be picked.
+ */
 export function batchOption(b: CourseBatch) {
-  return [`${b.coursebatch_id} — ${b.name}`, batchShift(b), seatsLabel(b)].filter(Boolean).join(" · ");
+  return [b.name, batchShift(b), takesNoOne(b) ? seatsLabel(b) : null].filter(Boolean).join(" · ");
 }
 
 /** Today in the browser's own time zone, as YYYY-MM-DD. */

@@ -338,6 +338,10 @@ export interface BatchProfitParams {
   branch_id?: number;
   course?: number;
   status?: "upcoming" | "running" | "closed";
+  /** Batches that start on or after this day, YYYY-MM-DD. */
+  start_date?: string;
+  /** Batches that start on or before this day, YYYY-MM-DD. */
+  end_date?: string;
 }
 
 export interface EnquiryFunnelParams extends ReportBaseParams {

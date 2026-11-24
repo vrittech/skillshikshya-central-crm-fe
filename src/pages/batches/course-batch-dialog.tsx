@@ -70,6 +70,8 @@ export function CourseBatchDialog({
   const [form, setForm] = useState<FormState>(EMPTY);
   const [courseSearch, setCourseSearch] = useState("");
   const [addingSlot, setAddingSlot] = useState(false);
+  /** Save was pressed: show what is missing. */
+  const [tried, setTried] = useState(false);
 
   const { user, hasPerm } = useAuth();
   const isStaff = !!user?.is_staff;
@@ -85,6 +87,7 @@ export function CourseBatchDialog({
   useEffect(() => {
     if (!open) return;
     setCourseSearch("");
+    setTried(false);
     setForm(
       courseBatch
         ? {
@@ -109,7 +112,8 @@ export function CourseBatchDialog({
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!form.name.trim() || !form.course || !form.batch || !seatsValid) return;
+    setTried(true);
+    if (missing || errors.capacity || errors.dates) return;
     const payload: CourseBatchPayload = {
       name: form.name.trim(),
       course: Number(form.course),
@@ -136,7 +140,22 @@ export function CourseBatchDialog({
   const seatsTaken = courseBatch?.seats_taken ?? 0;
   const seatsNotWhole = form.capacity !== "" && !(Number.isInteger(seats) && seats >= 1);
   const seatsBelowTaken = !seatsNotWhole && form.capacity !== "" && seats < seatsTaken;
-  const seatsValid = form.capacity !== "" && !seatsNotWhole && !seatsBelowTaken;
+  const missing = !form.name.trim() || !form.course || !form.batch || form.capacity === "";
+
+  const errors = {
+    name: tried && !form.name.trim() ? "Enter a name." : null,
+    course: tried && !form.course ? "Select a course." : null,
+    batch: tried && !form.batch ? "Select a shift." : null,
+    capacity:
+      tried && form.capacity === ""
+        ? "Enter the number of seats."
+        : seatsNotWhole
+          ? "Seats must be a whole number, 1 or more."
+          : seatsBelowTaken
+            ? `${seatsTaken} students sit in this batch now, so it needs at least ${seatsTaken} seats.`
+            : null,
+    dates: dateRangeInvalid ? "End date cannot be before the start date." : null,
+  };
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
@@ -144,17 +163,19 @@ export function CourseBatchDialog({
         <DialogHeader>
           <DialogTitle>{courseBatch ? `Edit ${courseBatch.name}` : "New batch"}</DialogTitle>
         </DialogHeader>
-        <form onSubmit={submit} className="space-y-4">
+        <form onSubmit={submit} noValidate className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="grid gap-2 sm:col-span-2">
               <Label htmlFor="cohort-name" required>Name</Label>
               <Input
                 id="cohort-name"
                 required
+                aria-invalid={!!errors.name}
                 placeholder="Python Bootcamp"
                 value={form.name}
                 onChange={(e) => set("name", e.target.value)}
               />
+              <FieldError text={errors.name} />
             </div>
 
             <div className="grid gap-2">
@@ -173,6 +194,7 @@ export function CourseBatchDialog({
                 searchPlaceholder="Search courses…"
                 emptyText="No courses found."
               />
+              <FieldError text={errors.course} />
             </div>
 
             <div className="grid min-w-0 gap-2">
@@ -191,7 +213,7 @@ export function CourseBatchDialog({
                 )}
               </div>
               <Select value={form.batch} onValueChange={(v) => set("batch", v)}>
-                <SelectTrigger className="min-w-0 [&>span]:text-ellipsis">
+                <SelectTrigger aria-invalid={!!errors.batch} className="min-w-0 [&>span]:text-ellipsis">
                   <SelectValue placeholder="Select shift" />
                 </SelectTrigger>
                 <SelectContent>
@@ -213,6 +235,7 @@ export function CourseBatchDialog({
                   )}
                 </SelectContent>
               </Select>
+              <FieldError text={errors.batch} />
             </div>
 
             <div className="grid gap-2">
@@ -229,10 +252,12 @@ export function CourseBatchDialog({
               <Input
                 id="cohort-end"
                 type="date"
+                aria-invalid={!!errors.dates}
                 min={form.start_date || undefined}
                 value={form.end_date}
                 onChange={(e) => set("end_date", e.target.value)}
               />
+              <FieldError text={errors.dates} />
             </div>
 
             <div className="grid gap-2">
@@ -241,6 +266,7 @@ export function CourseBatchDialog({
                 id="cohort-capacity"
                 type="number"
                 required
+                aria-invalid={!!errors.capacity}
                 min={Math.max(1, seatsTaken)}
                 step={1}
                 inputMode="numeric"
@@ -248,6 +274,7 @@ export function CourseBatchDialog({
                 value={form.capacity}
                 onChange={(e) => set("capacity", e.target.value)}
               />
+              <FieldError text={errors.capacity} />
             </div>
             <div className="grid gap-2">
               <Label htmlFor="cohort-trainer">Trainer</Label>
@@ -318,30 +345,13 @@ export function CourseBatchDialog({
             </div>
           </div>
 
-          {dateRangeInvalid && (
-            <p className="text-destructive text-xs">End date cannot be before the start date.</p>
-          )}
-          {seatsNotWhole && (
-            <p className="text-destructive text-xs">Seats must be a whole number, 1 or more.</p>
-          )}
-          {seatsBelowTaken && (
-            <p className="text-destructive text-xs">
-              {seatsTaken} students sit in this batch now, so it needs at least {seatsTaken} seats.
-            </p>
-          )}
           {/* unique_together on (course, batch, start_date) — surfaced via the error toast. */}
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={onClose}>
               Cancel
             </Button>
-            <Button
-              type="submit"
-              variant="brand"
-              disabled={
-                saving || !form.course || !form.batch || dateRangeInvalid || !seatsValid
-              }
-            >
+            <Button type="submit" variant="brand" disabled={saving}>
               {saving ? "Saving…" : courseBatch ? "Save changes" : "Create batch"}
             </Button>
           </DialogFooter>
@@ -355,4 +365,8 @@ export function CourseBatchDialog({
       />
     </Dialog>
   );
+}
+
+function FieldError({ text }: { text: string | null }) {
+  return text ? <p className="text-destructive text-xs">{text}</p> : null;
 }

@@ -68,6 +68,7 @@ import { LeadTimeline } from "./components/lead-timeline";
 import { EditCallDialog } from "./components/edit-call-dialog";
 import { LeadActionDialogs, type LeadAction } from "./components/lead-action-dialogs";
 import { PriorityBadge, ScoreBar, StatusBadge } from "./components/lead-badges";
+import { CALL_OUTCOME_TONE } from "@/data/lead-lookups";
 
 /* --------------------------------------------- dynamic (JSONB) field render */
 
@@ -165,17 +166,6 @@ function whatsappHref(phone: string | null | undefined): string {
   if (!d.startsWith("977") && d.length === 10) d = `977${d}`;
   return `https://wa.me/${d}`;
 }
-
-const CALL_OUTCOME_TONE: Record<string, string> = {
-  interested: "bg-orange-500/10 text-orange-600 dark:text-orange-400",
-  requested_counseling: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
-  follow_up_required: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
-  call_back_later: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
-  no_answer: "bg-muted text-muted-foreground",
-  busy: "bg-muted text-muted-foreground",
-  not_interested: "bg-destructive/10 text-destructive",
-  wrong_number: "bg-destructive/10 text-destructive",
-};
 
 function CallHistory({
   calls,

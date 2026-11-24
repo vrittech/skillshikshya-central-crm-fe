@@ -22,6 +22,7 @@ import { useAuth } from "@/context/auth";
 import { useDataSource } from "@/context/data-source";
 import { useBranches } from "@/hooks/use-branches";
 import { useBatchProfit } from "@/hooks/use-reports";
+import { DateRange } from "@/components/date-range";
 import { formatDate, formatNPR } from "@/lib/leads-format";
 import { cn } from "@/lib/utils";
 import type { BatchProfitParams, BatchProfitRow } from "@/types/reports-api";
@@ -109,12 +110,16 @@ export default function BatchProfitPage() {
   const branches = useBranches(1, 100, "", isApi && isStaff);
   const [branch, setBranch] = useState("all");
   const [status, setStatus] = useState<Status | "all">("all");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
   const params = useMemo(
     () => ({
       branch_id: branch === "all" ? undefined : Number(branch),
       status: status === "all" ? undefined : status,
+      start_date: from || undefined,
+      end_date: to || undefined,
     }),
-    [branch, status],
+    [branch, status, from, to],
   );
   const { data, isLoading } = useBatchProfit(params, isApi);
   const s = data?.summary;
@@ -133,6 +138,14 @@ export default function BatchProfitPage() {
         </div>
         {isApi && (
           <div className="flex flex-wrap gap-2">
+            <DateRange
+              from={from}
+              to={to}
+              onFromChange={setFrom}
+              onToChange={setTo}
+              fromLabel="Starts on or after"
+              toLabel="Starts on or before"
+            />
             <Select value={status} onValueChange={(v) => setStatus(v as Status | "all")}>
               <SelectTrigger className="w-40">
                 <SelectValue />

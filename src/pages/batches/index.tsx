@@ -354,7 +354,6 @@ function SlotsTab({ canAdd, canChange, canDelete }: TabPerms) {
     page,
     page_size: PAGE_SIZE,
     search: debounced || undefined,
-    ordering: "name",
   });
   const del = useDeleteBatch();
 

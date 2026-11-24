@@ -3,6 +3,7 @@ import { AppLayout } from "@/components/layout/app-layout";
 import { DataSourceProvider } from "@/context/data-source";
 import { RoleProvider } from "@/context/role";
 import BatchProfitPage from "@/pages/batch-profit";
+import CallsPage from "@/pages/calls";
 import EnquiriesReportPage from "@/pages/enquiries";
 import BatchesPage from "@/pages/batches";
 import BatchDetailPage from "@/pages/batches/batch-detail";
@@ -74,7 +75,7 @@ export default function App() {
           <Route path="/courses/course-batches" element={<Navigate to="/batches" replace />} />
           <Route path="/users" element={<UsersPage />} />
           <Route path="/roles" element={<RolesPage />} />
-          <Route path="/calls" element={<ComingSoonPage title="Calls" />} />
+          <Route path="/calls" element={<CallsPage />} />
           <Route path="/call-minutes" element={<CallMinutesPage />} />
           <Route path="*" element={<ComingSoonPage title="Not found" />} />
           </Route>
