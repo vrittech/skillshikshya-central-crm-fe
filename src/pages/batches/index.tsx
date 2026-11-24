@@ -47,6 +47,7 @@ import {
 } from "@/hooks/use-batches";
 import { formatDate } from "@/lib/leads-format";
 import type { Batch, CourseBatch, CourseBatchStatus } from "@/types";
+import { durationText, slotTimes } from "@/lib/time-slots";
 import { BatchDialog } from "./batch-dialog";
 import { CourseBatchDialog } from "./course-batch-dialog";
 import { STATUS_BADGE, STATUS_LABEL } from "./status";
@@ -383,6 +384,7 @@ function SlotsTab({ canAdd, canChange, canDelete }: TabPerms) {
             <TableRow>
               <TableHead>Name</TableHead>
               <TableHead>Time</TableHead>
+              <TableHead>Duration</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="w-10" />
             </TableRow>
@@ -391,14 +393,14 @@ function SlotsTab({ canAdd, canChange, canDelete }: TabPerms) {
             {isLoading &&
               Array.from({ length: 4 }).map((_, i) => (
                 <TableRow key={i}>
-                  <TableCell colSpan={4}>
+                  <TableCell colSpan={5}>
                     <Skeleton className="h-6 w-full" />
                   </TableCell>
                 </TableRow>
               ))}
             {!isLoading && rows.length === 0 && (
               <TableRow>
-                <TableCell colSpan={4} className="text-muted-foreground py-10 text-center">
+                <TableCell colSpan={5} className="text-muted-foreground py-10 text-center">
                   No time slots found.
                 </TableCell>
               </TableRow>
@@ -406,7 +408,8 @@ function SlotsTab({ canAdd, canChange, canDelete }: TabPerms) {
             {rows.map((b) => (
               <TableRow key={b.id}>
                 <TableCell className="font-semibold">{b.name}</TableCell>
-                <TableCell className="text-muted-foreground">{b.description || "—"}</TableCell>
+                <TableCell className="text-muted-foreground">{slotTimes(b) ?? "—"}</TableCell>
+                <TableCell className="text-muted-foreground">{durationText(b.duration_minutes)}</TableCell>
                 <TableCell>
                   <Badge variant={b.is_active ? "brand" : "secondary"}>
                     {b.is_active ? "Active" : "Inactive"}

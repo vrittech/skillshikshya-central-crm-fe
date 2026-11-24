@@ -177,7 +177,12 @@ export interface CourseListParams {
 export interface Batch {
   id: number;
   name: string;
+  /** Older slots kept the time as text here; new ones use start_time and end_time. */
   description: string | null;
+  /** "06:00" — a time of day; the end is after the start, same day. */
+  start_time: string | null;
+  end_time: string | null;
+  duration_minutes: number | null;
   is_active: boolean;
   branch: number | null;
   created_by: number | null;
@@ -185,7 +190,9 @@ export interface Batch {
   updated_at?: string;
 }
 
-export type BatchPayload = Partial<Pick<Batch, "name" | "description" | "is_active" | "branch">>;
+export type BatchPayload = Partial<
+  Pick<Batch, "name" | "description" | "start_time" | "end_time" | "is_active" | "branch">
+>;
 
 export interface BatchListParams {
   page?: number;

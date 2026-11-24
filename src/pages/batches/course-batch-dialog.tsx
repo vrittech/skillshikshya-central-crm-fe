@@ -24,6 +24,7 @@ import { useBatches, useCreateCourseBatch, useUpdateCourseBatch } from "@/hooks/
 import { useBranches } from "@/hooks/use-branches";
 import { useCourses } from "@/hooks/use-courses";
 import type { CourseBatch, CourseBatchMode, CourseBatchPayload, CourseBatchStatus } from "@/types";
+import { slotTimes } from "@/lib/time-slots";
 import { BatchDialog } from "./batch-dialog";
 
 interface FormState {
@@ -193,7 +194,7 @@ export function CourseBatchDialog({
                 <SelectContent>
                   {slots.map((b) => (
                     <SelectItem key={b.id} value={String(b.id)}>
-                      {b.description ? `${b.name} · ${b.description}` : b.name}
+                      {slotTimes(b) ? `${b.name} · ${slotTimes(b)}` : b.name}
                     </SelectItem>
                   ))}
                   {courseBatch?.batch != null &&
