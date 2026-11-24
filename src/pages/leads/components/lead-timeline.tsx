@@ -8,7 +8,7 @@ import {
   MonitorSmartphone,
   PhoneCall,
   StickyNote,
-  UserPlus,
+  UserRound,
   Wallet,
   Waypoints,
 } from "lucide-react";
@@ -38,7 +38,7 @@ const KINDS: { value: ApiTimelineKind; label: string }[] = [
 ];
 
 const ICONS: Record<ApiTimelineKind, React.ComponentType<{ className?: string }>> = {
-  lead: UserPlus,
+  lead: UserRound,
   enquiry: Waypoints,
   call: PhoneCall,
   note: StickyNote,
