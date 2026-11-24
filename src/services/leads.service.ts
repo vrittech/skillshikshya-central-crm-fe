@@ -139,9 +139,6 @@ export const leadsService = {
     const { data } = await api.patch<ApiEnrollment>(`/leads/${leadId}/enrollments/${id}/`, payload);
     return data;
   },
-  async deleteEnrollment(leadId: number, id: number) {
-    await api.delete(`/leads/${leadId}/enrollments/${id}/`);
-  },
   async payments(leadId: number, enrollmentId: number, params: PaymentListParams = {}) {
     const { data } = await api.get<Paginated<ApiPayment>>(
       `/leads/${leadId}/enrollments/${enrollmentId}/payments/`,
@@ -178,9 +175,6 @@ export const leadsService = {
       payload,
     );
     return data;
-  },
-  async deletePayment(leadId: number, enrollmentId: number, id: number) {
-    await api.delete(`/leads/${leadId}/enrollments/${enrollmentId}/payments/${id}/`);
   },
   async calls(leadId: number, params: CallListParams = {}) {
     const { data } = await api.get<Paginated<ApiLeadCall>>(`/leads/${leadId}/calls/`, { params });

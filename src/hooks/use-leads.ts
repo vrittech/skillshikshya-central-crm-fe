@@ -568,21 +568,6 @@ export function useUpdateEnrollment(leadId?: number) {
   });
 }
 
-export function useDeleteEnrollment(leadId?: number) {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (id: number) => leadsService.deleteEnrollment(leadId as number, id),
-    onSuccess: () => {
-      toast.success("Enrollment deleted");
-      void qc.invalidateQueries({ queryKey: ["lead"] });
-      void qc.invalidateQueries({ queryKey: ["leads"] });
-      void qc.invalidateQueries({ queryKey: ["enrollments"] });
-      void qc.invalidateQueries({ queryKey: ["payments"] });
-    },
-    onError: (e) => toast.error(apiErrorMessage(e, "Could not delete enrollment")),
-  });
-}
-
 export function useAddPayment(leadId?: number, enrollmentId?: number) {
   const qc = useQueryClient();
   return useMutation({
@@ -617,21 +602,6 @@ export function useUpdatePayment(leadId?: number, enrollmentId?: number) {
       void qc.invalidateQueries({ queryKey: ["invoices"] });
     },
     onError: (e) => toast.error(apiErrorMessage(e, "Could not update payment")),
-  });
-}
-
-export function useDeletePayment(leadId?: number, enrollmentId?: number) {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (id: number) =>
-      leadsService.deletePayment(leadId as number, enrollmentId as number, id),
-    onSuccess: () => {
-      toast.success("Payment deleted");
-      void qc.invalidateQueries({ queryKey: ["lead"] });
-      void qc.invalidateQueries({ queryKey: ["enrollments"] });
-      void qc.invalidateQueries({ queryKey: ["payments"] });
-    },
-    onError: (e) => toast.error(apiErrorMessage(e, "Could not delete payment")),
   });
 }
 

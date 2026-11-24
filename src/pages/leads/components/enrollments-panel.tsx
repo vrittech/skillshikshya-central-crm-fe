@@ -1,16 +1,6 @@
-import { ChevronDown, ChevronRight, PencilLine, Plus, Receipt, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronRight, PencilLine, Plus, Receipt } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -30,8 +20,6 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
-  useDeleteEnrollment,
-  useDeletePayment,
   useEnrollmentPayments,
   useLeadEnrollments,
   useLeadPayments,
@@ -104,8 +92,6 @@ function EnrollmentPayments({
   canManage: boolean;
 }) {
   const { payments, isLoading } = useEnrollmentPayments(leadId, enrollment.id);
-  const deletePayment = useDeletePayment(leadId, enrollment.id);
-  const [confirmId, setConfirmId] = useState<number | null>(null);
   const [editing, setEditing] = useState<ApiPayment | null>(null);
 
   if (isLoading) return <Skeleton className="h-16 w-full rounded-xl" />;
@@ -136,26 +122,15 @@ function EnrollmentPayments({
                 {p.status}
               </span>
               {canManage && (
-                <>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="text-muted-foreground size-8"
-                    title="Correct payment"
-                    onClick={() => setEditing(p)}
-                  >
-                    <PencilLine />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="text-muted-foreground hover:text-destructive size-8"
-                    title="Delete payment"
-                    onClick={() => setConfirmId(p.id)}
-                  >
-                    <Trash2 />
-                  </Button>
-                </>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="text-muted-foreground size-8"
+                  title="Correct payment"
+                  onClick={() => setEditing(p)}
+                >
+                  <PencilLine />
+                </Button>
               )}
             </div>
           </li>
@@ -170,28 +145,6 @@ function EnrollmentPayments({
         enrollmentApiId={enrollment.id}
         payment={editing}
       />
-
-      <AlertDialog open={confirmId != null} onOpenChange={(o) => !o && setConfirmId(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete this payment?</AlertDialogTitle>
-            <AlertDialogDescription>
-              The payment is removed permanently and the enrollment totals recalculate.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => {
-                if (confirmId != null) deletePayment.mutate(confirmId);
-                setConfirmId(null);
-              }}
-            >
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </>
   );
 }
@@ -203,13 +156,11 @@ function EnrollmentCard({
   enrollment,
   canManage,
   onEdit,
-  onDelete,
 }: {
   leadId?: number;
   enrollment: ApiEnrollment;
   canManage: boolean;
   onEdit: () => void;
-  onDelete: () => void;
 }) {
   const [payOpen, setPayOpen] = useState(false);
   const [showPayments, setShowPayments] = useState(false);
@@ -285,14 +236,6 @@ function EnrollmentCard({
             <Button size="sm" variant="outline" onClick={onEdit}>
               <PencilLine /> Edit
             </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              className="text-muted-foreground hover:text-destructive"
-              onClick={onDelete}
-            >
-              <Trash2 /> Delete
-            </Button>
           </>
         )}
       </div>
@@ -315,7 +258,7 @@ function EnrollmentCard({
 
 /* --------------------------------------------------------------- the panel */
 
-/** Enrollment tab (live path) — every enrollment of the lead with full CRUD. */
+/** Enrollment tab (live path) — every enrollment of the lead. Money records can't be deleted. */
 export function EnrollmentsPanel({
   leadId,
   primaryCourseId,
@@ -326,10 +269,8 @@ export function EnrollmentsPanel({
   canManage: boolean;
 }) {
   const { enrollments, isLoading } = useLeadEnrollments(leadId);
-  const deleteEnrollment = useDeleteEnrollment(leadId);
   const [createOpen, setCreateOpen] = useState(false);
   const [editing, setEditing] = useState<ApiEnrollment | null>(null);
-  const [deleting, setDeleting] = useState<ApiEnrollment | null>(null);
 
   if (isLoading) {
     return (
@@ -362,7 +303,6 @@ export function EnrollmentsPanel({
                 enrollment={e}
                 canManage={canManage}
                 onEdit={() => setEditing(e)}
-                onDelete={() => setDeleting(e)}
               />
             ))}
           </div>
@@ -390,29 +330,6 @@ export function EnrollmentsPanel({
         leadId={leadId}
         enrollment={editing}
       />
-
-      <AlertDialog open={deleting != null} onOpenChange={(o) => !o && setDeleting(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete this enrollment?</AlertDialogTitle>
-            <AlertDialogDescription>
-              “{deleting?.course_name ?? "Course"}” and its recorded payments are removed
-              permanently. This cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => {
-                if (deleting) deleteEnrollment.mutate(deleting.id);
-                setDeleting(null);
-              }}
-            >
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }
