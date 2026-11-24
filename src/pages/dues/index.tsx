@@ -1,5 +1,7 @@
+import { X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -28,7 +30,7 @@ import { useDueInMonth, useWhoOwes } from "@/hooks/use-reports";
 import { daysText } from "@/lib/due-dates";
 import { formatDate, formatNPR } from "@/lib/leads-format";
 import { cn } from "@/lib/utils";
-import type { DuesPerson } from "@/types/reports-api";
+import type { DuesPerson, OwedGroup, WhoOwesReport } from "@/types/reports-api";
 
 function money(value: string | null | undefined) {
   return formatNPR(Number(value ?? 0));
@@ -136,11 +138,122 @@ function TableState({
 
 /* ------------------------------------------------------------ who owes */
 
+type OwedView = "students" | "counselor" | "batch";
+
+/** The group a student list is narrowed to, picked from a By counselor or By batch row. */
+interface OwedFilter {
+  counselor?: number | "none";
+  batch?: number;
+  label: string;
+}
+
+interface GroupRow extends OwedGroup {
+  key: string;
+  name: string;
+  /** Picking the row narrows the student list to it; none for "No batch". */
+  filter?: OwedFilter;
+}
+
+function groupRows(data: WhoOwesReport | undefined, view: OwedView): GroupRow[] {
+  if (view === "counselor") {
+    return (data?.by_counselor ?? []).map((g) => {
+      const name = g.counselor_name ?? "Not assigned";
+      return { ...g, key: String(g.counselor), name, filter: { counselor: g.counselor ?? "none", label: name } };
+    });
+  }
+  return (data?.by_batch ?? []).map((g) => {
+    const name = g.batch == null ? "No batch" : (g.batch_name ?? "—");
+    return {
+      ...g,
+      key: String(g.batch),
+      name,
+      filter: g.batch == null ? undefined : { batch: g.batch, label: name },
+    };
+  });
+}
+
+function OwedGroups({
+  view,
+  rows,
+  loading,
+  error,
+  onPick,
+}: {
+  view: OwedView;
+  rows: GroupRow[];
+  loading: boolean;
+  error?: string;
+  onPick: (f: OwedFilter) => void;
+}) {
+  return (
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead className="pl-6">{view === "counselor" ? "Counselor" : "Batch"}</TableHead>
+          <TableHead className="text-right">Students</TableHead>
+          <TableHead className="text-right">Owed</TableHead>
+          <TableHead className="text-right">Late</TableHead>
+          <TableHead className="pr-6">Longest late</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        <TableState loading={loading} empty={!rows.length} cols={5} error={error} />
+        {!loading &&
+          rows.map((g) => (
+            <TableRow key={g.key}>
+              <TableCell className="pl-6">
+                {g.filter ? (
+                  <button
+                    type="button"
+                    className={cn(
+                      "font-semibold hover:underline",
+                      g.filter.counselor === "none" && "text-amber-600 dark:text-amber-400",
+                    )}
+                    onClick={() => g.filter && onPick(g.filter)}
+                  >
+                    {g.name}
+                  </button>
+                ) : (
+                  <span className="text-muted-foreground font-semibold">{g.name}</span>
+                )}
+              </TableCell>
+              <TableCell className="text-right tabular-nums">{g.students}</TableCell>
+              <TableCell className="text-right font-semibold tabular-nums">{money(g.owed)}</TableCell>
+              <TableCell
+                className={cn(
+                  "text-right tabular-nums",
+                  Number(g.late) > 0 && "text-destructive font-semibold",
+                )}
+              >
+                {Number(g.late) > 0 ? money(g.late) : "—"}
+              </TableCell>
+              <TableCell className="pr-6">{g.days_late > 0 ? daysText(g.days_late) : "—"}</TableCell>
+            </TableRow>
+          ))}
+      </TableBody>
+    </Table>
+  );
+}
+
 function WhoOwes({ branchId }: { branchId?: number }) {
   const [lateOnly, setLateOnly] = useState(false);
-  const { data, isLoading } = useWhoOwes({ branch_id: branchId, late_only: lateOnly || undefined });
+  const [view, setView] = useState<OwedView>("students");
+  const [filter, setFilter] = useState<OwedFilter | null>(null);
+  // A group view adds up everyone; the student list can be narrowed to one group.
+  const narrowed = view === "students" && filter;
+  const { data, isLoading } = useWhoOwes({
+    branch_id: branchId,
+    late_only: lateOnly || undefined,
+    counselor: narrowed ? filter.counselor : undefined,
+    batch: narrowed ? filter.batch : undefined,
+  });
   const s = data?.summary;
   const rows = data?.results ?? [];
+
+  function pick(f: OwedFilter) {
+    setFilter(f);
+    setView("students");
+  }
 
   return (
     <div className="space-y-4">
@@ -158,65 +271,103 @@ function WhoOwes({ branchId }: { branchId?: number }) {
       </div>
 
       <div className="bg-card overflow-hidden rounded-2xl border">
-        <div className="flex items-center justify-end gap-2 border-b p-4">
-          <Switch id="late-only" checked={lateOnly} onCheckedChange={setLateOnly} />
-          <Label htmlFor="late-only">Late only</Label>
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b p-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <Tabs value={view} onValueChange={(v) => setView(v as OwedView)}>
+              <TabsList>
+                <TabsTrigger value="students">Students</TabsTrigger>
+                <TabsTrigger value="counselor">By counselor</TabsTrigger>
+                <TabsTrigger value="batch">By batch</TabsTrigger>
+              </TabsList>
+            </Tabs>
+            {narrowed && (
+              <Badge variant="secondary" className="gap-1 py-1 pr-1">
+                {filter.label}
+                <button
+                  type="button"
+                  aria-label="Show everyone"
+                  className="hover:bg-foreground/10 rounded-full p-0.5"
+                  onClick={() => setFilter(null)}
+                >
+                  <X className="size-3" />
+                </button>
+              </Badge>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <Switch id="late-only" checked={lateOnly} onCheckedChange={setLateOnly} />
+            <Label htmlFor="late-only">Late only</Label>
+          </div>
         </div>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="pl-6">Student</TableHead>
-              <TableHead>Course</TableHead>
-              <TableHead className="text-right">Owed</TableHead>
-              <TableHead className="text-right">Late</TableHead>
-              <TableHead>Days late</TableHead>
-              <TableHead className="pr-6">Next due</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            <TableState
-              loading={isLoading}
-              empty={!rows.length}
-              cols={6}
-              error={data?.error}
-            />
-            {!isLoading &&
-              rows.map((r) => (
-                <TableRow key={r.enrollment}>
-                  <TableCell className="pl-6">
-                    <Person row={r} />
-                  </TableCell>
-                  <TableCell>
-                    <Course row={r} />
-                  </TableCell>
-                  <TableCell className="text-right font-semibold tabular-nums">
-                    {money(r.owed)}
-                  </TableCell>
-                  <TableCell
-                    className={cn(
-                      "text-right tabular-nums",
-                      Number(r.late) > 0 && "text-destructive font-semibold",
-                    )}
-                  >
-                    {Number(r.late) > 0 ? money(r.late) : "—"}
-                  </TableCell>
-                  <TableCell>{r.days_late > 0 ? daysText(r.days_late) : "—"}</TableCell>
-                  <TableCell className="pr-6">
-                    {r.next_due_on ? (
-                      <>
-                        <p>{formatDate(r.next_due_on)}</p>
-                        <p className="text-muted-foreground text-xs">
-                          {money(r.next_due_amount)}
-                        </p>
-                      </>
-                    ) : (
-                      "—"
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))}
-          </TableBody>
-        </Table>
+        {view === "students" ? (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="pl-6">Student</TableHead>
+                <TableHead>Course</TableHead>
+                <TableHead>Counselor</TableHead>
+                <TableHead className="text-right">Owed</TableHead>
+                <TableHead className="text-right">Late</TableHead>
+                <TableHead>Days late</TableHead>
+                <TableHead className="pr-6">Next due</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              <TableState
+                loading={isLoading}
+                empty={!rows.length}
+                cols={7}
+                error={data?.error}
+              />
+              {!isLoading &&
+                rows.map((r) => (
+                  <TableRow key={r.enrollment}>
+                    <TableCell className="pl-6">
+                      <Person row={r} />
+                    </TableCell>
+                    <TableCell>
+                      <Course row={r} />
+                    </TableCell>
+                    <TableCell className={cn(!r.counselor_name && "text-muted-foreground")}>
+                      {r.counselor_name ?? "Not assigned"}
+                    </TableCell>
+                    <TableCell className="text-right font-semibold tabular-nums">
+                      {money(r.owed)}
+                    </TableCell>
+                    <TableCell
+                      className={cn(
+                        "text-right tabular-nums",
+                        Number(r.late) > 0 && "text-destructive font-semibold",
+                      )}
+                    >
+                      {Number(r.late) > 0 ? money(r.late) : "—"}
+                    </TableCell>
+                    <TableCell>{r.days_late > 0 ? daysText(r.days_late) : "—"}</TableCell>
+                    <TableCell className="pr-6">
+                      {r.next_due_on ? (
+                        <>
+                          <p>{formatDate(r.next_due_on)}</p>
+                          <p className="text-muted-foreground text-xs">
+                            {money(r.next_due_amount)}
+                          </p>
+                        </>
+                      ) : (
+                        "—"
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))}
+            </TableBody>
+          </Table>
+        ) : (
+          <OwedGroups
+            view={view}
+            rows={groupRows(data, view)}
+            loading={isLoading}
+            error={data?.error}
+            onPick={pick}
+          />
+        )}
       </div>
     </div>
   );

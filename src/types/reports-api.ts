@@ -222,8 +222,12 @@ export interface DuesPerson {
   student_id: string | null;
   course_name: string;
   /** The money batch. */
+  batch?: number | null;
   batch_name: string | null;
   branch_name: string | null;
+  /** The lead's counselor: the person who chases the money. */
+  counselor?: number | null;
+  counselor_name?: string | null;
 }
 
 export interface WhoOwesRow extends DuesPerson {
@@ -247,14 +251,29 @@ export interface WhoOwesReport {
     days_61_90: string;
     over_90: string;
   };
+  /** Rows added up per counselor; counselor null = nobody assigned. */
+  by_counselor?: (OwedGroup & { counselor: number | null; counselor_name: string | null })[];
+  /** Rows added up per money batch; batch null = no batch. */
+  by_batch?: (OwedGroup & { batch: number | null; batch_name: string | null })[];
   results: WhoOwesRow[];
   error?: string;
+}
+
+/** Who owes, added up for one counselor or one batch. */
+export interface OwedGroup {
+  students: number;
+  owed: string;
+  late: string;
+  /** The longest any of them is late, in days. */
+  days_late: number;
 }
 
 export interface WhoOwesParams {
   branch_id?: number;
   course?: number;
   batch?: number;
+  /** A counselor id, or "none" for students with nobody assigned. */
+  counselor?: number | "none";
   late_only?: boolean;
 }
 
