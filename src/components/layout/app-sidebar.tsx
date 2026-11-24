@@ -45,7 +45,7 @@ const navItems: NavItem[] = [
   { to: "/batch-profit", label: "Batch profit", icon: PiggyBank, cap: "reports.view" },
   { to: "/enquiries", label: "Enquiries", icon: Funnel, cap: "reports.view" },
   { to: "/students", label: "Students", icon: GraduationCap },
-  { to: "/teams", label: "Teams", icon: Laptop, cap: "enrollment.manage" },
+  { to: "/teams", label: "Teams licences", icon: Laptop, cap: "enrollment.manage" },
   { to: "/reports", label: "Reports", icon: TrendingUp, cap: "reports.view" },
   { to: "/calls", label: "Calls", icon: PhoneCall },
   { to: "/call-minutes", label: "Call Minutes", icon: Timer },
