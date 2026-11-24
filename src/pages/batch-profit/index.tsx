@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
 import {
@@ -214,7 +215,9 @@ export default function BatchProfitPage() {
                   rows.map((r) => (
                     <TableRow key={r.batch}>
                       <TableCell className="pl-6">
-                        <p className="font-semibold">{r.name}</p>
+                        <Link to={`/batches/${r.batch}`} className="font-semibold hover:underline">
+                          {r.name}
+                        </Link>
                         <p className="text-muted-foreground text-xs">
                           <span className="font-mono">{r.coursebatch_id}</span> · {r.course_name}
                         </p>

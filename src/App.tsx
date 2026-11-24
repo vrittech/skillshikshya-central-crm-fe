@@ -1,10 +1,11 @@
-import { Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes } from "react-router-dom";
 import { AppLayout } from "@/components/layout/app-layout";
 import { DataSourceProvider } from "@/context/data-source";
 import { RoleProvider } from "@/context/role";
 import BatchProfitPage from "@/pages/batch-profit";
 import EnquiriesReportPage from "@/pages/enquiries";
 import BatchesPage from "@/pages/batches";
+import BatchDetailPage from "@/pages/batches/batch-detail";
 import BranchesPage from "@/pages/branches";
 import CallMinutesPage from "@/pages/call-minutes";
 import ComingSoonPage from "@/pages/coming-soon";
@@ -65,8 +66,11 @@ export default function App() {
 
           {/* Existing API-wired modules */}
           <Route path="/courses" element={<CoursesPage />} />
-          <Route path="/courses/batches" element={<BatchesPage defaultTab="slots" />} />
-          <Route path="/courses/course-batches" element={<BatchesPage defaultTab="course-batches" />} />
+          <Route path="/batches" element={<BatchesPage defaultTab="course-batches" />} />
+          <Route path="/batches/slots" element={<BatchesPage defaultTab="slots" />} />
+          <Route path="/batches/:id" element={<BatchDetailPage />} />
+          <Route path="/courses/batches" element={<Navigate to="/batches/slots" replace />} />
+          <Route path="/courses/course-batches" element={<Navigate to="/batches" replace />} />
           <Route path="/users" element={<UsersPage />} />
           <Route path="/roles" element={<RolesPage />} />
           <Route path="/calls" element={<ComingSoonPage title="Calls" />} />

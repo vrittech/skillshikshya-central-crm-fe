@@ -19,7 +19,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { useAuth } from "@/context/auth";
 import { useBatches, useCreateCourseBatch, useUpdateCourseBatch } from "@/hooks/use-batches";
+import { useBranches } from "@/hooks/use-branches";
 import { useCourses } from "@/hooks/use-courses";
 import type { CourseBatch, CourseBatchMode, CourseBatchPayload, CourseBatchStatus } from "@/types";
 
@@ -35,6 +37,8 @@ interface FormState {
   status: CourseBatchStatus;
   trainer: string;
   is_active: boolean;
+  /** Branch id as text; "" = the creator's branch. Staff only. */
+  branch: string;
 }
 
 const EMPTY: FormState = {
@@ -48,6 +52,7 @@ const EMPTY: FormState = {
   status: "upcoming",
   trainer: "",
   is_active: true,
+  branch: "",
 };
 
 /** Create/edit a course batch — a course run tied to a time slot and date range. */
@@ -63,6 +68,9 @@ export function CourseBatchDialog({
   const [form, setForm] = useState<FormState>(EMPTY);
   const [courseSearch, setCourseSearch] = useState("");
 
+  const { user } = useAuth();
+  const isStaff = !!user?.is_staff;
+  const branchesQ = useBranches(1, 100, "", open && isStaff);
   const coursesQ = useCourses(1, 50, courseSearch);
   const batchesQ = useBatches({ page_size: 100, is_active: true });
   const create = useCreateCourseBatch();
@@ -85,6 +93,7 @@ export function CourseBatchDialog({
             status: courseBatch.status,
             trainer: courseBatch.trainer ?? "",
             is_active: courseBatch.is_active,
+            branch: courseBatch.branch == null ? "" : String(courseBatch.branch),
           }
         : EMPTY,
     );
@@ -107,6 +116,7 @@ export function CourseBatchDialog({
       status: form.status,
       trainer: form.trainer.trim() || null,
       is_active: form.is_active,
+      ...(isStaff && form.branch ? { branch: Number(form.branch) } : {}),
     };
     if (courseBatch) {
       update.mutate({ id: courseBatch.id, payload }, { onSuccess: () => onClose() });
@@ -251,6 +261,24 @@ export function CourseBatchDialog({
                 </SelectContent>
               </Select>
             </div>
+
+            {isStaff && (
+              <div className="grid gap-2 sm:col-span-2">
+                <Label>Branch</Label>
+                <Select value={form.branch || undefined} onValueChange={(v) => set("branch", v)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select branch" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(branchesQ.data?.results ?? []).map((b) => (
+                      <SelectItem key={b.id} value={String(b.id)}>
+                        {b.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
             <div className="flex items-center gap-2 sm:col-span-2">
               <Switch

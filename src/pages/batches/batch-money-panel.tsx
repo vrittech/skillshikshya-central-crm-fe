@@ -19,14 +19,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Sheet,
-  SheetBody,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   useAddBatchCost,
@@ -220,23 +212,21 @@ function AddCostDialog({
   );
 }
 
-/* ------------------------------------------------------------ sheet */
+/* ------------------------------------------------------------ panel */
 
 /** A batch's money: figures, costs, and closing or reopening it. */
-export function BatchMoneySheet({
+export function BatchMoneyPanel({
   batch,
-  onClose,
   canAddCost,
   canVoidCost,
   canClose,
 }: {
-  batch: CourseBatch | null;
-  onClose: () => void;
+  batch: CourseBatch;
   canAddCost: boolean;
   canVoidCost: boolean;
   canClose: boolean;
 }) {
-  const { data: money, isLoading } = useBatchMoney(batch?.id ?? null);
+  const { data: money, isLoading } = useBatchMoney(batch.id);
   const [adding, setAdding] = useState(false);
   const [voiding, setVoiding] = useState<BatchCost | null>(null);
   const [closing, setClosing] = useState<"close" | "reopen" | null>(null);
@@ -245,129 +235,111 @@ export function BatchMoneySheet({
   const reopen = useReopenBatch();
   const isClosed = money?.status === "closed";
 
+  if (isLoading || !money) {
+    return (
+      <div className="space-y-3">
+        <Skeleton className="h-40 w-full rounded-xl" />
+        <Skeleton className="h-14 w-full rounded-xl" />
+      </div>
+    );
+  }
+
   return (
-    <>
-      <Sheet open={batch != null} onOpenChange={(o) => !o && onClose()}>
-        <SheetContent className="sm:max-w-xl">
-          <SheetHeader>
-            <SheetTitle>{batch?.name ?? "Batch"}</SheetTitle>
-            <SheetDescription>
-              <span className="font-mono">{batch?.coursebatch_id}</span>
-              {batch?.course_name ? ` · ${batch.course_name}` : ""}
-              {isClosed && money?.closed_at ? ` · Closed ${formatDate(money.closed_at)}` : ""}
-            </SheetDescription>
-          </SheetHeader>
-          <SheetBody>
-            {isLoading || !money || !batch ? (
-              <div className="space-y-3">
-                <Skeleton className="h-40 w-full rounded-xl" />
-                <Skeleton className="h-14 w-full rounded-xl" />
-              </div>
-            ) : (
-              <div className="space-y-6">
-                <section>
-                  <Figures money={money} />
-                </section>
+    <div className="space-y-6">
+      <section>
+        <Figures money={money} />
+      </section>
 
-                <section>
-                  <div className="flex items-center justify-between gap-2">
-                    <h3 className="text-sm font-semibold">Costs</h3>
-                    {canAddCost && (
-                      <Button size="sm" variant="outline" onClick={() => setAdding(true)}>
-                        <Plus /> Add cost
-                      </Button>
-                    )}
-                  </div>
-                  {money.costs.length ? (
-                    <ul className="divide-border divide-y">
-                      {money.costs.map((c) => (
-                        <CostRow
-                          key={c.id}
-                          cost={c}
-                          onVoid={canVoidCost ? () => setVoiding(c) : undefined}
-                        />
-                      ))}
-                    </ul>
-                  ) : (
-                    <p className="text-muted-foreground py-3 text-sm">No costs.</p>
-                  )}
-                </section>
-
-                {money.closings.length > 0 && (
-                  <section>
-                    <h3 className="text-sm font-semibold">Close history</h3>
-                    <ul className="divide-border divide-y">
-                      {money.closings.map((c) => (
-                        <li key={c.id} className="py-2.5">
-                          <p className="text-sm font-medium">
-                            {c.kind_display} · {formatDateTime(c.created_at)}
-                          </p>
-                          <p className="text-muted-foreground text-xs">
-                            {c.created_by_name} · {c.reason}
-                          </p>
-                        </li>
-                      ))}
-                    </ul>
-                  </section>
-                )}
-
-                {canClose && (
-                  <div className="flex justify-end border-t pt-4">
-                    {isClosed ? (
-                      <Button variant="outline" onClick={() => setClosing("reopen")}>
-                        Reopen batch
-                      </Button>
-                    ) : (
-                      <Button variant="destructive" onClick={() => setClosing("close")}>
-                        Close batch
-                      </Button>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-          </SheetBody>
-        </SheetContent>
-      </Sheet>
-
-        {batch && (
-          <>
-            <AddCostDialog batchId={batch.id} open={adding} onClose={() => setAdding(false)} />
-            <ReasonDialog
-              open={voiding != null}
-              onClose={() => setVoiding(null)}
-              title="Void cost"
-              description={
-                voiding ? `${voiding.kind_display} · ${formatNPR(Number(voiding.amount))}` : undefined
-              }
-              confirmLabel="Void"
-              destructive
-              pending={voidCost.isPending}
-              onConfirm={(reason) =>
-                voiding &&
-                voidCost.mutate(
-                  { id: batch.id, costId: voiding.id, reason },
-                  { onSuccess: () => setVoiding(null) },
-                )
-              }
-            />
-            <ReasonDialog
-              open={closing != null}
-              onClose={() => setClosing(null)}
-              title={closing === "reopen" ? "Reopen batch" : "Close batch"}
-              description={batch.name}
-              confirmLabel={closing === "reopen" ? "Reopen" : "Close batch"}
-              destructive={closing === "close"}
-              pending={close.isPending || reopen.isPending}
-              onConfirm={(reason) =>
-                (closing === "reopen" ? reopen : close).mutate(
-                  { id: batch.id, reason },
-                  { onSuccess: () => setClosing(null) },
-                )
-              }
-            />
-          </>
+      <section>
+        <div className="flex items-center justify-between gap-2">
+          <h3 className="text-sm font-semibold">Costs</h3>
+          {canAddCost && (
+            <Button size="sm" variant="outline" onClick={() => setAdding(true)}>
+              <Plus /> Add cost
+            </Button>
+          )}
+        </div>
+        {money.costs.length ? (
+          <ul className="divide-border divide-y">
+            {money.costs.map((c) => (
+              <CostRow
+                key={c.id}
+                cost={c}
+                onVoid={canVoidCost ? () => setVoiding(c) : undefined}
+              />
+            ))}
+          </ul>
+        ) : (
+          <p className="text-muted-foreground py-3 text-sm">No costs.</p>
         )}
-    </>
+      </section>
+
+      {money.closings.length > 0 && (
+        <section>
+          <h3 className="text-sm font-semibold">Close history</h3>
+          <ul className="divide-border divide-y">
+            {money.closings.map((c) => (
+              <li key={c.id} className="py-2.5">
+                <p className="text-sm font-medium">
+                  {c.kind_display} · {formatDateTime(c.created_at)}
+                </p>
+                <p className="text-muted-foreground text-xs">
+                  {c.created_by_name} · {c.reason}
+                </p>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {canClose && (
+        <div className="flex justify-end border-t pt-4">
+          {isClosed ? (
+            <Button variant="outline" onClick={() => setClosing("reopen")}>
+              Reopen batch
+            </Button>
+          ) : (
+            <Button variant="destructive" onClick={() => setClosing("close")}>
+              Close batch
+            </Button>
+          )}
+        </div>
+      )}
+
+      <AddCostDialog batchId={batch.id} open={adding} onClose={() => setAdding(false)} />
+      <ReasonDialog
+        open={voiding != null}
+        onClose={() => setVoiding(null)}
+        title="Void cost"
+        description={
+          voiding ? `${voiding.kind_display} · ${formatNPR(Number(voiding.amount))}` : undefined
+        }
+        confirmLabel="Void"
+        destructive
+        pending={voidCost.isPending}
+        onConfirm={(reason) =>
+          voiding &&
+          voidCost.mutate(
+            { id: batch.id, costId: voiding.id, reason },
+            { onSuccess: () => setVoiding(null) },
+          )
+        }
+      />
+      <ReasonDialog
+        open={closing != null}
+        onClose={() => setClosing(null)}
+        title={closing === "reopen" ? "Reopen batch" : "Close batch"}
+        description={batch.name}
+        confirmLabel={closing === "reopen" ? "Reopen" : "Close batch"}
+        destructive={closing === "close"}
+        pending={close.isPending || reopen.isPending}
+        onConfirm={(reason) =>
+          (closing === "reopen" ? reopen : close).mutate(
+            { id: batch.id, reason },
+            { onSuccess: () => setClosing(null) },
+          )
+        }
+      />
+    </div>
   );
 }

@@ -2,6 +2,7 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tansta
 import { toast } from "sonner";
 import { apiErrorMessage } from "@/lib/api";
 import { batchesService, courseBatchesService } from "@/services/batches.service";
+import { globalListsService } from "@/services/global-lists.service";
 import type {
   BatchCostPayload,
   BatchListParams,
@@ -117,6 +118,25 @@ export function useBatchStudents(id: number | null) {
   return useQuery({
     queryKey: ["course-batches", "students", id],
     queryFn: () => courseBatchesService.students(id as number),
+    enabled: id != null,
+  });
+}
+
+export function useCourseBatch(id: number | null) {
+  return useQuery({
+    queryKey: ["course-batches", "detail", id],
+    queryFn: () => courseBatchesService.get(id as number),
+    enabled: id != null && Number.isFinite(id),
+    retry: false,
+  });
+}
+
+/** Pending enrollments that picked this batch; they take a seat when confirmed. */
+export function useBatchPending(id: number | null) {
+  return useQuery({
+    queryKey: ["course-batches", "pending", id],
+    queryFn: () =>
+      globalListsService.enrollments({ batch: id, status: "pending", page_size: 100 }),
     enabled: id != null,
   });
 }

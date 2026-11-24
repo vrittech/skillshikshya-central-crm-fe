@@ -228,7 +228,9 @@ export interface CourseBatch {
   waiting_count?: number;
   is_active: boolean;
   branch: number | null;
+  branch_name?: string | null;
   created_by: number | null;
+  created_by_name?: string | null;
   created_at?: string;
   updated_at?: string;
 }

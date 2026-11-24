@@ -94,7 +94,9 @@ function Person({ row }: { row: DuesPerson }) {
 function Course({ row }: { row: DuesPerson }) {
   return (
     <>
-      <p>{row.course_name}</p>
+      <Link to={`/enrollments/${row.enrollment}`} className="hover:underline">
+        {row.course_name}
+      </Link>
       <p className="text-muted-foreground text-xs">{row.batch_name ?? "—"}</p>
     </>
   );

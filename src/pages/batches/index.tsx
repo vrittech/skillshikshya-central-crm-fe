@@ -1,5 +1,6 @@
 import { ChevronLeft, ChevronRight, MoreHorizontal, Plus, Search } from "lucide-react";
 import { useEffect, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -47,36 +48,21 @@ import {
 import { formatDate } from "@/lib/leads-format";
 import type { Batch, CourseBatch, CourseBatchStatus } from "@/types";
 import { BatchDialog } from "./batch-dialog";
-import { BatchMoneySheet } from "./batch-money-sheet";
-import { BatchStudentsSheet } from "./batch-students-sheet";
 import { CourseBatchDialog } from "./course-batch-dialog";
+import { STATUS_BADGE, STATUS_LABEL } from "./status";
 
 const PAGE_SIZE = 20;
 const ALL_SLOTS = "all";
 const ALL_STATUSES = "all";
 
-const STATUS_BADGE: Record<CourseBatchStatus, "brand" | "outline" | "secondary"> = {
-  upcoming: "outline",
-  running: "brand",
-  closed: "secondary",
-};
-
-const STATUS_LABEL: Record<CourseBatchStatus, string> = {
-  upcoming: "Upcoming",
-  running: "Running",
-  closed: "Closed",
-};
-
 export default function BatchesPage({ defaultTab = "course-batches" }: { defaultTab?: "course-batches" | "slots" }) {
   const { hasPerm } = useAuth();
   const { source } = useDataSource();
   const isApi = source === "api";
-
-  const [tab, setTab] = useState(defaultTab);
-
-  useEffect(() => {
-    setTab(defaultTab);
-  }, [defaultTab]);
+  const navigate = useNavigate();
+  const tab = defaultTab;
+  const setTab = (next: "course-batches" | "slots") =>
+    navigate(next === "slots" ? "/batches/slots" : "/batches");
 
   if (!isApi) {
     return (
@@ -103,8 +89,6 @@ export default function BatchesPage({ defaultTab = "course-batches" }: { default
             canAdd={hasPerm("course.add_coursebatch")}
             canChange={hasPerm("course.change_coursebatch")}
             canDelete={hasPerm("course.delete_coursebatch")}
-            canAddCost={hasPerm("course.add_batchcost")}
-            canVoidCost={hasPerm("course.change_batchcost")}
           />
         </TabsContent>
         <TabsContent value="slots" className="mt-6">
@@ -126,9 +110,6 @@ function PageHeading() {
         Institute
       </p>
       <h1 className="font-headline mt-1 text-3xl font-semibold tracking-tight">Batches</h1>
-      <p className="text-muted-foreground mt-1 text-sm">
-        Course batches and the recurring time slots they run in.
-      </p>
     </div>
   );
 }
@@ -141,13 +122,8 @@ interface TabPerms {
   canDelete: boolean;
 }
 
-function CourseBatchesTab({
-  canAdd,
-  canChange,
-  canDelete,
-  canAddCost,
-  canVoidCost,
-}: TabPerms & { canAddCost: boolean; canVoidCost: boolean }) {
+function CourseBatchesTab({ canAdd, canChange, canDelete }: TabPerms) {
+  const navigate = useNavigate();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [debounced, setDebounced] = useState("");
@@ -158,8 +134,6 @@ function CourseBatchesTab({
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<CourseBatch | null>(null);
   const [deleting, setDeleting] = useState<CourseBatch | null>(null);
-  const [viewing, setViewing] = useState<CourseBatch | null>(null);
-  const [moneyOf, setMoneyOf] = useState<CourseBatch | null>(null);
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -278,7 +252,9 @@ function CourseBatchesTab({
             {rows.map((cb) => (
               <TableRow key={cb.id}>
                 <TableCell>
-                  <div className="font-semibold">{cb.name}</div>
+                  <Link to={`/batches/${cb.id}`} className="font-semibold hover:underline">
+                    {cb.name}
+                  </Link>
                   <div className="text-muted-foreground text-xs">
                     {cb.mode === "online" ? "Online" : "Physical"}
                     {cb.trainer ? ` · ${cb.trainer}` : ""}
@@ -304,8 +280,7 @@ function CourseBatchesTab({
                 </TableCell>
                 <TableCell>
                   <RowMenu
-                    onStudents={() => setViewing(cb)}
-                    onMoney={() => setMoneyOf(cb)}
+                    onOpen={() => navigate(`/batches/${cb.id}`)}
                     onEdit={
                       canChange
                         ? () => {
@@ -335,16 +310,6 @@ function CourseBatchesTab({
         open={formOpen}
         onClose={() => setFormOpen(false)}
         courseBatch={editing}
-      />
-
-      <BatchStudentsSheet batch={viewing} onClose={() => setViewing(null)} />
-
-      <BatchMoneySheet
-        batch={moneyOf}
-        onClose={() => setMoneyOf(null)}
-        canAddCost={canAddCost}
-        canVoidCost={canVoidCost}
-        canClose={canChange}
       />
 
       <ConfirmDelete
@@ -515,13 +480,11 @@ function SeatsCell({ batch }: { batch: CourseBatch }) {
 /* ------------------------------------------------------------------- shared */
 
 function RowMenu({
-  onStudents,
-  onMoney,
+  onOpen,
   onEdit,
   onDelete,
 }: {
-  onStudents?: () => void;
-  onMoney?: () => void;
+  onOpen?: () => void;
   onEdit?: () => void;
   onDelete?: () => void;
 }) {
@@ -533,8 +496,7 @@ function RowMenu({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        {onStudents && <DropdownMenuItem onSelect={onStudents}>Students</DropdownMenuItem>}
-        {onMoney && <DropdownMenuItem onSelect={onMoney}>Money</DropdownMenuItem>}
+        {onOpen && <DropdownMenuItem onSelect={onOpen}>Open</DropdownMenuItem>}
         {onEdit && <DropdownMenuItem onSelect={onEdit}>Edit</DropdownMenuItem>}
         {onDelete && (
           <DropdownMenuItem variant="destructive" onSelect={onDelete}>

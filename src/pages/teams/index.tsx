@@ -49,7 +49,9 @@ function Student({ row }: { row: ApiTeamsLicence }) {
         {row.name}
       </Link>
       <p className="text-muted-foreground text-xs">
-        {row.course_name}
+        <Link to={`/enrollments/${row.enrollment}`} className="hover:underline">
+          {row.course_name}
+        </Link>
         {row.batch_name ? ` · ${row.batch_name}` : ""}
       </p>
     </>
