@@ -12,7 +12,7 @@ import {
   UserPlus,
 } from "lucide-react";
 import { useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -64,6 +64,7 @@ import {
 import { cn } from "@/lib/utils";
 import type { Activity, Lead, LeadCustomData } from "@/types/leads";
 import { ActivityTimeline } from "./components/activity-timeline";
+import { LeadTimeline } from "./components/lead-timeline";
 import { EditCallDialog } from "./components/edit-call-dialog";
 import { LeadActionDialogs, type LeadAction } from "./components/lead-action-dialogs";
 import { PriorityBadge, ScoreBar, StatusBadge } from "./components/lead-badges";
@@ -269,6 +270,7 @@ const TAB_ACTIVE =
 
 export default function LeadDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { can } = useRole();
   const { source } = useDataSource();
@@ -424,18 +426,20 @@ export default function LeadDetailPage() {
 
       {/* Unified record card: tab bar + all panels in one frame */}
       <Card className="gap-0 overflow-hidden py-0">
-        <Tabs defaultValue="overview">
+        <Tabs defaultValue={searchParams.get("tab") ?? "overview"}>
           <TabsList className="h-auto w-full flex-wrap justify-start gap-1 rounded-none border-b bg-transparent p-2">
             <TabsTrigger value="overview" className={TAB_ACTIVE}>Overview</TabsTrigger>
             {source === "api" && lead.apiId != null && (
               <TabsTrigger value="enquiries" className={TAB_ACTIVE}>Enquiries</TabsTrigger>
             )}
-            <TabsTrigger value="activity" className={TAB_ACTIVE}>Activity</TabsTrigger>
+            <TabsTrigger value="history" className={TAB_ACTIVE}>History</TabsTrigger>
             <TabsTrigger value="calls" className={TAB_ACTIVE}>Calls</TabsTrigger>
             <TabsTrigger value="followups" className={TAB_ACTIVE}>Follow-ups</TabsTrigger>
             <TabsTrigger value="enrollment" className={TAB_ACTIVE}>Enrollment</TabsTrigger>
             <TabsTrigger value="payments" className={TAB_ACTIVE}>Payments</TabsTrigger>
-            <TabsTrigger value="audit" className={TAB_ACTIVE}>Audit History</TabsTrigger>
+            {source !== "api" && (
+              <TabsTrigger value="audit" className={TAB_ACTIVE}>Audit History</TabsTrigger>
+            )}
           </TabsList>
 
           <div className="p-5">
@@ -586,9 +590,13 @@ export default function LeadDetailPage() {
               </div>
             </TabsContent>
 
-            {/* Activity */}
-            <TabsContent value="activity">
-              <ActivityTimeline activities={lead.activities} />
+            {/* History: everything about the person, newest first */}
+            <TabsContent value="history">
+              {source === "api" && lead.apiId != null ? (
+                <LeadTimeline leadId={lead.apiId} />
+              ) : (
+                <ActivityTimeline activities={lead.activities} />
+              )}
             </TabsContent>
 
             {/* Calls */}

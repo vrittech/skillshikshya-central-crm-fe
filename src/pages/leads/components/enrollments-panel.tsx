@@ -43,6 +43,7 @@ import {
   useMakeFeeInvoice,
 } from "@/hooks/use-leads";
 import { daysText, dueSummary, partsAreValid, splitEvenly } from "@/lib/due-dates";
+import { changeText } from "@/lib/history-format";
 import { formatDate, formatDateTime, formatNPR } from "@/lib/leads-format";
 import { canSit, enrolledBatchIfDifferent, localToday, seatText } from "@/lib/seats";
 import { cn } from "@/lib/utils";
@@ -183,30 +184,6 @@ function EnrollmentPayments({
 }
 
 /* --------------------------------------------- reason trail of enrollment */
-
-/** "status: active → cancelled · amount: 10000.00" — unchanged values are shown once. */
-function changeText(before: Record<string, unknown>, after: Record<string, unknown>) {
-  const keys = [...new Set([...Object.keys(before ?? {}), ...Object.keys(after ?? {})])];
-  const show = (v: unknown) => {
-    if (Array.isArray(v)) {
-      if (!v.length) return "—";
-      return (v as ApiDuePart[])
-        .map((p) => `${formatDate(p.due_on)} ${formatNPR(Number(p.amount))}`)
-        .join(", ");
-    }
-    if (v == null || v === "") return "—";
-    // An email (Teams account) is shown as it is.
-    return String(v).includes("@") ? String(v) : label(String(v));
-  };
-  const name = (k: string) => label(k).replace(/^./, (c) => c.toUpperCase());
-  return keys
-    .map((k) =>
-      show(before?.[k]) === show(after?.[k])
-        ? `${name(k)}: ${show(after?.[k])}`
-        : `${name(k)}: ${show(before?.[k])} → ${show(after?.[k])}`,
-    )
-    .join(" · ");
-}
 
 function EnrollmentHistoryList({ leadId, enrollment }: { leadId?: number; enrollment: ApiEnrollment }) {
   const { history, isLoading } = useEnrollmentHistory(leadId, enrollment.id);

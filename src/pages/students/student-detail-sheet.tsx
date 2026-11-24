@@ -1,5 +1,6 @@
-import { CalendarCheck, ExternalLink, FileText, Send, Trash2 } from "lucide-react";
+import { CalendarCheck, ExternalLink, FileText, History, Send, Trash2 } from "lucide-react";
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -361,6 +362,13 @@ export function StudentDetailSheet({
                 <span className="font-mono">{student.student_id}</span> · {student.phone}
                 {student.branch_name ? ` · ${student.branch_name}` : ""}
               </SheetDescription>
+              {student.lead != null && (
+                <Button size="sm" variant="outline" className="w-fit" asChild>
+                  <Link to={`/leads/${student.lead}?tab=history`}>
+                    <History /> Full history
+                  </Link>
+                </Button>
+              )}
             </>
           )}
         </SheetHeader>
