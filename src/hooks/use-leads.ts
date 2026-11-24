@@ -667,7 +667,7 @@ export function useSeatAction(leadId?: number) {
       toast.success(SEAT_DONE[vars.action], {
         description: data.current_batch_name ?? undefined,
       });
-      for (const key of ["lead", "enrollments", "course-batches"]) {
+      for (const key of ["lead", "enrollments", "course-batches", "teams"]) {
         void qc.invalidateQueries({ queryKey: [key] });
       }
     },
@@ -695,8 +695,9 @@ export function useEnrollmentStatusAction(leadId?: number) {
       void qc.invalidateQueries({ queryKey: ["lead"] });
       void qc.invalidateQueries({ queryKey: ["leads"] });
       void qc.invalidateQueries({ queryKey: ["enrollments"] });
-      // Cancel frees the seat.
+      // Cancel frees the seat and the Teams licence.
       void qc.invalidateQueries({ queryKey: ["course-batches"] });
+      void qc.invalidateQueries({ queryKey: ["teams"] });
     },
     onError: (e) => toast.error(apiErrorMessage(e, "Could not update the enrollment")),
   });

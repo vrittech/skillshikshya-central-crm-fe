@@ -58,6 +58,7 @@ import { ChangeDueDatesDialog, DueDatesList, DuePartsEditor, ReminderList } from
 import { EnrollmentDialog, PaymentDialog } from "./enrollment-dialogs";
 import { PaymentActions } from "./payment-actions";
 import { SeatButtons, SeatDialog, SeatHistoryList } from "./seat-actions";
+import { TeamsLicenceLine } from "./teams-licence";
 
 /* ------------------------------------------------------------ status tones */
 
@@ -192,13 +193,16 @@ function changeText(before: Record<string, unknown>, after: Record<string, unkno
         .map((p) => `${formatDate(p.due_on)} ${formatNPR(Number(p.amount))}`)
         .join(", ");
     }
-    return v == null || v === "" ? "—" : label(String(v));
+    if (v == null || v === "") return "—";
+    // An email (Teams account) is shown as it is.
+    return String(v).includes("@") ? String(v) : label(String(v));
   };
+  const name = (k: string) => label(k).replace(/^./, (c) => c.toUpperCase());
   return keys
     .map((k) =>
       show(before?.[k]) === show(after?.[k])
-        ? `${label(k)}: ${show(after?.[k])}`
-        : `${label(k)}: ${show(before?.[k])} → ${show(after?.[k])}`,
+        ? `${name(k)}: ${show(after?.[k])}`
+        : `${name(k)}: ${show(before?.[k])} → ${show(after?.[k])}`,
     )
     .join(" · ");
 }
@@ -223,7 +227,13 @@ function EnrollmentHistoryList({ leadId, enrollment }: { leadId?: number; enroll
           </div>
           <p className="mt-0.5 text-sm">“{h.reason}”</p>
           {(Object.keys(h.before ?? {}).length > 0 || Object.keys(h.after ?? {}).length > 0) && (
-            <p className="text-muted-foreground mt-0.5 text-xs capitalize">
+            <p
+              className={cn(
+                "text-muted-foreground mt-0.5 text-xs",
+                // A Teams account is an email: keep its case.
+                !("teams_account" in (h.after ?? {})) && "capitalize",
+              )}
+            >
               {changeText(h.before, h.after)}
             </p>
           )}
@@ -346,6 +356,8 @@ function EnrollmentCard({
           ""
         )}
       </p>
+
+      {leadId != null && <TeamsLicenceLine enrollment={enrollment} canManage={canManage} />}
 
       {enrollment.remarks && (
         <p className="text-muted-foreground mt-3 text-sm">{enrollment.remarks}</p>

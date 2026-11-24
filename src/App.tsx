@@ -24,6 +24,7 @@ import ResetPasswordPage from "@/pages/reset-password";
 import RolesPage from "@/pages/roles";
 import SettingsPage from "@/pages/settings";
 import StudentsPage from "@/pages/students";
+import TeamsPage from "@/pages/teams";
 import UsersPage from "@/pages/users";
 
 export default function App() {
@@ -54,6 +55,7 @@ export default function App() {
           <Route path="/invoices" element={<InvoicesPage />} />
           <Route path="/dues" element={<DuesPage />} />
           <Route path="/batch-profit" element={<BatchProfitPage />} />
+          <Route path="/teams" element={<TeamsPage />} />
           <Route path="/reports" element={<ReportsPage />} />
           <Route path="/settings" element={<SettingsPage />} />
 

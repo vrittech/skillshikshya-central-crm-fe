@@ -143,8 +143,10 @@ function useBatchMoneyAction<V>(
     onSuccess: (money) => {
       toast.success(done);
       qc.setQueryData(["course-batches", "money", money.batch], money);
-      void qc.invalidateQueries({ queryKey: ["course-batches"] });
-      void qc.invalidateQueries({ queryKey: ["reports"] });
+      // Closing frees the students' Teams licences.
+      for (const key of ["course-batches", "reports", "teams", "lead", "enrollments"]) {
+        void qc.invalidateQueries({ queryKey: [key] });
+      }
     },
     onError: (e) => toast.error(apiErrorMessage(e, failed)),
   });

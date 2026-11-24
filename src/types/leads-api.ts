@@ -306,6 +306,8 @@ export interface ApiEnrollment {
   due_dates?: ApiDueRow[];
   /** An active course-fee invoice exists. */
   has_fee_invoice?: boolean;
+  /** The Teams licence the student holds now, or null. */
+  teams_licence?: { id: number; account: string; assigned_at: string } | null;
   enrollment_date: string | null;
   status: ApiEnrollmentStatus;
   listed_fee: string;
@@ -777,4 +779,43 @@ export interface ApiUpload {
   url: string;
   filename: string;
   size: number;
+}
+
+/* ------------------------------------------------------------ Teams licences */
+
+export interface ApiTeamsLicence {
+  id: number;
+  enrollment: number;
+  lead: number;
+  name: string;
+  student_id: string | null;
+  course_name: string;
+  /** The batch the student sits in now. */
+  batch_name: string | null;
+  account: string;
+  assigned_by: number;
+  assigned_by_name: string;
+  assigned_at: string;
+  released_at: string | null;
+  released_by: number | null;
+  released_by_name: string | null;
+  release_reason: string | null;
+}
+
+/** total and free are null when no total is set (admin site, Teams licence settings). */
+export interface ApiTeamsSummary {
+  total: number | null;
+  in_use: number;
+  free: number | null;
+}
+
+export interface ApiTeamsLicenceParams {
+  page?: number;
+  page_size?: number;
+  search?: string;
+  /** true: in use now; false: freed. */
+  open?: boolean;
+  enrollment?: number;
+  batch?: number;
+  branch_id?: number;
 }
