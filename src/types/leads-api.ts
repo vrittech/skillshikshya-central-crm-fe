@@ -614,7 +614,12 @@ export interface ApiEnrollmentListRow {
   student_name?: string | null;
   course: number;
   course_name?: string;
-  batch: string | null;
+  /** The money batch. */
+  batch: number | null;
+  batch_name?: string | null;
+  /** The batch the student sits in now. */
+  current_batch?: number | null;
+  current_batch_name?: string | null;
   status: ApiEnrollmentStatus;
   enrollment_date: string | null;
   listed_fee: string;

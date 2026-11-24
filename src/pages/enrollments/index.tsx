@@ -1,6 +1,6 @@
 import { GraduationCap, Plus, Search } from "lucide-react";
 import { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -128,10 +128,26 @@ export default function EnrollmentsPage() {
               {filtered.map((e) => (
                 <TableRow
                   key={e.id}
-                  className={cn(e.leadId && "cursor-pointer")}
-                  onClick={() => e.leadId && navigate(`/leads/${e.leadId}`)}
+                  className={cn(source === "api" && "cursor-pointer")}
+                  onClick={() =>
+                    source === "api"
+                      ? navigate(`/enrollments/${e.id}`)
+                      : e.leadId && navigate(`/leads/${e.leadId}`)
+                  }
                 >
-                  <TableCell className="font-semibold">{e.leadName}</TableCell>
+                  <TableCell className="font-semibold">
+                    {e.leadId ? (
+                      <Link
+                        to={`/leads/${e.leadId}`}
+                        className="hover:underline"
+                        onClick={(ev) => ev.stopPropagation()}
+                      >
+                        {e.leadName}
+                      </Link>
+                    ) : (
+                      e.leadName
+                    )}
+                  </TableCell>
                   <TableCell>{e.courseName}</TableCell>
                   <TableCell className="text-muted-foreground">{e.batch || "—"}</TableCell>
                   <TableCell>

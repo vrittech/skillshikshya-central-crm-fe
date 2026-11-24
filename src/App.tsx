@@ -12,6 +12,7 @@ import CoursesPage from "@/pages/courses";
 import DashboardPage from "@/pages/dashboard";
 import DuesPage from "@/pages/dues";
 import EnrollmentsPage from "@/pages/enrollments";
+import EnrollmentDetailPage from "@/pages/enrollments/enrollment-detail";
 import FollowUpsPage from "@/pages/follow-ups";
 import InvoicesPage from "@/pages/invoices";
 import LeadsPage from "@/pages/leads";
@@ -52,6 +53,7 @@ export default function App() {
           {/* Planned lead-ops modules — navigation ready, pages pending */}
           <Route path="/follow-ups" element={<FollowUpsPage />} />
           <Route path="/enrollments" element={<EnrollmentsPage />} />
+          <Route path="/enrollments/:id" element={<EnrollmentDetailPage />} />
           <Route path="/payments" element={<PaymentsPage />} />
           <Route path="/invoices" element={<InvoicesPage />} />
           <Route path="/dues" element={<DuesPage />} />

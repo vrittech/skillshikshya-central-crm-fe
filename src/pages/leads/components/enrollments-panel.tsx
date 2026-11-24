@@ -12,6 +12,7 @@ import {
   RotateCcw,
 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { ReasonDialog } from "@/components/reason-dialog";
 import { Badge } from "@/components/ui/badge";
@@ -245,23 +246,26 @@ function EnrollmentHistoryList({ leadId, enrollment }: { leadId?: number; enroll
 
 /* -------------------------------------------------------- enrollment card */
 
-function EnrollmentCard({
+/** One enrollment with its money, sections and actions. On its own page (`page`) every section starts open. */
+export function EnrollmentCard({
   leadId,
   enrollment,
   canManage,
   onEdit,
+  page = false,
 }: {
   leadId?: number;
   enrollment: ApiEnrollment;
   canManage: boolean;
   onEdit: () => void;
+  page?: boolean;
 }) {
   const [payOpen, setPayOpen] = useState(false);
-  const [showPayments, setShowPayments] = useState(false);
-  const [showHistory, setShowHistory] = useState(false);
-  const [showSeats, setShowSeats] = useState(false);
-  const [showDue, setShowDue] = useState(false);
-  const [showReminders, setShowReminders] = useState(false);
+  const [showPayments, setShowPayments] = useState(page);
+  const [showHistory, setShowHistory] = useState(page);
+  const [showSeats, setShowSeats] = useState(page);
+  const [showDue, setShowDue] = useState(page);
+  const [showReminders, setShowReminders] = useState(page);
   const [dueOpen, setDueOpen] = useState(false);
   const [confirmParts, setConfirmParts] = useState<ApiDuePart[]>([]);
   const feeInvoice = useMakeFeeInvoice(leadId);
@@ -296,7 +300,16 @@ function EnrollmentCard({
     <div className="rounded-2xl border p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="font-headline text-lg font-semibold">{enrollment.course_name ?? "Course"}</p>
+          {page ? (
+            <p className="font-headline text-lg font-semibold">{enrollment.course_name ?? "Course"}</p>
+          ) : (
+            <Link
+              to={`/enrollments/${enrollment.id}`}
+              className="font-headline text-lg font-semibold hover:underline"
+            >
+              {enrollment.course_name ?? "Course"}
+            </Link>
+          )}
           <p className="text-muted-foreground text-sm">
             {seatText(enrollment)} · Enrolled {formatDate(enrollment.enrollment_date ?? undefined)}
             {enrollment.branch_name ? ` · ${enrollment.branch_name}` : ""}

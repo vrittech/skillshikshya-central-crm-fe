@@ -23,6 +23,7 @@ import {
 } from "@/data/lead-adapters";
 import { getLeadById, LEAD_LIST } from "@/data/mock-leads";
 import { isOverdue } from "@/lib/leads-format";
+import { globalListsService } from "@/services/global-lists.service";
 import { leadsService, type LeadListParams } from "@/services/leads.service";
 import type {
   ApiAdjustmentKind,
@@ -796,3 +797,23 @@ export function useArchiveLead() {
     onError: (e) => toast.error(apiErrorMessage(e, "Could not update lead")),
   });
 }
+
+/**
+ * One enrollment for its own page. The global endpoint gives the lead, then
+ * the lead's enrollment endpoint gives the full record the actions need.
+ * The key starts with "lead", so every enrollment action refreshes it.
+ */
+export function useEnrollmentPage(id?: number) {
+  const { isMock } = useDataSource();
+  return useQuery({
+    queryKey: ["lead", "enrollment-page", id],
+    enabled: !isMock && id != null && Number.isFinite(id),
+    queryFn: async () => {
+      const row = await globalListsService.enrollment(id!);
+      const enrollment = await leadsService.enrollment(row.lead, id!);
+      return { leadId: row.lead, enrollment };
+    },
+    retry: false,
+  });
+}
+

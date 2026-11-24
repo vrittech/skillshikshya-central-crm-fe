@@ -16,6 +16,10 @@ export const globalListsService = {
     const { data } = await api.get<Paginated<ApiEnrollmentListRow>>("/enrollments/", { params });
     return data;
   },
+  async enrollment(id: number) {
+    const { data } = await api.get<ApiEnrollmentListRow>(`/enrollments/${id}/`);
+    return data;
+  },
   async payments(params: Record<string, unknown> = {}) {
     const { data } = await api.get<Paginated<ApiPaymentListRow>>("/payments/", { params });
     return data;

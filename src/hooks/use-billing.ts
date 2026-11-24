@@ -51,7 +51,7 @@ export function useEnrollments() {
       leadId: String(e.lead),
       leadName: e.lead_name,
       courseName: e.course_name ?? "—",
-      batch: e.batch ?? undefined,
+      batch: e.current_batch_name ?? e.batch_name ?? undefined,
       status: e.status,
       enrollmentDate: e.enrollment_date ?? undefined,
       agreed: Number(e.agreed_amount),
