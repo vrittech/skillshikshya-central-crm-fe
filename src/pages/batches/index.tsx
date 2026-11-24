@@ -47,6 +47,7 @@ import {
 import { formatDate } from "@/lib/leads-format";
 import type { Batch, CourseBatch, CourseBatchStatus } from "@/types";
 import { BatchDialog } from "./batch-dialog";
+import { BatchMoneySheet } from "./batch-money-sheet";
 import { BatchStudentsSheet } from "./batch-students-sheet";
 import { CourseBatchDialog } from "./course-batch-dialog";
 
@@ -102,6 +103,8 @@ export default function BatchesPage({ defaultTab = "course-batches" }: { default
             canAdd={hasPerm("course.add_coursebatch")}
             canChange={hasPerm("course.change_coursebatch")}
             canDelete={hasPerm("course.delete_coursebatch")}
+            canAddCost={hasPerm("course.add_batchcost")}
+            canVoidCost={hasPerm("course.change_batchcost")}
           />
         </TabsContent>
         <TabsContent value="slots" className="mt-6">
@@ -138,7 +141,13 @@ interface TabPerms {
   canDelete: boolean;
 }
 
-function CourseBatchesTab({ canAdd, canChange, canDelete }: TabPerms) {
+function CourseBatchesTab({
+  canAdd,
+  canChange,
+  canDelete,
+  canAddCost,
+  canVoidCost,
+}: TabPerms & { canAddCost: boolean; canVoidCost: boolean }) {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [debounced, setDebounced] = useState("");
@@ -150,6 +159,7 @@ function CourseBatchesTab({ canAdd, canChange, canDelete }: TabPerms) {
   const [editing, setEditing] = useState<CourseBatch | null>(null);
   const [deleting, setDeleting] = useState<CourseBatch | null>(null);
   const [viewing, setViewing] = useState<CourseBatch | null>(null);
+  const [moneyOf, setMoneyOf] = useState<CourseBatch | null>(null);
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -295,6 +305,7 @@ function CourseBatchesTab({ canAdd, canChange, canDelete }: TabPerms) {
                 <TableCell>
                   <RowMenu
                     onStudents={() => setViewing(cb)}
+                    onMoney={() => setMoneyOf(cb)}
                     onEdit={
                       canChange
                         ? () => {
@@ -327,6 +338,14 @@ function CourseBatchesTab({ canAdd, canChange, canDelete }: TabPerms) {
       />
 
       <BatchStudentsSheet batch={viewing} onClose={() => setViewing(null)} />
+
+      <BatchMoneySheet
+        batch={moneyOf}
+        onClose={() => setMoneyOf(null)}
+        canAddCost={canAddCost}
+        canVoidCost={canVoidCost}
+        canClose={canChange}
+      />
 
       <ConfirmDelete
         name={deleting?.name}
@@ -497,10 +516,12 @@ function SeatsCell({ batch }: { batch: CourseBatch }) {
 
 function RowMenu({
   onStudents,
+  onMoney,
   onEdit,
   onDelete,
 }: {
   onStudents?: () => void;
+  onMoney?: () => void;
   onEdit?: () => void;
   onDelete?: () => void;
 }) {
@@ -513,6 +534,7 @@ function RowMenu({
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
         {onStudents && <DropdownMenuItem onSelect={onStudents}>Students</DropdownMenuItem>}
+        {onMoney && <DropdownMenuItem onSelect={onMoney}>Money</DropdownMenuItem>}
         {onEdit && <DropdownMenuItem onSelect={onEdit}>Edit</DropdownMenuItem>}
         {onDelete && (
           <DropdownMenuItem variant="destructive" onSelect={onDelete}>

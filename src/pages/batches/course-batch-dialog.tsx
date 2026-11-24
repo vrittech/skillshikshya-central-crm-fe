@@ -235,9 +235,11 @@ export function CourseBatchDialog({
             </div>
             <div className="grid gap-2">
               <Label>Status</Label>
+              {/* Closing and reopening go through the batch's Money panel, with a reason. */}
               <Select
                 value={form.status}
                 onValueChange={(v) => set("status", v as CourseBatchStatus)}
+                disabled={form.status === "closed"}
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -245,7 +247,7 @@ export function CourseBatchDialog({
                 <SelectContent>
                   <SelectItem value="upcoming">Upcoming</SelectItem>
                   <SelectItem value="running">Running</SelectItem>
-                  <SelectItem value="closed">Closed</SelectItem>
+                  {form.status === "closed" && <SelectItem value="closed">Closed</SelectItem>}
                 </SelectContent>
               </Select>
             </div>

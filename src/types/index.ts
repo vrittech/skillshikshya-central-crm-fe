@@ -259,6 +259,73 @@ export interface BatchStudents {
   paused: BatchStudentRow[];
 }
 
+/** A batch's money, counted on the batch the student first joined. Money is a string. */
+export interface BatchFigures {
+  students: number;
+  fees: string;
+  collected: string;
+  owed: string;
+  costs: string;
+  /** collected - costs */
+  profit: string;
+}
+
+export type BatchCostKind = "trainer" | "venue" | "licences" | "other";
+
+export interface BatchCost {
+  id: number;
+  course_batch: number;
+  kind: BatchCostKind;
+  kind_display: string;
+  amount: string;
+  spent_on: string;
+  note: string;
+  created_by: number;
+  created_by_name: string;
+  created_at: string;
+  voided_at: string | null;
+  voided_by: number | null;
+  voided_by_name: string | null;
+  void_reason: string | null;
+}
+
+export interface BatchCostPayload {
+  kind: BatchCostKind;
+  amount: string;
+  spent_on?: string;
+  note?: string;
+}
+
+/** A close or reopen of a batch. A close row keeps the figures of that day. */
+export interface BatchClosing {
+  id: number;
+  kind: "close" | "reopen";
+  kind_display: string;
+  reason: string;
+  students: number | null;
+  fees: string | null;
+  collected: string | null;
+  owed: string | null;
+  costs: string | null;
+  profit: string | null;
+  created_by: number;
+  created_by_name: string;
+  created_at: string;
+}
+
+/** GET /course-batches/{id}/money/ */
+export interface BatchMoney {
+  batch: number;
+  status: CourseBatchStatus;
+  figures: BatchFigures;
+  /** Closed batches only: the figures kept at close, and what came after. */
+  at_close: BatchFigures | null;
+  after_close: BatchFigures | null;
+  closed_at: string | null;
+  costs: BatchCost[];
+  closings: BatchClosing[];
+}
+
 export type CourseBatchPayload = Partial<
   Pick<
     CourseBatch,

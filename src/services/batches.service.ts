@@ -1,7 +1,9 @@
 import { api } from "@/lib/api";
 import type {
   Batch,
+  BatchCostPayload,
   BatchListParams,
+  BatchMoney,
   BatchPayload,
   BatchStudents,
   CourseBatch,
@@ -70,6 +72,34 @@ export const courseBatchesService = {
   /** Who sits in the batch now, who moved in, and who is paused out of it. */
   async students(id: number) {
     const { data } = await api.get<BatchStudents>(`/course-batches/${id}/students/`);
+    return data;
+  },
+
+  /** Fees, collected, owed, costs and profit, with the costs and close history. */
+  async money(id: number) {
+    const { data } = await api.get<BatchMoney>(`/course-batches/${id}/money/`);
+    return data;
+  },
+
+  async addCost(id: number, payload: BatchCostPayload) {
+    const { data } = await api.post<BatchMoney>(`/course-batches/${id}/costs/`, payload);
+    return data;
+  },
+
+  async voidCost(id: number, costId: number, reason: string) {
+    const { data } = await api.post<BatchMoney>(`/course-batches/${id}/costs/${costId}/void/`, {
+      reason,
+    });
+    return data;
+  },
+
+  async close(id: number, reason: string) {
+    const { data } = await api.post<BatchMoney>(`/course-batches/${id}/close/`, { reason });
+    return data;
+  },
+
+  async reopen(id: number, reason: string) {
+    const { data } = await api.post<BatchMoney>(`/course-batches/${id}/reopen/`, { reason });
     return data;
   },
 };

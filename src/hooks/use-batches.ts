@@ -2,7 +2,14 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tansta
 import { toast } from "sonner";
 import { apiErrorMessage } from "@/lib/api";
 import { batchesService, courseBatchesService } from "@/services/batches.service";
-import type { BatchListParams, BatchPayload, CourseBatchListParams, CourseBatchPayload } from "@/types";
+import type {
+  BatchCostPayload,
+  BatchListParams,
+  BatchMoney,
+  BatchPayload,
+  CourseBatchListParams,
+  CourseBatchPayload,
+} from "@/types";
 
 /* ------------------------------------------------------- time slots (Batch) */
 
@@ -112,4 +119,67 @@ export function useBatchStudents(id: number | null) {
     queryFn: () => courseBatchesService.students(id as number),
     enabled: id != null,
   });
+}
+
+/* ------------------------------------------------------- batch money */
+
+export function useBatchMoney(id: number | null) {
+  return useQuery({
+    queryKey: ["course-batches", "money", id],
+    queryFn: () => courseBatchesService.money(id as number),
+    enabled: id != null,
+  });
+}
+
+/** Each batch money action replies with the new money; the list and reports refresh. */
+function useBatchMoneyAction<V>(
+  run: (vars: V) => Promise<BatchMoney>,
+  done: string,
+  failed: string,
+) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: run,
+    onSuccess: (money) => {
+      toast.success(done);
+      qc.setQueryData(["course-batches", "money", money.batch], money);
+      void qc.invalidateQueries({ queryKey: ["course-batches"] });
+      void qc.invalidateQueries({ queryKey: ["reports"] });
+    },
+    onError: (e) => toast.error(apiErrorMessage(e, failed)),
+  });
+}
+
+export function useAddBatchCost() {
+  return useBatchMoneyAction(
+    ({ id, payload }: { id: number; payload: BatchCostPayload }) =>
+      courseBatchesService.addCost(id, payload),
+    "Cost added",
+    "Could not add the cost",
+  );
+}
+
+export function useVoidBatchCost() {
+  return useBatchMoneyAction(
+    ({ id, costId, reason }: { id: number; costId: number; reason: string }) =>
+      courseBatchesService.voidCost(id, costId, reason),
+    "Cost voided",
+    "Could not void the cost",
+  );
+}
+
+export function useCloseBatch() {
+  return useBatchMoneyAction(
+    ({ id, reason }: { id: number; reason: string }) => courseBatchesService.close(id, reason),
+    "Batch closed",
+    "Could not close the batch",
+  );
+}
+
+export function useReopenBatch() {
+  return useBatchMoneyAction(
+    ({ id, reason }: { id: number; reason: string }) => courseBatchesService.reopen(id, reason),
+    "Batch reopened",
+    "Could not reopen the batch",
+  );
 }
