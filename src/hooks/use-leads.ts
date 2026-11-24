@@ -24,6 +24,7 @@ import { isOverdue } from "@/lib/leads-format";
 import { leadsService, type LeadListParams } from "@/services/leads.service";
 import type {
   ApiEnrollment,
+  ApiEnrollmentHistory,
   ApiEnrollmentPayload,
   ApiFollowup,
   ApiLeadCall,
@@ -565,6 +566,47 @@ export function useUpdateEnrollment(leadId?: number) {
       void qc.invalidateQueries({ queryKey: ["enrollments"] });
     },
     onError: (e) => toast.error(apiErrorMessage(e, "Could not update enrollment")),
+  });
+}
+
+/** Reason trail of one enrollment (who, when, what, from → to, why). */
+export function useEnrollmentHistory(leadId?: number, enrollmentId?: number, load = true) {
+  const { source } = useDataSource();
+  const enabled = source === "api" && leadId != null && enrollmentId != null && load;
+  const query = useQuery({
+    queryKey: ["lead", "history", leadId, enrollmentId],
+    enabled,
+    queryFn: () => leadsService.enrollmentHistory(leadId as number, enrollmentId as number),
+  });
+  return {
+    history: (query.data?.results ?? []) as ApiEnrollmentHistory[],
+    isLoading: enabled && query.isLoading,
+  };
+}
+
+/** Cancel or reinstate an enrollment. Both need a reason and add a history row. */
+export function useEnrollmentStatusAction(leadId?: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      id,
+      action,
+      reason,
+    }: {
+      id: number;
+      action: "cancel" | "reinstate";
+      reason: string;
+    }) =>
+      action === "cancel"
+        ? leadsService.cancelEnrollment(leadId as number, id, reason)
+        : leadsService.reinstateEnrollment(leadId as number, id, reason),
+    onSuccess: (_data, vars) => {
+      toast.success(vars.action === "cancel" ? "Enrollment cancelled" : "Enrollment reinstated");
+      void qc.invalidateQueries({ queryKey: ["lead"] });
+      void qc.invalidateQueries({ queryKey: ["leads"] });
+      void qc.invalidateQueries({ queryKey: ["enrollments"] });
+    },
+    onError: (e) => toast.error(apiErrorMessage(e, "Could not update the enrollment")),
   });
 }
 

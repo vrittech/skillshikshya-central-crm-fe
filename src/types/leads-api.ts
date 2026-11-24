@@ -358,6 +358,36 @@ export interface ApiPayment {
   created_at?: string;
 }
 
+/** What a reason-trail row records — mirrors EnrollmentHistory.Action. */
+export type ApiHistoryAction =
+  | "cancel"
+  | "reinstate"
+  | "switch_batch"
+  | "pause"
+  | "resume"
+  | "change_fee"
+  | "extra_charge"
+  | "discount"
+  | "refund"
+  | "write_off"
+  | "void_payment"
+  | "cancel_invoice"
+  | "change_due_dates";
+
+/** One row of an enrollment's reason trail — GET .../enrollments/{id}/history/. */
+export interface ApiEnrollmentHistory {
+  id: number;
+  enrollment: number;
+  action: ApiHistoryAction;
+  action_display: string;
+  reason: string;
+  before: Record<string, unknown>;
+  after: Record<string, unknown>;
+  performed_by: number;
+  performed_by_name: string | null;
+  created_at: string;
+}
+
 export interface ApiPaymentPayload {
   amount?: string;
   payment_date?: string;

@@ -81,6 +81,7 @@ export function EnrollmentDialog({
 }) {
   const [f, setF] = useState<ApiEnrollmentPayload>({});
   const isEdit = !!enrollment;
+  const wasCancelled = enrollment?.status === "cancelled";
   const needsLead = allowLeadPick && !isEdit;
   const [pickedLeadId, setPickedLeadId] = useState<string>("");
   const [leadSearch, setLeadSearch] = useState("");
@@ -232,18 +233,26 @@ export function EnrollmentDialog({
           </div>
           <div className="grid gap-2">
             <Label>Status</Label>
-            <Select value={f.status ?? "active"} onValueChange={(v) => set("status", v as ApiEnrollmentStatus)}>
+            {/* Cancel and reinstate need a reason, so they are buttons on the card, not options here. */}
+            <Select
+              value={f.status ?? "active"}
+              onValueChange={(v) => set("status", v as ApiEnrollmentStatus)}
+              disabled={wasCancelled}
+            >
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {ENR_STATUS.map((s) => (
+                {ENR_STATUS.filter((s) => wasCancelled || s !== "cancelled").map((s) => (
                   <SelectItem key={s} value={s} className="capitalize">
                     {s.replace(/_/g, " ")}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
+            {wasCancelled && (
+              <p className="text-muted-foreground text-xs">Use Reinstate on the card to reopen it.</p>
+            )}
           </div>
           <div className="grid gap-2">
             <Label>Listed fee</Label>

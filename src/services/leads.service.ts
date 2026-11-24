@@ -3,6 +3,7 @@ import type { Paginated } from "@/types";
 import type {
   ApiCourseInterest,
   ApiEnrollment,
+  ApiEnrollmentHistory,
   ApiEnrollmentPayload,
   EnrollmentListParams,
   PaymentListParams,
@@ -137,6 +138,30 @@ export const leadsService = {
   },
   async updateEnrollment(leadId: number, id: number, payload: ApiEnrollmentPayload) {
     const { data } = await api.patch<ApiEnrollment>(`/leads/${leadId}/enrollments/${id}/`, payload);
+    return data;
+  },
+  /** Cancel with a reason — the only way to cancel; PATCH refuses it. */
+  async cancelEnrollment(leadId: number, id: number, reason: string) {
+    const { data } = await api.post<ApiEnrollment>(
+      `/leads/${leadId}/enrollments/${id}/cancel/`,
+      { reason },
+    );
+    return data;
+  },
+  /** Undo a cancel with a reason — back to the status it had before. */
+  async reinstateEnrollment(leadId: number, id: number, reason: string) {
+    const { data } = await api.post<ApiEnrollment>(
+      `/leads/${leadId}/enrollments/${id}/reinstate/`,
+      { reason },
+    );
+    return data;
+  },
+  /** Reason trail of one enrollment, newest first (read-only). */
+  async enrollmentHistory(leadId: number, enrollmentId: number) {
+    const { data } = await api.get<Paginated<ApiEnrollmentHistory>>(
+      `/leads/${leadId}/enrollments/${enrollmentId}/history/`,
+      { params: { page_size: 100 } },
+    );
     return data;
   },
   async payments(leadId: number, enrollmentId: number, params: PaymentListParams = {}) {

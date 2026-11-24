@@ -1,6 +1,15 @@
-import { ChevronDown, ChevronRight, PencilLine, Plus, Receipt } from "lucide-react";
+import {
+  Ban,
+  ChevronDown,
+  ChevronRight,
+  PencilLine,
+  Plus,
+  Receipt,
+  RotateCcw,
+} from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
+import { ReasonDialog } from "@/components/reason-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -20,7 +29,9 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
+  useEnrollmentHistory,
   useEnrollmentPayments,
+  useEnrollmentStatusAction,
   useLeadEnrollments,
   useLeadPayments,
 } from "@/hooks/use-leads";
@@ -149,6 +160,44 @@ function EnrollmentPayments({
   );
 }
 
+/* --------------------------------------------- reason trail of enrollment */
+
+function changeText(before: Record<string, unknown>, after: Record<string, unknown>) {
+  const keys = [...new Set([...Object.keys(before ?? {}), ...Object.keys(after ?? {})])];
+  const show = (v: unknown) => (v == null || v === "" ? "—" : label(String(v)));
+  return keys.map((k) => `${label(k)}: ${show(before?.[k])} → ${show(after?.[k])}`).join(" · ");
+}
+
+function EnrollmentHistoryList({ leadId, enrollment }: { leadId?: number; enrollment: ApiEnrollment }) {
+  const { history, isLoading } = useEnrollmentHistory(leadId, enrollment.id);
+
+  if (isLoading) return <Skeleton className="h-16 w-full rounded-xl" />;
+  if (!history.length)
+    return <p className="text-muted-foreground py-3 text-sm">No changes recorded yet.</p>;
+
+  return (
+    <ul className="divide-border divide-y">
+      {history.map((h) => (
+        <li key={h.id} className="py-2.5">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <p className="text-sm font-medium">{h.action_display}</p>
+            <p className="text-muted-foreground text-xs">
+              {formatDateTime(h.created_at)}
+              {h.performed_by_name ? ` · by ${h.performed_by_name}` : ""}
+            </p>
+          </div>
+          <p className="mt-0.5 text-sm">“{h.reason}”</p>
+          {(Object.keys(h.before ?? {}).length > 0 || Object.keys(h.after ?? {}).length > 0) && (
+            <p className="text-muted-foreground mt-0.5 text-xs capitalize">
+              {changeText(h.before, h.after)}
+            </p>
+          )}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 /* -------------------------------------------------------- enrollment card */
 
 function EnrollmentCard({
@@ -164,6 +213,10 @@ function EnrollmentCard({
 }) {
   const [payOpen, setPayOpen] = useState(false);
   const [showPayments, setShowPayments] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
+  const [statusAction, setStatusAction] = useState<"cancel" | "reinstate" | null>(null);
+  const statusMutation = useEnrollmentStatusAction(leadId);
+  const isCancelled = enrollment.status === "cancelled";
   const agreed = Number(enrollment.agreed_amount);
   const paid = Number(enrollment.total_paid);
   const remaining = Number(enrollment.remaining_amount);
@@ -227,6 +280,14 @@ function EnrollmentCard({
         >
           {showPayments ? <ChevronDown /> : <ChevronRight />} Payments
         </Button>
+        <Button
+          size="sm"
+          variant="ghost"
+          className="text-muted-foreground"
+          onClick={() => setShowHistory((v) => !v)}
+        >
+          {showHistory ? <ChevronDown /> : <ChevronRight />} History
+        </Button>
         <div className="grow" />
         {canManage && (
           <>
@@ -236,6 +297,20 @@ function EnrollmentCard({
             <Button size="sm" variant="outline" onClick={onEdit}>
               <PencilLine /> Edit
             </Button>
+            {isCancelled ? (
+              <Button size="sm" variant="outline" onClick={() => setStatusAction("reinstate")}>
+                <RotateCcw /> Reinstate
+              </Button>
+            ) : (
+              <Button
+                size="sm"
+                variant="outline"
+                className="text-destructive"
+                onClick={() => setStatusAction("cancel")}
+              >
+                <Ban /> Cancel
+              </Button>
+            )}
           </>
         )}
       </div>
@@ -246,11 +321,38 @@ function EnrollmentCard({
         </div>
       )}
 
+      {showHistory && (
+        <div className="mt-1 border-t pt-2">
+          <EnrollmentHistoryList leadId={leadId} enrollment={enrollment} />
+        </div>
+      )}
+
       <PaymentDialog
         open={payOpen}
         onClose={() => setPayOpen(false)}
         leadId={leadId}
         enrollmentApiId={enrollment.id}
+      />
+
+      <ReasonDialog
+        open={statusAction != null}
+        onClose={() => setStatusAction(null)}
+        title={statusAction === "reinstate" ? "Reinstate enrollment" : "Cancel enrollment"}
+        description={
+          statusAction === "reinstate"
+            ? "The enrollment goes back to the status it had before it was cancelled."
+            : "The enrollment is marked cancelled. Its payments stay as they are."
+        }
+        confirmLabel={statusAction === "reinstate" ? "Reinstate" : "Cancel enrollment"}
+        destructive={statusAction === "cancel"}
+        pending={statusMutation.isPending}
+        onConfirm={(reason) =>
+          statusAction &&
+          statusMutation.mutate(
+            { id: enrollment.id, action: statusAction, reason },
+            { onSuccess: () => setStatusAction(null) },
+          )
+        }
       />
     </div>
   );
