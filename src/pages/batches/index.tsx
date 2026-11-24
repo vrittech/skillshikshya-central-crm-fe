@@ -47,6 +47,7 @@ import {
 import { formatDate } from "@/lib/leads-format";
 import type { Batch, CourseBatch, CourseBatchStatus } from "@/types";
 import { BatchDialog } from "./batch-dialog";
+import { BatchStudentsSheet } from "./batch-students-sheet";
 import { CourseBatchDialog } from "./course-batch-dialog";
 
 const PAGE_SIZE = 20;
@@ -148,6 +149,7 @@ function CourseBatchesTab({ canAdd, canChange, canDelete }: TabPerms) {
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<CourseBatch | null>(null);
   const [deleting, setDeleting] = useState<CourseBatch | null>(null);
+  const [viewing, setViewing] = useState<CourseBatch | null>(null);
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -291,19 +293,18 @@ function CourseBatchesTab({ canAdd, canChange, canDelete }: TabPerms) {
                   </div>
                 </TableCell>
                 <TableCell>
-                  {(canChange || canDelete) && (
-                    <RowMenu
-                      onEdit={
-                        canChange
-                          ? () => {
-                              setEditing(cb);
-                              setFormOpen(true);
-                            }
-                          : undefined
-                      }
-                      onDelete={canDelete ? () => setDeleting(cb) : undefined}
-                    />
-                  )}
+                  <RowMenu
+                    onStudents={() => setViewing(cb)}
+                    onEdit={
+                      canChange
+                        ? () => {
+                            setEditing(cb);
+                            setFormOpen(true);
+                          }
+                        : undefined
+                    }
+                    onDelete={canDelete ? () => setDeleting(cb) : undefined}
+                  />
                 </TableCell>
               </TableRow>
             ))}
@@ -324,6 +325,8 @@ function CourseBatchesTab({ canAdd, canChange, canDelete }: TabPerms) {
         onClose={() => setFormOpen(false)}
         courseBatch={editing}
       />
+
+      <BatchStudentsSheet batch={viewing} onClose={() => setViewing(null)} />
 
       <ConfirmDelete
         name={deleting?.name}
@@ -492,7 +495,15 @@ function SeatsCell({ batch }: { batch: CourseBatch }) {
 
 /* ------------------------------------------------------------------- shared */
 
-function RowMenu({ onEdit, onDelete }: { onEdit?: () => void; onDelete?: () => void }) {
+function RowMenu({
+  onStudents,
+  onEdit,
+  onDelete,
+}: {
+  onStudents?: () => void;
+  onEdit?: () => void;
+  onDelete?: () => void;
+}) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -501,6 +512,7 @@ function RowMenu({ onEdit, onDelete }: { onEdit?: () => void; onDelete?: () => v
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
+        {onStudents && <DropdownMenuItem onSelect={onStudents}>Students</DropdownMenuItem>}
         {onEdit && <DropdownMenuItem onSelect={onEdit}>Edit</DropdownMenuItem>}
         {onDelete && (
           <DropdownMenuItem variant="destructive" onSelect={onDelete}>

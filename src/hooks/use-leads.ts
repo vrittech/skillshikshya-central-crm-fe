@@ -33,6 +33,8 @@ import type {
   ApiLeadPayload,
   ApiPayment,
   ApiPaymentPayload,
+  ApiSeatAction,
+  ApiSeatActionBody,
   EnrollmentListParams,
   PaymentListParams,
 } from "@/types/leads-api";
@@ -604,6 +606,31 @@ export function useConfirmEnrollment() {
       }
     },
     onError: (e) => toast.error(apiErrorMessage(e, "Could not confirm the enrollment")),
+  });
+}
+
+const SEAT_DONE: Record<ApiSeatAction, string> = {
+  join: "Joined the batch",
+  move: "Moved to the new batch",
+  pause: "Paused — the seat is free",
+  resume: "Back in a batch",
+};
+
+/** Join batch, Move, Pause or Resume. Each needs a reason and adds a seat history row. */
+export function useSeatAction(leadId?: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, action, body }: { id: number; action: ApiSeatAction; body: ApiSeatActionBody }) =>
+      leadsService.seatAction(leadId as number, id, action, body),
+    onSuccess: (data, vars) => {
+      toast.success(SEAT_DONE[vars.action], {
+        description: data.current_batch_name ?? undefined,
+      });
+      for (const key of ["lead", "enrollments", "course-batches"]) {
+        void qc.invalidateQueries({ queryKey: [key] });
+      }
+    },
+    onError: (e) => toast.error(apiErrorMessage(e, "Could not change the seat")),
   });
 }
 

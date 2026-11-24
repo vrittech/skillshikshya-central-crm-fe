@@ -3,6 +3,7 @@ import type {
   Batch,
   BatchListParams,
   BatchPayload,
+  BatchStudents,
   CourseBatch,
   CourseBatchListParams,
   CourseBatchPayload,
@@ -64,5 +65,11 @@ export const courseBatchesService = {
 
   async remove(id: number) {
     await api.delete(`/course-batches/${id}/`);
+  },
+
+  /** Who sits in the batch now, who moved in, and who is paused out of it. */
+  async students(id: number) {
+    const { data } = await api.get<BatchStudents>(`/course-batches/${id}/students/`);
+    return data;
   },
 };

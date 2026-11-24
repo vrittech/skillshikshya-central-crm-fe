@@ -104,3 +104,12 @@ export function useDeleteCourseBatch() {
     onError: (e) => toast.error(apiErrorMessage(e, "Could not delete course batch")),
   });
 }
+
+/** Who sits in a course batch now, who moved in, and who is paused out of it. */
+export function useBatchStudents(id: number | null) {
+  return useQuery({
+    queryKey: ["course-batches", "students", id],
+    queryFn: () => courseBatchesService.students(id as number),
+    enabled: id != null,
+  });
+}

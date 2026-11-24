@@ -17,6 +17,8 @@ import type {
   ApiLeadPayload,
   ApiPayment,
   ApiPaymentPayload,
+  ApiSeatAction,
+  ApiSeatActionBody,
 } from "@/types/leads-api";
 
 /** Query params accepted by GET /api/leads/ (see be-mds/lead_app_lead_api_guide.md). */
@@ -146,6 +148,16 @@ export const leadsService = {
   /** Confirm a pending enrollment. This makes the lead a student and sends the fee invoice. */
   async confirmEnrollment(leadId: number, id: number) {
     const { data } = await api.post<ApiEnrollment>(`/leads/${leadId}/enrollments/${id}/confirm/`, {});
+    return data;
+  },
+
+  /** Join batch, Move, Pause or Resume — each adds a seat history row. */
+  async seatAction(leadId: number, id: number, action: ApiSeatAction, body: ApiSeatActionBody) {
+    const path = action === "join" ? "join-batch" : action;
+    const { data } = await api.post<ApiEnrollment>(
+      `/leads/${leadId}/enrollments/${id}/${path}/`,
+      body,
+    );
     return data;
   },
 

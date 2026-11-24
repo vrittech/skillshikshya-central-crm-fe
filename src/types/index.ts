@@ -233,6 +233,32 @@ export interface CourseBatch {
   updated_at?: string;
 }
 
+/** One row of GET /course-batches/{id}/students/. */
+export interface BatchStudentRow {
+  enrollment: number;
+  lead: number;
+  name: string;
+  phone: string | null;
+  student_id: string | null;
+  status: string;
+  /** Day they joined, moved in, resumed — or paused, on a paused row. */
+  since: string | null;
+  how: "join" | "move" | "resume" | "pause" | null;
+  how_display: string;
+  from_batch: number | null;
+  from_batch_name: string | null;
+  /** The batch their fees count on. */
+  money_batch: number | null;
+  money_batch_name: string | null;
+  /** True when the money batch is another batch: this batch's revenue leaves them out. */
+  moved_in: boolean;
+}
+
+export interface BatchStudents {
+  seated: BatchStudentRow[];
+  paused: BatchStudentRow[];
+}
+
 export type CourseBatchPayload = Partial<
   Pick<
     CourseBatch,

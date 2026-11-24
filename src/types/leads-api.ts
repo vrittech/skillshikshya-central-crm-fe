@@ -295,6 +295,10 @@ export interface ApiEnrollment {
   /** Where the student sits now. null = not in a batch (paused, left or not placed). */
   current_batch?: number | null;
   current_batch_name?: string | null;
+  /** seated = in a batch now; paused; none = never placed, or left. */
+  seat_state?: ApiSeatState;
+  /** Seat history, newest first. */
+  placements?: ApiPlacement[];
   enrollment_date: string | null;
   status: ApiEnrollmentStatus;
   listed_fee: string;
@@ -318,6 +322,41 @@ export interface ApiEnrollment {
   updated_by?: number | null;
   created_at?: string;
   updated_at?: string;
+}
+
+export type ApiSeatState = "seated" | "paused" | "none";
+
+/** One seat change — mirrors lead.Placement.Kind. */
+export type ApiPlacementKind = "join" | "move" | "pause" | "resume" | "leave";
+
+/** One row of an enrollment's seat history. Rows are only added, never edited. */
+export interface ApiPlacement {
+  id: number;
+  kind: ApiPlacementKind;
+  kind_display: string;
+  /** The batch sat in from this row on; null for pause and leave. */
+  course_batch: number | null;
+  course_batch_name: string | null;
+  /** Where the student came from (move, resume) or left (pause, leave). */
+  from_batch: number | null;
+  from_batch_name: string | null;
+  started_on: string;
+  reason: string;
+  created_by: number | null;
+  created_by_name: string | null;
+  created_at: string;
+}
+
+/** The four seat actions on an enrollment. */
+export type ApiSeatAction = "join" | "move" | "pause" | "resume";
+
+export interface ApiSeatActionBody {
+  /** Needed for join, move and resume. */
+  batch?: number;
+  /** Needed for move, pause and resume (optional for join). */
+  reason: string;
+  /** Day the change takes effect; today if left out. */
+  started_on?: string;
 }
 
 export interface ApiEnrollmentPayload {

@@ -39,16 +39,19 @@ import {
   useLeadPayments,
 } from "@/hooks/use-leads";
 import { formatDate, formatDateTime, formatNPR } from "@/lib/leads-format";
+import { canSit, seatText } from "@/lib/seats";
 import { cn } from "@/lib/utils";
 import type {
   ApiEnrollment,
   ApiEnrollmentStatus,
   ApiPayment,
   ApiPaymentStatus,
+  ApiSeatAction,
 } from "@/types/leads-api";
 import { AdjustmentDialog } from "./adjustment-dialog";
 import { EnrollmentDialog, PaymentDialog } from "./enrollment-dialogs";
 import { PaymentActions } from "./payment-actions";
+import { SeatButtons, SeatDialog, SeatHistoryList } from "./seat-actions";
 
 /* ------------------------------------------------------------ status tones */
 
@@ -232,6 +235,8 @@ function EnrollmentCard({
   const [payOpen, setPayOpen] = useState(false);
   const [showPayments, setShowPayments] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+  const [showSeats, setShowSeats] = useState(false);
+  const [seatAction, setSeatAction] = useState<ApiSeatAction | null>(null);
   const [statusAction, setStatusAction] = useState<"cancel" | "reinstate" | null>(null);
   const statusMutation = useEnrollmentStatusAction(leadId);
   const confirm = useConfirmEnrollment();
@@ -257,8 +262,7 @@ function EnrollmentCard({
         <div className="min-w-0">
           <p className="font-headline text-lg font-semibold">{enrollment.course_name ?? "Course"}</p>
           <p className="text-muted-foreground text-sm">
-            {enrollment.batch_name ? `Batch ${enrollment.batch_name}` : "No batch assigned"} ·
-            Enrolled {formatDate(enrollment.enrollment_date ?? undefined)}
+            {seatText(enrollment)} · Enrolled {formatDate(enrollment.enrollment_date ?? undefined)}
             {enrollment.branch_name ? ` · ${enrollment.branch_name}` : ""}
           </p>
         </div>
@@ -325,6 +329,16 @@ function EnrollmentCard({
         >
           {showHistory ? <ChevronDown /> : <ChevronRight />} History
         </Button>
+        {(canSit(enrollment) || !!enrollment.placements?.length) && (
+          <Button
+            size="sm"
+            variant="ghost"
+            className="text-muted-foreground"
+            onClick={() => setShowSeats((v) => !v)}
+          >
+            {showSeats ? <ChevronDown /> : <ChevronRight />} Seat history
+          </Button>
+        )}
         <div className="grow" />
         {canManage && (
           <>
@@ -333,6 +347,7 @@ function EnrollmentCard({
                 <BadgeCheck /> Confirm
               </Button>
             )}
+            {leadId != null && <SeatButtons enrollment={enrollment} onAction={setSeatAction} />}
             <Button size="sm" variant="outline" onClick={() => setPayOpen(true)}>
               <Receipt /> Add Payment
             </Button>
@@ -372,6 +387,19 @@ function EnrollmentCard({
         </div>
       )}
 
+      {showSeats && (
+        <div className="mt-1 border-t pt-2">
+          <SeatHistoryList enrollment={enrollment} />
+        </div>
+      )}
+
+      <SeatDialog
+        leadId={leadId}
+        enrollment={enrollment}
+        action={seatAction}
+        onClose={() => setSeatAction(null)}
+      />
+
       <PaymentDialog
         open={payOpen}
         onClose={() => setPayOpen(false)}
@@ -391,8 +419,10 @@ function EnrollmentCard({
           <DialogHeader>
             <DialogTitle>Confirm enrollment</DialogTitle>
             <DialogDescription>
-              {enrollment.lead_name ?? "The lead"} becomes a student, and the fee invoice for{" "}
-              {formatNPR(agreed)} is made and emailed. After this the price is fixed.
+              {enrollment.lead_name ?? "The lead"} becomes a student
+              {enrollment.batch_name ? ` and takes a seat in ${enrollment.batch_name}` : ""}, and
+              the fee invoice for {formatNPR(agreed)} is made and emailed. After this the price,
+              course and batch are fixed.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -423,7 +453,7 @@ function EnrollmentCard({
         description={
           statusAction === "reinstate"
             ? "The enrollment goes back to the status it had before it was cancelled."
-            : "The enrollment is marked cancelled. Its payments stay as they are."
+            : "The enrollment is marked cancelled and its seat is freed. Its payments stay as they are."
         }
         confirmLabel={statusAction === "reinstate" ? "Reinstate" : "Cancel enrollment"}
         destructive={statusAction === "cancel"}

@@ -39,8 +39,8 @@ import type {
   ApiPaymentPayload,
   ApiPaymentStatus,
 } from "@/types/leads-api";
-import type { CourseBatch } from "@/types";
 import { toNepalIso } from "@/lib/leads-format";
+import { seatsLabel } from "@/lib/seats";
 
 const ENR_STATUS: ApiEnrollmentStatus[] = [
   "pending",
@@ -57,13 +57,6 @@ const PAY_STATUS: ApiPaymentStatus[] = ["successful", "pending"];
 
 function num(a: string, b: string) {
   return String((Number(a || "0") - Number(b || "0") - 0).toFixed(2));
-}
-
-/** "12 seats left", "full" or "no seat limit" for the batch picker. */
-function seatsLabel(b: CourseBatch) {
-  if (b.capacity == null) return "no seat limit";
-  if (!b.seats_left) return "full";
-  return `${b.seats_left} ${b.seats_left === 1 ? "seat" : "seats"} left`;
 }
 
 export function EnrollmentDialog({
@@ -281,6 +274,7 @@ export function EnrollmentDialog({
             {seatLocked ? (
               <p className="text-muted-foreground text-xs">
                 The course and batch are fixed once confirmed, because the fees count on this batch.
+                To change where the student sits, use Move on the enrollment card.
               </p>
             ) : (
               chosenBatch?.capacity != null &&
