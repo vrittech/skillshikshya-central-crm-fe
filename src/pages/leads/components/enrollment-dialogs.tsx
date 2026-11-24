@@ -83,6 +83,10 @@ export function EnrollmentDialog({
   const needsLead = allowLeadPick && !isEdit;
   const [pickedLeadId, setPickedLeadId] = useState<string>("");
   const [leadSearch, setLeadSearch] = useState("");
+  // The fee follows the course, and the agreed amount follows the fee, until
+  // the user types their own value.
+  const [listedEdited, setListedEdited] = useState(false);
+  const [agreedEdited, setAgreedEdited] = useState(false);
   const effectiveLeadId = leadId ?? (pickedLeadId ? Number(pickedLeadId) : undefined);
 
   const leadOptionsQ = useLeadOptions(open && needsLead ? leadSearch : "");
@@ -101,6 +105,8 @@ export function EnrollmentDialog({
     if (!open) return;
     setPickedLeadId("");
     setLeadSearch("");
+    setListedEdited(!!enrollment);
+    setAgreedEdited(!!enrollment);
     if (enrollment) {
       setF({
         course: enrollment.course,
@@ -124,10 +130,18 @@ export function EnrollmentDialog({
       listed_fee: "0",
       standard_discount: "0",
       additional_discount: "0",
-      agreed_amount: "0",
+      agreed_amount: "",
       remarks: "",
     });
   }, [open, primaryCourseId, enrollment]);
+
+  // Fill the listed fee from the course price (also for a preselected course,
+  // once the course list has loaded).
+  useEffect(() => {
+    if (!open || isEdit || listedEdited || f.course == null) return;
+    const course = courses.find((c) => c.id === f.course);
+    if (course) setF((p) => ({ ...p, listed_fee: String(Number(course.full_amount || 0)) }));
+  }, [open, isEdit, listedEdited, f.course, courses]);
 
   const set = <K extends keyof ApiEnrollmentPayload>(k: K, v: ApiEnrollmentPayload[K]) =>
     setF((p) => ({ ...p, [k]: v }));
@@ -141,7 +155,7 @@ export function EnrollmentDialog({
       return;
     }
     if (!f.course) return;
-    const payload = { ...f, agreed_amount: f.agreed_amount || agreedAuto };
+    const payload = { ...f, agreed_amount: agreedEdited && f.agreed_amount ? f.agreed_amount : agreedAuto };
     if (enrollment) {
       updateEnrollment.mutate({ id: enrollment.id, payload }, { onSuccess: () => onClose() });
       return;
@@ -181,13 +195,15 @@ export function EnrollmentDialog({
             <Label required>Course</Label>
             <Select
               value={f.course != null ? String(f.course) : undefined}
-              onValueChange={(v) =>
+              onValueChange={(v) => {
+                // A new course brings its own price, even after a typed fee.
+                setListedEdited(false);
                 setF((p) => ({
                   ...p,
                   course: Number(v),
                   batch: undefined,
-                }))
-              }
+                }));
+              }}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Select course" />
@@ -255,7 +271,15 @@ export function EnrollmentDialog({
           {/* The price is fixed once saved; later changes are money entries with a reason. */}
           <div className="grid gap-2">
             <Label>Listed fee</Label>
-            <Input type="number" value={f.listed_fee ?? ""} disabled={isEdit} onChange={(e) => set("listed_fee", e.target.value)} />
+            <Input
+              type="number"
+              value={f.listed_fee ?? ""}
+              disabled={isEdit}
+              onChange={(e) => {
+                setListedEdited(true);
+                set("listed_fee", e.target.value);
+              }}
+            />
           </div>
           <div className="grid gap-2">
             <Label>Standard discount</Label>
@@ -269,11 +293,16 @@ export function EnrollmentDialog({
             <Label>Agreed amount</Label>
             <Input
               type="number"
-              value={f.agreed_amount ?? ""}
+              value={agreedEdited ? (f.agreed_amount ?? "") : agreedAuto}
               disabled={isEdit}
-              onChange={(e) => set("agreed_amount", e.target.value)}
-              placeholder={agreedAuto}
+              onChange={(e) => {
+                setAgreedEdited(true);
+                set("agreed_amount", e.target.value);
+              }}
             />
+            {!isEdit && !agreedEdited && (
+              <p className="text-muted-foreground text-xs">Listed fee minus discounts.</p>
+            )}
           </div>
           {isEdit && (
             <p className="text-muted-foreground text-xs sm:col-span-2">
