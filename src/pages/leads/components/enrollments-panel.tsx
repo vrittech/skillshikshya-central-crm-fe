@@ -1,5 +1,6 @@
 import {
   Ban,
+  BadgeCheck,
   ChevronDown,
   ChevronRight,
   Coins,
@@ -30,6 +31,7 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
+  useConfirmEnrollment,
   useEnrollmentHistory,
   useEnrollmentPayments,
   useEnrollmentStatusAction,
@@ -232,7 +234,10 @@ function EnrollmentCard({
   const [showHistory, setShowHistory] = useState(false);
   const [statusAction, setStatusAction] = useState<"cancel" | "reinstate" | null>(null);
   const statusMutation = useEnrollmentStatusAction(leadId);
+  const confirm = useConfirmEnrollment();
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const isCancelled = enrollment.status === "cancelled";
+  const isPending = enrollment.status === "pending";
   const [adjustOpen, setAdjustOpen] = useState(false);
   const agreed = Number(enrollment.agreed_amount);
   const paid = Number(enrollment.total_paid);
@@ -323,6 +328,11 @@ function EnrollmentCard({
         <div className="grow" />
         {canManage && (
           <>
+            {isPending && leadId != null && (
+              <Button size="sm" variant="brand" onClick={() => setConfirmOpen(true)}>
+                <BadgeCheck /> Confirm
+              </Button>
+            )}
             <Button size="sm" variant="outline" onClick={() => setPayOpen(true)}>
               <Receipt /> Add Payment
             </Button>
@@ -375,6 +385,36 @@ function EnrollmentCard({
         leadId={leadId}
         enrollment={enrollment}
       />
+
+      <Dialog open={confirmOpen} onOpenChange={(o) => !o && setConfirmOpen(false)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirm enrollment</DialogTitle>
+            <DialogDescription>
+              {enrollment.lead_name ?? "The lead"} becomes a student, and the fee invoice for{" "}
+              {formatNPR(agreed)} is made and emailed. After this the price is fixed.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmOpen(false)}>
+              Not yet
+            </Button>
+            <Button
+              variant="brand"
+              disabled={confirm.isPending}
+              onClick={() =>
+                leadId != null &&
+                confirm.mutate(
+                  { leadId, id: enrollment.id },
+                  { onSuccess: () => setConfirmOpen(false) },
+                )
+              }
+            >
+              {confirm.isPending ? "Confirming…" : "Confirm enrollment"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <ReasonDialog
         open={statusAction != null}

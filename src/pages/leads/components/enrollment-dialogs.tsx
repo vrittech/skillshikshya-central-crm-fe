@@ -27,6 +27,7 @@ import { useLeadOptions } from "@/hooks/use-lead-options";
 import {
   useAddEnrollment,
   useAddPayment,
+  useConfirmEnrollment,
   useUpdateEnrollment,
   useLeadEnrollments,
 } from "@/hooks/use-leads";
@@ -80,6 +81,9 @@ export function EnrollmentDialog({
   const [f, setF] = useState<ApiEnrollmentPayload>({});
   const isEdit = !!enrollment;
   const wasCancelled = enrollment?.status === "cancelled";
+  const wasPending = enrollment?.status === "pending";
+  // The price can change until the enrollment is confirmed or something is paid.
+  const priceLocked = isEdit && !(wasPending && Number(enrollment?.total_paid ?? 0) === 0);
   const needsLead = allowLeadPick && !isEdit;
   const [pickedLeadId, setPickedLeadId] = useState<string>("");
   const [leadSearch, setLeadSearch] = useState("");
@@ -99,14 +103,22 @@ export function EnrollmentDialog({
   const batches = useMemo(() => batchesQ.data?.results ?? [], [batchesQ.data]);
   const addEnrollment = useAddEnrollment(effectiveLeadId);
   const updateEnrollment = useUpdateEnrollment(leadId);
-  const saving = addEnrollment.isPending || updateEnrollment.isPending;
+  const confirm = useConfirmEnrollment();
+  const saving = addEnrollment.isPending || updateEnrollment.isPending || confirm.isPending;
 
   useEffect(() => {
     if (!open) return;
     setPickedLeadId("");
     setLeadSearch("");
     setListedEdited(!!enrollment);
-    setAgreedEdited(!!enrollment);
+    // On edit, the agreed amount keeps following the fee if it still equals fee minus discounts.
+    const agreedFollowsFee =
+      enrollment != null &&
+      Number(enrollment.agreed_amount) ===
+        Number(enrollment.listed_fee) -
+          Number(enrollment.standard_discount) -
+          Number(enrollment.additional_discount);
+    setAgreedEdited(!!enrollment && !agreedFollowsFee);
     if (enrollment) {
       setF({
         course: enrollment.course,
@@ -126,7 +138,8 @@ export function EnrollmentDialog({
       course: primaryCourseId ?? undefined,
       batch: undefined,
       enrollment_date: new Date().toISOString().slice(0, 10),
-      status: "active",
+      // A new enrollment is pending until it is confirmed (that makes the lead a student).
+      status: "pending",
       listed_fee: "0",
       standard_discount: "0",
       additional_discount: "0",
@@ -138,10 +151,10 @@ export function EnrollmentDialog({
   // Fill the listed fee from the course price (also for a preselected course,
   // once the course list has loaded).
   useEffect(() => {
-    if (!open || isEdit || listedEdited || f.course == null) return;
+    if (!open || priceLocked || listedEdited || f.course == null) return;
     const course = courses.find((c) => c.id === f.course);
     if (course) setF((p) => ({ ...p, listed_fee: String(Number(course.full_amount || 0)) }));
-  }, [open, isEdit, listedEdited, f.course, courses]);
+  }, [open, priceLocked, listedEdited, f.course, courses]);
 
   const set = <K extends keyof ApiEnrollmentPayload>(k: K, v: ApiEnrollmentPayload[K]) =>
     setF((p) => ({ ...p, [k]: v }));
@@ -149,7 +162,7 @@ export function EnrollmentDialog({
   // Keep agreed = listed - standard - additional as a helpful default.
   const agreedAuto = num(num(f.listed_fee ?? "0", f.standard_discount ?? "0"), f.additional_discount ?? "0");
 
-  function submit() {
+  function submit(confirmAfter = false) {
     if (needsLead && !effectiveLeadId) {
       toast.error("Pick a lead first.");
       return;
@@ -164,6 +177,10 @@ export function EnrollmentDialog({
       onSuccess: (created) => {
         onCreated?.(created);
         onClose();
+        // "Save and confirm": the lead becomes a student right away.
+        if (confirmAfter && effectiveLeadId != null) {
+          confirm.mutate({ leadId: effectiveLeadId, id: created.id });
+        }
       },
     });
   }
@@ -245,36 +262,43 @@ export function EnrollmentDialog({
             <Label>Enrollment date</Label>
             <Input type="date" value={f.enrollment_date ?? ""} onChange={(e) => set("enrollment_date", e.target.value)} />
           </div>
-          <div className="grid gap-2">
-            <Label>Status</Label>
-            {/* Cancel and reinstate need a reason, so they are buttons on the card, not options here. */}
-            <Select
-              value={f.status ?? "active"}
-              onValueChange={(v) => set("status", v as ApiEnrollmentStatus)}
-              disabled={wasCancelled}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {ENR_STATUS.filter((s) => wasCancelled || s !== "cancelled").map((s) => (
-                  <SelectItem key={s} value={s} className="capitalize">
-                    {s.replace(/_/g, " ")}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {wasCancelled && (
-              <p className="text-muted-foreground text-xs">Use Reinstate on the card to reopen it.</p>
-            )}
-          </div>
-          {/* The price is fixed once saved; later changes are money entries with a reason. */}
+          {isEdit && (
+            <div className="grid gap-2">
+              <Label>Status</Label>
+              {/* Confirm, cancel and reinstate are buttons on the card, not options here. */}
+              <Select
+                value={f.status ?? "pending"}
+                onValueChange={(v) => set("status", v as ApiEnrollmentStatus)}
+                disabled={wasCancelled || wasPending}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {ENR_STATUS.filter(
+                    (s) => (wasCancelled || s !== "cancelled") && (wasPending || s !== "pending"),
+                  ).map((s) => (
+                    <SelectItem key={s} value={s} className="capitalize">
+                      {s.replace(/_/g, " ")}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {wasCancelled && (
+                <p className="text-muted-foreground text-xs">Use Reinstate on the card to reopen it.</p>
+              )}
+              {wasPending && (
+                <p className="text-muted-foreground text-xs">Use Confirm on the card when they join.</p>
+              )}
+            </div>
+          )}
+          {/* The price is fixed once confirmed or paid; later changes are money entries with a reason. */}
           <div className="grid gap-2">
             <Label>Listed fee</Label>
             <Input
               type="number"
               value={f.listed_fee ?? ""}
-              disabled={isEdit}
+              disabled={priceLocked}
               onChange={(e) => {
                 setListedEdited(true);
                 set("listed_fee", e.target.value);
@@ -283,31 +307,31 @@ export function EnrollmentDialog({
           </div>
           <div className="grid gap-2">
             <Label>Standard discount</Label>
-            <Input type="number" value={f.standard_discount ?? ""} disabled={isEdit} onChange={(e) => set("standard_discount", e.target.value)} />
+            <Input type="number" value={f.standard_discount ?? ""} disabled={priceLocked} onChange={(e) => set("standard_discount", e.target.value)} />
           </div>
           <div className="grid gap-2">
             <Label>Additional discount</Label>
-            <Input type="number" value={f.additional_discount ?? ""} disabled={isEdit} onChange={(e) => set("additional_discount", e.target.value)} />
+            <Input type="number" value={f.additional_discount ?? ""} disabled={priceLocked} onChange={(e) => set("additional_discount", e.target.value)} />
           </div>
           <div className="grid gap-2">
             <Label>Agreed amount</Label>
             <Input
               type="number"
               value={agreedEdited ? (f.agreed_amount ?? "") : agreedAuto}
-              disabled={isEdit}
+              disabled={priceLocked}
               onChange={(e) => {
                 setAgreedEdited(true);
                 set("agreed_amount", e.target.value);
               }}
             />
-            {!isEdit && !agreedEdited && (
+            {!priceLocked && !agreedEdited && (
               <p className="text-muted-foreground text-xs">Listed fee minus discounts.</p>
             )}
           </div>
-          {isEdit && (
+          {priceLocked && (
             <p className="text-muted-foreground text-xs sm:col-span-2">
-              The price is fixed after saving. Use “Money entry” on the card for an extra charge,
-              discount, write-off or refund.
+              The price is fixed once the enrollment is confirmed or paid. Use “Money entry” on the
+              card for an extra charge, discount, write-off or refund.
             </p>
           )}
           <div className="grid gap-2 sm:col-span-2">
@@ -319,9 +343,20 @@ export function EnrollmentDialog({
           <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>
-          <Button variant="brand" onClick={submit} disabled={saving}>
-            {saving ? "Saving…" : isEdit ? "Save Changes" : "Create Enrollment"}
-          </Button>
+          {isEdit ? (
+            <Button variant="brand" onClick={() => submit()} disabled={saving}>
+              {saving ? "Saving…" : "Save Changes"}
+            </Button>
+          ) : (
+            <>
+              <Button variant="outline" onClick={() => submit()} disabled={saving}>
+                Save as pending
+              </Button>
+              <Button variant="brand" onClick={() => submit(true)} disabled={saving}>
+                {saving ? "Saving…" : "Save and confirm"}
+              </Button>
+            </>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>

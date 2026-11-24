@@ -50,7 +50,6 @@ import { useDataSource } from "@/context/data-source";
 import { useCompleteFollowup } from "@/hooks/use-followups";
 import { useDeleteLead, useLead } from "@/hooks/use-leads";
 import { EnrollmentsPanel, LeadPaymentsPanel } from "@/pages/leads/components/enrollments-panel";
-import { StudentFormDialog } from "@/pages/students/student-form-dialog";
 import {
   formatDate,
   formatDateTime,
@@ -275,7 +274,6 @@ export default function LeadDetailPage() {
   const { lead, isLoading, notFound } = useLead(id);
   const [action, setAction] = useState<LeadAction>(null);
   const [editingCall, setEditingCall] = useState<Activity | null>(null);
-  const [convertOpen, setConvertOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const deleteLead = useDeleteLead();
   const completeFollowup = useCompleteFollowup();
@@ -381,11 +379,6 @@ export default function LeadDetailPage() {
                   <CalendarPlus /> Add Follow-up
                 </Button>
               </>
-            )}
-            {source === "api" && !lead.isConverted && can("enrollment.manage") && (
-              <Button variant="outline" onClick={() => setConvertOpen(true)}>
-                <GraduationCap /> Convert
-              </Button>
             )}
             {source === "api" && lead.isConverted && (
               <Badge variant="brand" className="gap-1">
@@ -795,7 +788,6 @@ export default function LeadDetailPage() {
           onClose={() => setEditingCall(null)}
         />
       )}
-      <StudentFormDialog open={convertOpen} onClose={() => setConvertOpen(false)} fromLead={lead} />
       <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>

@@ -143,6 +143,12 @@ export const leadsService = {
     return data;
   },
   /** Cancel with a reason — the only way to cancel; PATCH refuses it. */
+  /** Confirm a pending enrollment. This makes the lead a student and sends the fee invoice. */
+  async confirmEnrollment(leadId: number, id: number) {
+    const { data } = await api.post<ApiEnrollment>(`/leads/${leadId}/enrollments/${id}/confirm/`, {});
+    return data;
+  },
+
   async cancelEnrollment(leadId: number, id: number, reason: string) {
     const { data } = await api.post<ApiEnrollment>(
       `/leads/${leadId}/enrollments/${id}/cancel/`,

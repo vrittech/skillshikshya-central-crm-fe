@@ -387,6 +387,7 @@ export interface ApiAdjustment {
 
 /** What a reason-trail row records — mirrors EnrollmentHistory.Action. */
 export type ApiHistoryAction =
+  | "confirm"
   | "cancel"
   | "reinstate"
   | "switch_batch"

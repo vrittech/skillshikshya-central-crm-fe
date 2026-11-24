@@ -586,6 +586,24 @@ export function useAddAdjustment(leadId?: number, enrollmentId?: number) {
 }
 
 /** Cancel or reinstate an enrollment. Both need a reason and add a history row. */
+/** Confirm a pending enrollment: the lead becomes a student and gets the fee invoice. */
+export function useConfirmEnrollment() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ leadId, id }: { leadId: number; id: number }) =>
+      leadsService.confirmEnrollment(leadId, id),
+    onSuccess: (data) => {
+      toast.success("Enrollment confirmed", {
+        description: data.student_name ? `${data.student_name} is now a student.` : undefined,
+      });
+      for (const key of ["lead", "leads", "enrollments", "invoices", "students"]) {
+        void qc.invalidateQueries({ queryKey: [key] });
+      }
+    },
+    onError: (e) => toast.error(apiErrorMessage(e, "Could not confirm the enrollment")),
+  });
+}
+
 export function useEnrollmentStatusAction(leadId?: number) {
   const qc = useQueryClient();
   return useMutation({
