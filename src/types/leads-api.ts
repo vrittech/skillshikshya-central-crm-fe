@@ -350,7 +350,12 @@ export interface ApiEnrollment {
   /** An active course-fee invoice exists. */
   has_fee_invoice?: boolean;
   /** The Teams licence the student holds now, or null. */
-  teams_licence?: { id: number; account: string; assigned_at: string } | null;
+  teams_licence?: {
+    id: number;
+    account: string;
+    assigned_at: string;
+    paused_at?: string | null;
+  } | null;
   enrollment_date: string | null;
   status: ApiEnrollmentStatus;
   listed_fee: string;
@@ -848,12 +853,16 @@ export interface ApiTeamsLicence {
   released_by: number | null;
   released_by_name: string | null;
   release_reason: string | null;
+  /** Set while the student is paused: the licence is kept for them. */
+  paused_at: string | null;
 }
 
 /** total and free are null when no total is set (admin site, Teams licence settings). */
 export interface ApiTeamsSummary {
   total: number | null;
   in_use: number;
+  /** Kept for paused students; not free. */
+  paused: number;
   free: number | null;
 }
 

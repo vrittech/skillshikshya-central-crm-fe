@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { ReasonDialog } from "@/components/reason-dialog";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -125,6 +126,11 @@ export function TeamsLicenceLine({
           <>
             <span className="font-medium">{licence.account}</span>
             <span className="text-muted-foreground"> · {formatDate(licence.assigned_at)}</span>
+            {licence.paused_at && (
+              <Badge variant="warning" className="ml-2">
+                Paused
+              </Badge>
+            )}
           </>
         ) : (
           "—"

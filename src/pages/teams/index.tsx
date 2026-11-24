@@ -1,6 +1,7 @@
 import { ChevronLeft, ChevronRight, Search } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -110,9 +111,10 @@ export default function TeamsPage() {
         </div>
       ) : (
         <>
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <Kpi label="Total" value={s?.total ?? "—"} loading={summary.isLoading} />
             <Kpi label="In use" value={s?.in_use ?? 0} loading={summary.isLoading} />
+            <Kpi label="Paused" value={s?.paused ?? 0} loading={summary.isLoading} />
             <Kpi label="Free" value={s?.free ?? "—"} loading={summary.isLoading} />
           </div>
 
@@ -179,7 +181,14 @@ export default function TeamsPage() {
                       <TableCell className="pl-6">
                         <Student row={r} />
                       </TableCell>
-                      <TableCell className="font-mono text-sm">{r.account}</TableCell>
+                      <TableCell>
+                        <span className="font-mono text-sm">{r.account}</span>
+                        {tab === "open" && r.paused_at && (
+                          <Badge variant="warning" className="ml-2">
+                            Paused
+                          </Badge>
+                        )}
+                      </TableCell>
                       <TableCell>
                         <p>{formatDate(r.assigned_at)}</p>
                         <p className="text-muted-foreground text-xs">{r.assigned_by_name}</p>
