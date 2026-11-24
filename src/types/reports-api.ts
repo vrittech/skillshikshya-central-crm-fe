@@ -320,3 +320,49 @@ export interface BatchProfitParams {
   course?: number;
   status?: "upcoming" | "running" | "closed";
 }
+
+export interface EnquiryFunnelParams extends ReportBaseParams {
+  course?: number;
+  source?: number;
+  counselor?: number;
+}
+
+export interface EnquiryFunnelStage {
+  stage: "new" | "contacted" | "interested" | "won";
+  label: string;
+  reached: number;
+  reached_rate: number;
+  open: number;
+  lost: number;
+  lost_rate: number;
+}
+
+export interface EnquiryBreakdownRow {
+  id: number | null;
+  name: string;
+  enquiries: number;
+  won: number;
+  lost: number;
+  open: number;
+  win_rate: number;
+}
+
+/** Where enquiries die: reached per stage, where the lost ones stopped and why. */
+export interface EnquiryFunnelReport {
+  summary: {
+    enquiries: number;
+    won: number;
+    lost: number;
+    open: number;
+    stale: number;
+    stale_days: number;
+    win_rate: number;
+  };
+  funnel: EnquiryFunnelStage[];
+  lost_by_reason: { reason: string; label: string; count: number; rate: number }[];
+  by_course: EnquiryBreakdownRow[];
+  by_source: EnquiryBreakdownRow[];
+  by_counselor: EnquiryBreakdownRow[];
+  error?: string;
+}
+

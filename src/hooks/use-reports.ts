@@ -4,6 +4,7 @@ import type {
   BatchProfitParams,
   CounselorPerformanceParams,
   DueInMonthParams,
+  EnquiryFunnelParams,
   EnrollmentsReportParams,
   LeadTrendParams,
   ReportBaseParams,
@@ -121,3 +122,13 @@ export function useBatchProfit(params: BatchProfitParams, enabled = true) {
     placeholderData: keepPreviousData,
   });
 }
+
+export function useEnquiryFunnel(params: EnquiryFunnelParams, enabled = true) {
+  return useQuery({
+    queryKey: ["reports", "enquiry-funnel", params],
+    queryFn: () => reportsService.enquiryFunnel(params),
+    enabled,
+    placeholderData: keepPreviousData,
+  });
+}
+

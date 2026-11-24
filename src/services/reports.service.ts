@@ -8,6 +8,8 @@ import type {
   DimensionReport,
   DueInMonthParams,
   DueInMonthReport,
+  EnquiryFunnelParams,
+  EnquiryFunnelReport,
   EnrollmentsReport,
   EnrollmentsReportParams,
   LeadTrendParams,
@@ -29,6 +31,13 @@ function clean(params: object) {
 }
 
 export const reportsService = {
+  /** Where enquiries die: how far enquiries got, and why the lost ones were lost. */
+  async enquiryFunnel(params: EnquiryFunnelParams) {
+    const { data } = await api.get<EnquiryFunnelReport>("/reports/enquiry-funnel/", {
+      params: clean(params),
+    });
+    return data;
+  },
   /** Each batch's fees, collected, owed, costs and profit, newest first. */
   async batchProfit(params: BatchProfitParams) {
     const { data } = await api.get<BatchProfitReport>("/reports/batch-profit/", {
