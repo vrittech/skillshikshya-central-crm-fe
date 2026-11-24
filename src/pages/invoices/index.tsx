@@ -114,8 +114,7 @@ export default function InvoicesPage() {
 
       {!isApi ? (
         <div className="text-muted-foreground rounded-2xl border border-dashed py-16 text-center text-sm">
-          Invoices are a live-backend feature. Toggle to <span className="font-semibold">Live</span>{" "}
-          in the header.
+          Switch to Live data to see invoices.
         </div>
       ) : (
         <div className="bg-card overflow-hidden rounded-2xl border shadow-[0_1px_3px_0_rgba(0,0,0,0.05),0_1px_2px_-1px_rgba(0,0,0,0.05)]">

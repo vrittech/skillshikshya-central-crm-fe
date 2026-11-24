@@ -75,7 +75,7 @@ function InvoicesTab({ studentId }: { studentId: number }) {
   if (!invoices.length)
     return (
       <p className="text-muted-foreground py-8 text-center text-sm">
-        No invoices yet — they are generated on enrollment and on each successful payment.
+        No invoices.
       </p>
     );
 

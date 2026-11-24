@@ -529,11 +529,6 @@ export default function SettingsPage() {
             <CardHeader className="flex-row items-center justify-between">
               <div>
                 <CardTitle className="text-base">{heading}</CardTitle>
-                <p className="text-muted-foreground mt-1 text-xs">
-                  {isTypes
-                    ? "Fixed system enum — not editable."
-                    : "Controlled values reused across attribution, filtering, and reports."}
-                </p>
               </div>
               {canManage && !isTypes && !isIntegrations && (
                 <Button

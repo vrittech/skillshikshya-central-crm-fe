@@ -224,7 +224,7 @@ export default function LeadsPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={() => toast.info("Import Leads", { description: "Bulk import ships with the backend importer." })}>
+          <Button variant="outline" onClick={() => toast.info("Import is coming soon.")}>
             <Upload /> Import
           </Button>
           <Button variant="outline" onClick={exportCsv}>

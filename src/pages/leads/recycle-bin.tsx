@@ -165,7 +165,7 @@ export default function RecycleBinPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Permanently delete “{purgeName}”?</AlertDialogTitle>
             <AlertDialogDescription>
-              This cannot be undone. The lead and its history will be removed from the database for good.
+              This cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

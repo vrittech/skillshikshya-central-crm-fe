@@ -8,8 +8,7 @@ export default function ComingSoonPage({ title }: { title: string }) {
       </div>
       <h1 className="font-headline text-xl font-semibold">{title}</h1>
       <p className="text-muted-foreground max-w-sm text-sm">
-        The {title} module is ready in the navigation, but its backend API hasn't shipped yet.
-        It will be wired up as soon as the endpoints are available.
+        Coming soon.
       </p>
     </div>
   );
