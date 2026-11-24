@@ -535,6 +535,7 @@ export function useAddEnrollment(leadId?: number) {
       void qc.invalidateQueries({ queryKey: ["lead"] });
       void qc.invalidateQueries({ queryKey: ["leads"] });
       void qc.invalidateQueries({ queryKey: ["enrollments"] });
+      void qc.invalidateQueries({ queryKey: ["course-batches"] });
     },
     onError: (e) => toast.error(apiErrorMessage(e, "Could not create enrollment")),
   });
@@ -550,6 +551,7 @@ export function useUpdateEnrollment(leadId?: number) {
       void qc.invalidateQueries({ queryKey: ["lead"] });
       void qc.invalidateQueries({ queryKey: ["leads"] });
       void qc.invalidateQueries({ queryKey: ["enrollments"] });
+      void qc.invalidateQueries({ queryKey: ["course-batches"] });
     },
     onError: (e) => toast.error(apiErrorMessage(e, "Could not update enrollment")),
   });
@@ -596,7 +598,8 @@ export function useConfirmEnrollment() {
       toast.success("Enrollment confirmed", {
         description: data.student_name ? `${data.student_name} is now a student.` : undefined,
       });
-      for (const key of ["lead", "leads", "enrollments", "invoices", "students"]) {
+      // Confirm also takes a seat, so batch seat counts change.
+      for (const key of ["lead", "leads", "enrollments", "invoices", "students", "course-batches"]) {
         void qc.invalidateQueries({ queryKey: [key] });
       }
     },
@@ -624,6 +627,8 @@ export function useEnrollmentStatusAction(leadId?: number) {
       void qc.invalidateQueries({ queryKey: ["lead"] });
       void qc.invalidateQueries({ queryKey: ["leads"] });
       void qc.invalidateQueries({ queryKey: ["enrollments"] });
+      // Cancel frees the seat.
+      void qc.invalidateQueries({ queryKey: ["course-batches"] });
     },
     onError: (e) => toast.error(apiErrorMessage(e, "Could not update the enrollment")),
   });

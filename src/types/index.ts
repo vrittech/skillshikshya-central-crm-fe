@@ -220,6 +220,12 @@ export interface CourseBatch {
   status: CourseBatchStatus;
   status_display?: string;
   trainer: string | null;
+  /** Students sitting in the batch now (read-only). */
+  seats_taken?: number;
+  /** capacity - seats_taken, never below 0. null = no limit. */
+  seats_left?: number | null;
+  /** Pending enrollments that chose this batch; they take a seat on confirm. */
+  waiting_count?: number;
   is_active: boolean;
   branch: number | null;
   created_by: number | null;

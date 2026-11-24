@@ -242,6 +242,7 @@ function CourseBatchesTab({ canAdd, canChange, canDelete }: TabPerms) {
               <TableHead>Course</TableHead>
               <TableHead>Time slot</TableHead>
               <TableHead>Runs</TableHead>
+              <TableHead>Seats</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="w-10" />
             </TableRow>
@@ -250,14 +251,14 @@ function CourseBatchesTab({ canAdd, canChange, canDelete }: TabPerms) {
             {isLoading &&
               Array.from({ length: 5 }).map((_, i) => (
                 <TableRow key={i}>
-                  <TableCell colSpan={7}>
+                  <TableCell colSpan={8}>
                     <Skeleton className="h-6 w-full" />
                   </TableCell>
                 </TableRow>
               ))}
             {!isLoading && rows.length === 0 && (
               <TableRow>
-                <TableCell colSpan={7} className="text-muted-foreground py-10 text-center">
+                <TableCell colSpan={8} className="text-muted-foreground py-10 text-center">
                   No course batches found.
                 </TableCell>
               </TableRow>
@@ -277,6 +278,9 @@ function CourseBatchesTab({ canAdd, canChange, canDelete }: TabPerms) {
                 <TableCell className="text-muted-foreground text-sm">
                   {cb.start_date ? formatDate(cb.start_date) : "—"}
                   {cb.end_date ? ` → ${formatDate(cb.end_date)}` : ""}
+                </TableCell>
+                <TableCell>
+                  <SeatsCell batch={cb} />
                 </TableCell>
                 <TableCell>
                   <div className="flex flex-wrap gap-1">
@@ -323,7 +327,7 @@ function CourseBatchesTab({ canAdd, canChange, canDelete }: TabPerms) {
 
       <ConfirmDelete
         name={deleting?.name}
-        description="This permanently removes the course batch. Enrollments that reference it are not changed."
+        description="This permanently removes the course batch. A batch that has enrollments can't be deleted; close it instead."
         onCancel={() => setDeleting(null)}
         onConfirm={() => {
           if (deleting) del.mutate(deleting.id);
@@ -462,6 +466,26 @@ function SlotsTab({ canAdd, canChange, canDelete }: TabPerms) {
           setDeleting(null);
         }}
       />
+    </div>
+  );
+}
+
+/** "12 / 30" with a Full badge, or "12 · no limit"; pending enrollments show as waiting. */
+function SeatsCell({ batch }: { batch: CourseBatch }) {
+  const taken = batch.seats_taken ?? 0;
+  const full = batch.capacity != null && batch.seats_left === 0;
+  return (
+    <div className="text-sm">
+      <div className="flex items-center gap-1.5">
+        <span className="font-medium tabular-nums">
+          {batch.capacity == null ? taken : `${taken} / ${batch.capacity}`}
+        </span>
+        {batch.capacity == null && <span className="text-muted-foreground">· no limit</span>}
+        {full && <Badge variant="warning">Full</Badge>}
+      </div>
+      {!!batch.waiting_count && (
+        <div className="text-muted-foreground text-xs">{batch.waiting_count} waiting to confirm</div>
+      )}
     </div>
   );
 }

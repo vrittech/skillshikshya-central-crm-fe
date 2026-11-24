@@ -39,6 +39,7 @@ import type {
   ApiPaymentPayload,
   ApiPaymentStatus,
 } from "@/types/leads-api";
+import type { CourseBatch } from "@/types";
 import { toNepalIso } from "@/lib/leads-format";
 
 const ENR_STATUS: ApiEnrollmentStatus[] = [
@@ -56,6 +57,13 @@ const PAY_STATUS: ApiPaymentStatus[] = ["successful", "pending"];
 
 function num(a: string, b: string) {
   return String((Number(a || "0") - Number(b || "0") - 0).toFixed(2));
+}
+
+/** "12 seats left", "full" or "no seat limit" for the batch picker. */
+function seatsLabel(b: CourseBatch) {
+  if (b.capacity == null) return "no seat limit";
+  if (!b.seats_left) return "full";
+  return `${b.seats_left} ${b.seats_left === 1 ? "seat" : "seats"} left`;
 }
 
 export function EnrollmentDialog({
@@ -84,6 +92,8 @@ export function EnrollmentDialog({
   const wasPending = enrollment?.status === "pending";
   // The price can change until the enrollment is confirmed or something is paid.
   const priceLocked = isEdit && !(wasPending && Number(enrollment?.total_paid ?? 0) === 0);
+  // Once confirmed, the course and the money batch are fixed.
+  const seatLocked = isEdit && !wasPending;
   const needsLead = allowLeadPick && !isEdit;
   const [pickedLeadId, setPickedLeadId] = useState<string>("");
   const [leadSearch, setLeadSearch] = useState("");
@@ -96,11 +106,16 @@ export function EnrollmentDialog({
   const leadOptionsQ = useLeadOptions(open && needsLead ? leadSearch : "");
   const coursesQ = useCourses(1, 100, "");
   const courses = useMemo(() => coursesQ.data?.results ?? [], [coursesQ.data]);
+  // Closed batches take no one new, so they are not offered.
   const batchesQ = useCourseBatches(
-    { course: f.course, page_size: 100, is_active: true },
+    { course: f.course, page_size: 100, is_active: true, status: ["upcoming", "running"] },
     !!f.course,
   );
   const batches = useMemo(() => batchesQ.data?.results ?? [], [batchesQ.data]);
+  const chosenBatch = batches.find((b) => b.id === f.batch);
+  // The saved batch may be closed or inactive now; still show its name.
+  const savedBatchMissing =
+    enrollment?.batch != null && !batches.some((b) => b.id === enrollment.batch);
   const addEnrollment = useAddEnrollment(effectiveLeadId);
   const updateEnrollment = useUpdateEnrollment(leadId);
   const confirm = useConfirmEnrollment();
@@ -211,6 +226,7 @@ export function EnrollmentDialog({
           <div className="grid gap-2 sm:col-span-2">
             <Label required>Course</Label>
             <Select
+              disabled={seatLocked}
               value={f.course != null ? String(f.course) : undefined}
               onValueChange={(v) => {
                 // A new course brings its own price, even after a typed fee.
@@ -244,19 +260,37 @@ export function EnrollmentDialog({
                   batch: Number(v),
                 }));
               }}
-              disabled={!f.course || batchesQ.isLoading}
+              disabled={seatLocked || !f.course || batchesQ.isLoading}
             >
               <SelectTrigger>
                 <SelectValue placeholder={f.course ? "Select course batch" : "Select a course first"} />
               </SelectTrigger>
               <SelectContent>
+                {savedBatchMissing && enrollment?.batch != null && (
+                  <SelectItem value={String(enrollment.batch)}>
+                    {enrollment.batch_name ?? `Batch #${enrollment.batch}`}
+                  </SelectItem>
+                )}
                 {batches.map((b) => (
                   <SelectItem key={b.id} value={String(b.id)}>
-                    {b.coursebatch_id} — {b.name}
+                    {b.coursebatch_id} — {b.name} · {seatsLabel(b)}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
+            {seatLocked ? (
+              <p className="text-muted-foreground text-xs">
+                The course and batch are fixed once confirmed, because the fees count on this batch.
+              </p>
+            ) : (
+              chosenBatch?.capacity != null &&
+              chosenBatch.seats_left === 0 && (
+                <p className="text-xs text-amber-600 dark:text-amber-400">
+                  {chosenBatch.name} is full. Confirm is refused until a seat frees up or seats are
+                  added.
+                </p>
+              )
+            )}
           </div>
           <div className="grid gap-2">
             <Label>Enrollment date</Label>

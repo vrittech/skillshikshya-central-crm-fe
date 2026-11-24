@@ -289,8 +289,12 @@ export interface ApiEnrollment {
   course_name?: string;
   student: number | null;
   student_name?: string | null;
+  /** The money batch: the batch first joined. Fees count here; fixed once confirmed. */
   batch: number | null;
   batch_name?: string | null;
+  /** Where the student sits now. null = not in a batch (paused, left or not placed). */
+  current_batch?: number | null;
+  current_batch_name?: string | null;
   enrollment_date: string | null;
   status: ApiEnrollmentStatus;
   listed_fee: string;
@@ -388,6 +392,7 @@ export interface ApiAdjustment {
 /** What a reason-trail row records — mirrors EnrollmentHistory.Action. */
 export type ApiHistoryAction =
   | "confirm"
+  | "join_batch"
   | "cancel"
   | "reinstate"
   | "switch_batch"
