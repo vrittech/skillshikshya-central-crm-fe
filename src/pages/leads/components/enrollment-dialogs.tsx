@@ -58,6 +58,20 @@ const PAY_METHODS: ApiPaymentMethod[] = ["cash", "esewa", "khalti", "bank_transf
 /** A new payment is pending or successful; Confirm and Void change it later. */
 const PAY_STATUS: ApiPaymentStatus[] = ["successful", "pending"];
 
+/** A short error under a money field. */
+function FieldError({ children }: { children?: string | null }) {
+  if (!children) return null;
+  return <p className="text-destructive text-xs">{children}</p>;
+}
+
+/** Why a payment amount can't be taken, checked against what is left to pay. */
+function paymentAmountError(amount: string | undefined, left: number | null) {
+  if (left == null) return null;
+  if (left <= 0) return "Nothing left to pay";
+  if (Number(amount) > left) return `More than left to pay (${formatNPR(left)})`;
+  return null;
+}
+
 function num(a: string, b: string) {
   return String((Number(a || "0") - Number(b || "0") - 0).toFixed(2));
 }
@@ -174,6 +188,25 @@ export function EnrollmentDialog({
 
   // Keep agreed = listed - standard - additional as a helpful default.
   const agreedAuto = num(num(f.listed_fee ?? "0", f.standard_discount ?? "0"), f.additional_discount ?? "0");
+  // The same limits the server checks: a typo (100000 for 10000) is caught here first.
+  const listed = Number(f.listed_fee ?? 0);
+  const discountTotal = Number(f.standard_discount || 0) + Number(f.additional_discount || 0);
+  const agreedValue = Number(agreedEdited ? f.agreed_amount || 0 : agreedAuto);
+  const discountError =
+    Number(f.standard_discount || 0) < 0 || Number(f.additional_discount || 0) < 0
+      ? "Can't be below 0"
+      : discountTotal > listed
+        ? `More than the listed fee (${formatNPR(listed)})`
+        : null;
+  const agreedError =
+    discountError || priceLocked
+      ? null
+      : agreedValue < 0
+        ? "Can't be below 0"
+        : agreedValue > listed - discountTotal
+          ? `More than ${formatNPR(listed - discountTotal)}`
+          : null;
+  const priceInvalid = !priceLocked && (!!discountError || !!agreedError);
 
   function submit(confirmAfter = false) {
     if (needsLead && !effectiveLeadId) {
@@ -324,6 +357,7 @@ export function EnrollmentDialog({
             <div className="grid gap-2">
               <Label>Additional discount</Label>
               <Input type="number" value={f.additional_discount ?? ""} disabled={priceLocked} onChange={(e) => set("additional_discount", e.target.value)} />
+              {!priceLocked && <FieldError>{discountError}</FieldError>}
             </div>
             <div className="grid gap-2">
               <Label>Agreed amount</Label>
@@ -336,6 +370,7 @@ export function EnrollmentDialog({
                   set("agreed_amount", e.target.value);
                 }}
               />
+              <FieldError>{agreedError}</FieldError>
             </div>
             <div className="grid gap-2 sm:col-span-2">
               <Label>Remarks</Label>
@@ -347,15 +382,15 @@ export function EnrollmentDialog({
               Cancel
             </Button>
             {isEdit ? (
-              <Button variant="brand" onClick={() => submit()} disabled={saving}>
+              <Button variant="brand" onClick={() => submit()} disabled={saving || priceInvalid}>
                 {saving ? "Saving…" : "Save Changes"}
               </Button>
             ) : (
               <>
-                <Button variant="outline" onClick={() => submit()} disabled={saving}>
+                <Button variant="outline" onClick={() => submit()} disabled={saving || priceInvalid}>
                   Save as pending
                 </Button>
-                <Button variant="brand" onClick={() => submit(true)} disabled={saving}>
+                <Button variant="brand" onClick={() => submit(true)} disabled={saving || priceInvalid}>
                   {saving ? "Saving…" : "Save and confirm"}
                 </Button>
               </>
@@ -404,7 +439,9 @@ export function ConfirmEnrollmentDialog({
     setReference("");
   }, [open, agreed]);
 
-  const amountOk = !needsPayment || Number(amount) > 0;
+  const left = Number(enrollment?.remaining_amount ?? 0);
+  const firstError = needsPayment && amount ? paymentAmountError(amount, left) : null;
+  const amountOk = !needsPayment || (Number(amount) > 0 && !firstError);
   const valid = amountOk && (agreed <= 0 || partsAreValid(parts, agreed));
 
   function submit() {
@@ -450,6 +487,7 @@ export function ConfirmEnrollmentDialog({
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
                 />
+                <FieldError>{firstError}</FieldError>
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="first-payment-method">Method</Label>
@@ -528,8 +566,11 @@ export function PaymentDialog({
     enrollmentApiId ?? (pickedEnrollmentId ? Number(pickedEnrollmentId) : undefined);
 
   const leadOptionsQ = useLeadOptions(open && needsPickers ? leadSearch : "");
-  const enrollmentsQ = useLeadEnrollments(needsPickers ? effectiveLeadId : undefined);
+  const enrollmentsQ = useLeadEnrollments(open ? effectiveLeadId : undefined);
   const enrollments = enrollmentsQ.enrollments;
+  const target = enrollments.find((e) => e.id === effectiveEnrollmentId);
+  const left = target ? Number(target.remaining_amount) : null;
+  const amountError = f.amount ? paymentAmountError(f.amount, left) : left != null && left <= 0 ? "Nothing left to pay" : null;
   const addPayment = useAddPayment(effectiveLeadId, effectiveEnrollmentId);
   const saving = addPayment.isPending;
 
@@ -647,6 +688,11 @@ export function PaymentDialog({
           <div className="grid gap-2">
             <Label required>Amount</Label>
             <Input type="number" value={f.amount ?? ""} onChange={(e) => set("amount", e.target.value)} />
+            {amountError ? (
+              <FieldError>{amountError}</FieldError>
+            ) : (
+              left != null && <p className="text-muted-foreground text-xs">Left to pay {formatNPR(left)}</p>
+            )}
           </div>
           <div className="grid gap-2">
             <Label>Date</Label>
@@ -699,7 +745,7 @@ export function PaymentDialog({
           <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>
-          <Button variant="brand" onClick={submit} disabled={saving}>
+          <Button variant="brand" onClick={submit} disabled={saving || !!amountError}>
             {saving ? "Saving…" : "Record Payment"}
           </Button>
         </DialogFooter>
