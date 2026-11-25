@@ -1,8 +1,9 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useDataSource } from "@/context/data-source";
 import { ALL_LEADS } from "@/data/mock-leads";
+import { useDebouncedValue } from "@/lib/use-debounced-value";
 import { globalListsService } from "@/services/global-lists.service";
-import type { ApiSeatState } from "@/types/leads-api";
+import type { ApiEnrollmentStatus, ApiSeatState } from "@/types/leads-api";
 
 export interface EnrollmentRow {
   id: string;
@@ -35,20 +36,40 @@ export interface PaymentRow {
   receivedBy?: string;
 }
 
-/** Global enrollments register — `GET /api/enrollments/` (live) or mock leads' enrollments. */
-export function useEnrollments(seat?: ApiSeatState) {
+export interface EnrollmentListParams {
+  page: number;
+  pageSize: number;
+  search: string;
+  status?: ApiEnrollmentStatus;
+  seat?: ApiSeatState;
+}
+
+/**
+ * Global enrollments register, one page at a time. Live data is searched,
+ * filtered and paged by `GET /api/enrollments/`; mock data is done here.
+ */
+export function useEnrollments({ page, pageSize, search, status, seat }: EnrollmentListParams) {
   const { source } = useDataSource();
   const isApi = source === "api";
+  const q = useDebouncedValue(search.trim(), 300);
 
   const query = useQuery({
-    queryKey: ["enrollments", "list", seat ?? "all"],
+    queryKey: ["enrollments", "list", { page, pageSize, q, status, seat }],
     enabled: isApi,
     queryFn: () =>
-      globalListsService.enrollments({ ordering: "-created_at", page_size: 100, seat }),
+      globalListsService.enrollments({
+        ordering: "-created_at",
+        page,
+        page_size: pageSize,
+        search: q || undefined,
+        status,
+        seat,
+      }),
     placeholderData: keepPreviousData,
   });
 
   let rows: EnrollmentRow[];
+  let count: number;
   if (isApi) {
     rows = (query.data?.results ?? []).map((e) => ({
       id: String(e.id),
@@ -65,8 +86,9 @@ export function useEnrollments(seat?: ApiSeatState) {
       seatState: e.seat_state,
       pausedOn: e.paused_on ?? undefined,
     }));
+    count = query.data?.count ?? 0;
   } else {
-    rows = ALL_LEADS.filter((l) => l.enrollment).map((l) => {
+    const all: EnrollmentRow[] = ALL_LEADS.filter((l) => l.enrollment).map((l) => {
       const en = l.enrollment!;
       const paid = l.payments.filter((p) => p.status === "successful").reduce((s, p) => s + p.amount, 0);
       return {
@@ -83,8 +105,16 @@ export function useEnrollments(seat?: ApiSeatState) {
         isFullPaid: en.agreedAmount > 0 && en.agreedAmount - paid <= 0,
       };
     });
+    const needle = q.toLowerCase();
+    const matched = all.filter(
+      (r) =>
+        (!status || r.status === status) &&
+        (!needle || `${r.leadName} ${r.courseName} ${r.batch ?? ""}`.toLowerCase().includes(needle)),
+    );
+    count = matched.length;
+    rows = matched.slice((page - 1) * pageSize, page * pageSize);
   }
-  return { rows, isLoading: isApi && query.isLoading };
+  return { rows, count, isLoading: isApi && query.isLoading };
 }
 
 /** Global payments ledger — `GET /api/payments/` (live) or mock leads' payments. */
