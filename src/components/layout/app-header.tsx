@@ -22,7 +22,7 @@ export function AppHeader({ onMenuClick }: { onMenuClick: () => void }) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const { theme, toggle } = useTheme();
-  const { source, setSource } = useDataSource();
+  const { source, isMock, setSource } = useDataSource();
   const [changePwOpen, setChangePwOpen] = useState(false);
 
   const initials =
@@ -83,8 +83,8 @@ export function AppHeader({ onMenuClick }: { onMenuClick: () => void }) {
           <Plus /> Quick Create
         </Button>
 
-        {/* Dev-only role switcher for previewing permission-scoped UI */}
-        <RoleSwitcher />
+        {/* Previews a role with mock data; live data follows the user's real permissions */}
+        {isMock && <RoleSwitcher />}
 
         {/* Notifications */}
         <NotificationBell />

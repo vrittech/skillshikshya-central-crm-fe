@@ -13,9 +13,8 @@ import { cn } from "@/lib/utils";
 const ORDER: MockRole[] = ["admin", "manager", "counselor", "finance", "readonly"];
 
 /**
- * Dev-only role switcher. Lets reviewers preview how navigation, columns, and
- * actions change per role before backend RBAC exists. Drives the mock `role`
- * context — not real auth.
+ * Previews how navigation and actions change per role. Shown with mock data
+ * only; with live data the buttons follow the user's real permissions.
  */
 export function RoleSwitcher() {
   const { role, def, setRole } = useRole();

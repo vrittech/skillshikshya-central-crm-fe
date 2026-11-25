@@ -32,8 +32,8 @@ export default function RecycleBinPage() {
   const restore = useRestoreLead();
   const purge = usePurgeLead();
 
-  const canRestore = can("leads.archive") || can("leads.delete");
-  const canPurge = can("leads.delete");
+  const canRestore = can("leads.archive");
+  const canPurge = can("leads.purge");
 
   const totalPages = Math.max(1, Math.ceil(count / pageSize));
   const currentPage = Math.min(page, totalPages);
