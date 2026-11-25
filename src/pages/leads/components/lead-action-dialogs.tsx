@@ -84,6 +84,32 @@ const REMINDER_OFFSETS_MS: Record<FollowUpForm["reminder"], number> = {
  * laid out with the fields the real workflow needs, but Save only shows a
  * toast — no mutation is performed.
  */
+
+function parseCallDuration(value: string): number | null {
+  const input = value.trim();
+
+  if (!input) return null;
+
+  // Plain integer means seconds.
+  if (/^\d+$/.test(input)) {
+    return Number(input);
+  }
+
+  // Formats: 4:19, 4.19, 4m19s
+  const match = input.match(
+    /^(\d+)\s*(?::|\.)\s*(\d{1,2})$|^(\d+)\s*m\s*(\d{1,2})\s*s$/i,
+  );
+
+  if (!match) return NaN;
+
+  const minutes = Number(match[1] ?? match[3]);
+  const seconds = Number(match[2] ?? match[4]);
+
+  if (seconds > 59) return NaN;
+
+  return minutes * 60 + seconds;
+}
+
 export function LeadActionDialogs({ action, lead, onClose }: Props) {
   const name = lead?.fullName ?? "lead";
   const { isMock } = useDataSource();
@@ -118,6 +144,12 @@ export function LeadActionDialogs({ action, lead, onClose }: Props) {
   }
 
   function submitCall() {
+    const durationSeconds = parseCallDuration(call.duration);
+
+    if (Number.isNaN(durationSeconds)) {
+      toast.error("Invalid duration. Use 4:19, 4.19, 4m19s or seconds.");
+    return;
+    }
     // Mock path (or a lead with no backend id) can't persist — keep the toast.
     if (isMock || lead?.apiId == null) {
       done("Call logged");
@@ -130,7 +162,7 @@ export function LeadActionDialogs({ action, lead, onClose }: Props) {
         caller: user?.id ?? null,
         direction: call.direction,
         outcome: call.outcome || null,
-        duration_seconds: call.duration ? Math.round(Number(call.duration) * 60) : null,
+        duration_seconds: durationSeconds,
         recording_url: call.recording.trim() || null,
         notes: call.notes.trim() || null,
         next_followup_at: call.nextFollowUp ? toNepalIso(call.nextFollowUp) : null,
@@ -213,26 +245,32 @@ export function LeadActionDialogs({ action, lead, onClose }: Props) {
                 </Select>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="grid gap-2">
-                <Label>Duration (minutes)</Label>
-                <Input
-                  type="number"
-                  min={0}
-                  placeholder="e.g. 4"
-                  value={call.duration}
-                  onChange={(e) => setC("duration", e.target.value)}
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label>Recording link</Label>
-                <Input
-                  placeholder="Optional URL"
-                  value={call.recording}
-                  onChange={(e) => setC("recording", e.target.value)}
-                />
-              </div>
-            </div>
+<div className="grid grid-cols-2 gap-4">
+  <div className="grid gap-2">
+    <Label>Duration (mm:ss or seconds)</Label>
+    <Input
+      type="text"
+      placeholder="e.g. 4:19, 4.19 or 259"
+      value={call.duration}
+      onChange={(e) => setC("duration", e.target.value)}
+    />
+    {call.duration.trim() &&
+      Number.isNaN(parseCallDuration(call.duration)) && (
+        <p className="text-sm text-destructive">
+          Enter a valid duration, e.g. 4:19 or 259.
+        </p>
+      )}
+  </div>
+
+  <div className="grid gap-2">
+    <Label>Recording link</Label>
+    <Input
+      placeholder="Optional URL"
+      value={call.recording}
+      onChange={(e) => setC("recording", e.target.value)}
+    />
+  </div>
+</div>
             <div className="grid gap-2">
               <Label>Notes</Label>
               <Textarea
