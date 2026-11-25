@@ -99,6 +99,13 @@ export interface ApiEnrollmentSummary {
   batch: string | null;
 }
 
+/** A lead's main course, as the API sends it. */
+export interface ApiPrimaryCourse {
+  id: number;
+  name: string;
+  price: string | null;
+}
+
 export interface ApiLead {
   id: number;
   /** Future — see lead-additional.md §6. */
@@ -140,7 +147,8 @@ export interface ApiLead {
   priority: number | null;
   status: number | null;
   assigned_counselor: number | null;
-  primary_course: number | null;
+  /** Nested on read ({id, name, price}); written as an id. */
+  primary_course: ApiPrimaryCourse | null;
   created_by: number | null;
   updated_by: number | null;
   tags: number[];
@@ -155,7 +163,6 @@ export interface ApiLead {
   priority_color?: string;
   source_name?: string;
   campaign_name?: string;
-  primary_course_name?: string;
   branch_name?: string;
   assigned_counselor_name?: string;
   created_by_name?: string;

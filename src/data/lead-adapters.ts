@@ -188,8 +188,8 @@ export function adaptApiLeadToListItem(api: ApiLead): LeadListItem {
     source: "manual_entry",
     sourceName: api.source_name,
     campaign: api.campaign_name ?? undefined,
-    primaryCourse: api.primary_course_name ?? undefined,
-    primaryCourseId: api.primary_course != null ? String(api.primary_course) : undefined,
+    primaryCourse: api.primary_course?.name,
+    primaryCourseId: api.primary_course ? String(api.primary_course.id) : undefined,
     status: "new",
     statusName: api.status_name,
     statusColor: api.status_color,
@@ -238,11 +238,11 @@ export function adaptApiLead(api: ApiLead): Lead {
     assignedToName: api.assigned_counselor_name,
     branchName: api.branch_name,
     courseInterests:
-      api.primary_course != null
+      api.primary_course
         ? [
             {
-              courseId: String(api.primary_course),
-              courseName: api.primary_course_name ?? "Course",
+              courseId: String(api.primary_course.id),
+              courseName: api.primary_course.name,
               isPrimary: true,
               interestLevel: "high",
             },
@@ -263,7 +263,7 @@ export function adaptApiLead(api: ApiLead): Lead {
     sourceId: api.source,
     campaignId: api.campaign,
     branchId: api.branch,
-    primaryCourseId: api.primary_course,
+    primaryCourseId: api.primary_course?.id ?? null,
     leadTypeId: typeof api.lead_type === "number" ? api.lead_type : null,
     tagIds: api.tags ?? [],
     sourceSheet: "API",

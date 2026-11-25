@@ -267,7 +267,7 @@ export function LiveDashboard({ firstName }: { firstName: string }) {
               <div className="min-w-0">
                 <p className="truncate text-sm font-semibold">{l.full_name}</p>
                 <p className="text-muted-foreground truncate text-xs">
-                  {l.primary_course_name ?? l.source_name ?? "—"} · {formatDate(l.created_at)}
+                  {l.primary_course?.name ?? l.source_name ?? "—"} · {formatDate(l.created_at)}
                 </p>
               </div>
               {l.status_name && (
