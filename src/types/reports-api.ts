@@ -228,6 +228,8 @@ export interface DuesPerson {
   /** The lead's counselor: the person who chases the money. */
   counselor?: number | null;
   counselor_name?: string | null;
+  seat_state?: "seated" | "paused" | "none";
+  paused_on?: string | null;
 }
 
 export interface WhoOwesRow extends DuesPerson {
@@ -274,6 +276,7 @@ export interface WhoOwesParams {
   batch?: number;
   /** A counselor id, or "none" for students with nobody assigned. */
   counselor?: number | "none";
+  seat?: "seated" | "paused" | "none";
   late_only?: boolean;
 }
 

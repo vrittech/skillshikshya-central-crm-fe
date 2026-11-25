@@ -99,7 +99,14 @@ function Course({ row }: { row: DuesPerson }) {
       <Link to={`/enrollments/${row.enrollment}`} className="hover:underline">
         {row.course_name}
       </Link>
-      <p className="text-muted-foreground text-xs">{row.batch_name ?? "—"}</p>
+      <p className="text-muted-foreground text-xs">
+        {row.batch_name ?? "—"}
+        {row.seat_state === "paused" && (
+          <Badge variant="outline" className="ml-1.5 align-middle">
+            Paused
+          </Badge>
+        )}
+      </p>
     </>
   );
 }
@@ -237,6 +244,7 @@ function OwedGroups({
 
 function WhoOwes({ branchId }: { branchId?: number }) {
   const [lateOnly, setLateOnly] = useState(false);
+  const [pausedOnly, setPausedOnly] = useState(false);
   const [view, setView] = useState<OwedView>("students");
   const [filter, setFilter] = useState<OwedFilter | null>(null);
   // A group view adds up everyone; the student list can be narrowed to one group.
@@ -244,6 +252,7 @@ function WhoOwes({ branchId }: { branchId?: number }) {
   const { data, isLoading } = useWhoOwes({
     branch_id: branchId,
     late_only: lateOnly || undefined,
+    seat: pausedOnly ? "paused" : undefined,
     counselor: narrowed ? filter.counselor : undefined,
     batch: narrowed ? filter.batch : undefined,
   });
@@ -294,9 +303,15 @@ function WhoOwes({ branchId }: { branchId?: number }) {
               </Badge>
             )}
           </div>
-          <div className="flex items-center gap-2">
-            <Switch id="late-only" checked={lateOnly} onCheckedChange={setLateOnly} />
-            <Label htmlFor="late-only">Late only</Label>
+          <div className="flex flex-wrap items-center gap-4">
+            <div className="flex items-center gap-2">
+              <Switch id="paused-only" checked={pausedOnly} onCheckedChange={setPausedOnly} />
+              <Label htmlFor="paused-only">Paused only</Label>
+            </div>
+            <div className="flex items-center gap-2">
+              <Switch id="late-only" checked={lateOnly} onCheckedChange={setLateOnly} />
+              <Label htmlFor="late-only">Late only</Label>
+            </div>
           </div>
         </div>
         {view === "students" ? (

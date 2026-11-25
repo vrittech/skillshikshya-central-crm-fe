@@ -264,11 +264,19 @@ export interface BatchStudentRow {
   money_batch_name: string | null;
   /** True when the money batch is another batch: this batch's revenue leaves them out. */
   moved_in: boolean;
+  /** Moved-out rows only: the batch they moved to, and where they are now. */
+  to_batch?: number | null;
+  to_batch_name?: string | null;
+  seat_state?: "seated" | "paused" | "none";
+  now_batch?: number | null;
+  now_batch_name?: string | null;
 }
 
 export interface BatchStudents {
   seated: BatchStudentRow[];
   paused: BatchStudentRow[];
+  /** Students who moved from this batch to another one. */
+  moved_out?: BatchStudentRow[];
 }
 
 /** A batch's money, counted on the batch the student first joined. Money is a string. */

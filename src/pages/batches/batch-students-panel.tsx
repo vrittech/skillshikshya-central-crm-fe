@@ -38,6 +38,41 @@ function StudentRow({ row, paused = false }: { row: BatchStudentRow; paused?: bo
   );
 }
 
+/** A student who moved from this batch to another: where to, when, and where they are now. */
+function MovedOutRow({ row, batchId }: { row: BatchStudentRow; batchId: number }) {
+  const elsewhere =
+    row.seat_state === "paused"
+      ? "Now paused"
+      : row.seat_state === "none"
+        ? "Not in a batch now"
+        : row.now_batch != null && row.now_batch !== row.to_batch
+          ? `Now in ${row.now_batch_name ?? "another batch"}`
+          : null;
+  return (
+    <li className="flex flex-wrap items-start justify-between gap-3 py-3">
+      <div className="min-w-0">
+        <Link to={`/enrollments/${row.enrollment}`} className="font-medium hover:underline">
+          {row.name}
+        </Link>
+        <p className="text-muted-foreground text-xs">
+          {row.student_id ? <span className="font-mono">{row.student_id}</span> : "—"}
+          {row.phone ? ` · ${row.phone}` : ""}
+          {row.money_batch !== batchId && row.money_batch_name
+            ? ` · Fees on ${row.money_batch_name}`
+            : ""}
+        </p>
+      </div>
+      <div className="flex flex-col items-end gap-1">
+        <Badge variant="warning">Moved to {row.to_batch_name ?? "another batch"}</Badge>
+        <span className="text-muted-foreground text-xs">
+          {formatDate(row.since ?? undefined)}
+          {elsewhere ? ` · ${elsewhere}` : ""}
+        </span>
+      </div>
+    </li>
+  );
+}
+
 function PendingRow({ row }: { row: ApiEnrollmentListRow }) {
   return (
     <li className="flex flex-wrap items-start justify-between gap-3 py-3">
@@ -65,12 +100,16 @@ function Section({ title, count, children }: { title: string; count: number; chi
   );
 }
 
-/** The students in a batch, the ones paused from it, and pending enrollments waiting for a seat. */
+/**
+ * The students in a batch, pending enrollments waiting for a seat, the ones
+ * paused from it, and the ones who moved out (their fees stay on this batch).
+ */
 export function BatchStudentsPanel({ batchId }: { batchId: number }) {
   const { data, isLoading } = useBatchStudents(batchId);
   const pendingQ = useBatchPending(batchId);
   const seated = data?.seated ?? [];
   const paused = data?.paused ?? [];
+  const movedOut = data?.moved_out ?? [];
   const pending = pendingQ.data?.results ?? [];
 
   if (isLoading) {
@@ -109,6 +148,15 @@ export function BatchStudentsPanel({ batchId }: { batchId: number }) {
           <ul className="divide-border divide-y">
             {paused.map((r) => (
               <StudentRow key={r.enrollment} row={r} paused />
+            ))}
+          </ul>
+        </Section>
+      )}
+      {movedOut.length > 0 && (
+        <Section title="Moved out" count={movedOut.length}>
+          <ul className="divide-border divide-y">
+            {movedOut.map((r) => (
+              <MovedOutRow key={r.enrollment} row={r} batchId={batchId} />
             ))}
           </ul>
         </Section>

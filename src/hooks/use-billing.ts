@@ -2,6 +2,7 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useDataSource } from "@/context/data-source";
 import { ALL_LEADS } from "@/data/mock-leads";
 import { globalListsService } from "@/services/global-lists.service";
+import type { ApiSeatState } from "@/types/leads-api";
 
 export interface EnrollmentRow {
   id: string;
@@ -15,6 +16,8 @@ export interface EnrollmentRow {
   paid: number;
   remaining: number;
   isFullPaid: boolean;
+  seatState?: ApiSeatState;
+  pausedOn?: string;
 }
 
 export interface PaymentRow {
@@ -33,14 +36,15 @@ export interface PaymentRow {
 }
 
 /** Global enrollments register — `GET /api/enrollments/` (live) or mock leads' enrollments. */
-export function useEnrollments() {
+export function useEnrollments(seat?: ApiSeatState) {
   const { source } = useDataSource();
   const isApi = source === "api";
 
   const query = useQuery({
-    queryKey: ["enrollments", "list"],
+    queryKey: ["enrollments", "list", seat ?? "all"],
     enabled: isApi,
-    queryFn: () => globalListsService.enrollments({ ordering: "-created_at", page_size: 100 }),
+    queryFn: () =>
+      globalListsService.enrollments({ ordering: "-created_at", page_size: 100, seat }),
     placeholderData: keepPreviousData,
   });
 
@@ -51,13 +55,15 @@ export function useEnrollments() {
       leadId: String(e.lead),
       leadName: e.lead_name,
       courseName: e.course_name ?? "—",
-      batch: e.current_batch_name ?? e.batch_name ?? undefined,
+      batch: e.current_batch_name ?? e.paused_from_name ?? e.batch_name ?? undefined,
       status: e.status,
       enrollmentDate: e.enrollment_date ?? undefined,
       agreed: Number(e.agreed_amount),
       paid: Number(e.total_paid),
       remaining: Number(e.remaining_amount),
       isFullPaid: e.is_full_paid,
+      seatState: e.seat_state,
+      pausedOn: e.paused_on ?? undefined,
     }));
   } else {
     rows = ALL_LEADS.filter((l) => l.enrollment).map((l) => {

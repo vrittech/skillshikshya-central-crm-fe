@@ -19,6 +19,7 @@ import { useEnrollments } from "@/hooks/use-billing";
 import { formatDate, formatNPR } from "@/lib/leads-format";
 import { cn } from "@/lib/utils";
 import { EnrollmentDialog } from "@/pages/leads/components/enrollment-dialogs";
+import type { ApiSeatState } from "@/types/leads-api";
 
 const STATUS_TONE: Record<string, string> = {
   active: "bg-brand-fixed-dim/20 text-brand-container",
@@ -34,7 +35,8 @@ export default function EnrollmentsPage() {
   const navigate = useNavigate();
   const { isMock, source } = useDataSource();
   const { can } = useRole();
-  const { rows, isLoading } = useEnrollments();
+  const [seat, setSeat] = useState<ApiSeatState | "all">("all");
+  const { rows, isLoading } = useEnrollments(seat === "all" ? undefined : seat);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("all");
   const [createOpen, setCreateOpen] = useState(false);
@@ -86,6 +88,19 @@ export default function EnrollmentsPage() {
             ))}
           </SelectContent>
         </Select>
+        {!isMock && (
+          <Select value={seat} onValueChange={(v) => setSeat(v as ApiSeatState | "all")}>
+            <SelectTrigger className="w-40">
+              <SelectValue placeholder="All seats" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All seats</SelectItem>
+              <SelectItem value="seated">In a batch</SelectItem>
+              <SelectItem value="paused">Paused</SelectItem>
+              <SelectItem value="none">No batch</SelectItem>
+            </SelectContent>
+          </Select>
+        )}
         {source === "api" && can("enrollment.manage") && (
           <Button variant="brand" onClick={() => setCreateOpen(true)}>
             <Plus /> New Enrollment
@@ -149,7 +164,15 @@ export default function EnrollmentsPage() {
                     )}
                   </TableCell>
                   <TableCell>{e.courseName}</TableCell>
-                  <TableCell className="text-muted-foreground">{e.batch || "—"}</TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {e.batch || "—"}
+                    {e.seatState === "paused" && (
+                      <div className="mt-1 flex items-center gap-1.5">
+                        <Badge variant="outline">Paused</Badge>
+                        {e.pausedOn && <span className="text-xs">{formatDate(e.pausedOn)}</span>}
+                      </div>
+                    )}
+                  </TableCell>
                   <TableCell>
                     <Badge
                       variant="secondary"

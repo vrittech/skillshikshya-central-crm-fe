@@ -647,6 +647,10 @@ export interface ApiEnrollmentListRow {
   /** The batch the student sits in now. */
   current_batch?: number | null;
   current_batch_name?: string | null;
+  seat_state?: ApiSeatState;
+  /** Set only when paused: the day, and the batch they paused out of. */
+  paused_on?: string | null;
+  paused_from_name?: string | null;
   status: ApiEnrollmentStatus;
   enrollment_date: string | null;
   listed_fee: string;
