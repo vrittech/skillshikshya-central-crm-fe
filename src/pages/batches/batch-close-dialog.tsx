@@ -6,11 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useBatchCloseCheck, useCloseBatch, useCompleteBatchStudents } from "@/hooks/use-batches";
+import { useBatchCloseCheck, useCloseBatch } from "@/hooks/use-batches";
 import { formatDate, formatNPR } from "@/lib/leads-format";
 import type { BatchCloseCheck, CourseBatch } from "@/types";
-
-const STUDYING = ["confirmed", "active"];
 
 function Section({
   title,
@@ -58,85 +56,18 @@ function People({ rows }: { rows: { key: string | number; enrollment: number; na
   );
 }
 
-/** Mounted only while open, so everyone studying starts picked. */
-function CompleteStudentsDialog({
-  batch,
-  check,
-  onClose,
-}: {
-  batch: CourseBatch;
-  check: BatchCloseCheck;
-  onClose: () => void;
-}) {
-  const studying = check.students.filter((s) => STUDYING.includes(s.status));
-  const [picked, setPicked] = useState(() => studying.map((s) => s.enrollment));
-  const complete = useCompleteBatchStudents();
-
-  return (
-    <ReasonDialog
-      open
-      onClose={onClose}
-      title="Mark completed"
-      description={batch.name}
-      confirmLabel="Mark completed"
-      pending={complete.isPending}
-      confirmDisabled={!picked.length}
-      onConfirm={(reason) =>
-        complete.mutate({ id: batch.id, reason, enrollments: picked }, { onSuccess: onClose })
-      }
-    >
-      <ul className="max-h-48 space-y-2 overflow-y-auto">
-        {studying.map((s) => (
-          <li key={s.enrollment} className="flex items-center gap-2">
-            <Checkbox
-              id={`complete-${s.enrollment}`}
-              checked={picked.includes(s.enrollment)}
-              onCheckedChange={(on) =>
-                setPicked((p) =>
-                  on ? [...p, s.enrollment] : p.filter((id) => id !== s.enrollment),
-                )
-              }
-            />
-            <Label htmlFor={`complete-${s.enrollment}`} className="font-normal">
-              {s.name}
-            </Label>
-            <span className="text-muted-foreground ml-auto text-xs">{s.status_display}</span>
-          </li>
-        ))}
-      </ul>
-    </ReasonDialog>
-  );
-}
-
-function Checklist({
-  batch,
-  check,
-  canComplete,
-}: {
-  batch: CourseBatch;
-  check: BatchCloseCheck;
-  canComplete: boolean;
-}) {
-  const [completing, setCompleting] = useState(false);
-  const { students, attendance, teams, owing } = check;
-  const studying = students.filter((s) => STUDYING.includes(s.status)).length;
+function Checklist({ check }: { check: BatchCloseCheck }) {
+  const { completing, pending, attendance, teams, owing } = check;
 
   return (
     <div className="space-y-3 rounded-lg border p-3">
       <Section
         title="Students"
-        done={!students.length}
-        state={students.length ? `${students.length} open` : "Done"}
-        action={
-          canComplete && studying > 0 ? (
-            <Button size="sm" variant="outline" onClick={() => setCompleting(true)}>
-              Mark completed
-            </Button>
-          ) : undefined
-        }
+        done
+        state={completing.length ? `${completing.length} to complete` : "None"}
       >
         <People
-          rows={students.map((s) => ({
+          rows={completing.map((s) => ({
             key: s.enrollment,
             enrollment: s.enrollment,
             name: s.name,
@@ -144,6 +75,19 @@ function Checklist({
           }))}
         />
       </Section>
+
+      {pending.length > 0 && (
+        <Section title="Pending" done={false} state={`${pending.length} open`}>
+          <People
+            rows={pending.map((s) => ({
+              key: s.enrollment,
+              enrollment: s.enrollment,
+              name: s.name,
+              note: s.status_display,
+            }))}
+          />
+        </Section>
+      )}
 
       <Section
         title="Attendance"
@@ -158,7 +102,8 @@ function Checklist({
       >
         {attendance.days > 0 && (
           <p className="text-muted-foreground mt-1 text-xs">
-            {attendance.days} days · Last {formatDate(attendance.last_day ?? undefined)}
+            {attendance.days} {attendance.days === 1 ? "day" : "days"} · Last{" "}
+            {formatDate(attendance.last_day ?? undefined)}
           </p>
         )}
         <People
@@ -213,24 +158,19 @@ function Checklist({
         />
       </Section>
 
-      {completing && (
-        <CompleteStudentsDialog batch={batch} check={check} onClose={() => setCompleting(false)} />
-      )}
     </div>
   );
 }
 
-/** Close a batch: the checklist, Mark completed, and a reason. Open items need Close anyway. */
+/** Close a batch: the checklist and a reason. Open items need Close anyway. */
 export function BatchCloseDialog({
   batch,
   open,
   onClose,
-  canComplete,
 }: {
   batch: CourseBatch;
   open: boolean;
   onClose: () => void;
-  canComplete: boolean;
 }) {
   const check = useBatchCloseCheck(batch.id, open);
   const close = useCloseBatch();
@@ -260,7 +200,7 @@ export function BatchCloseDialog({
     >
       {check.data ? (
         <>
-          <Checklist batch={batch} check={check.data} canComplete={canComplete} />
+          <Checklist check={check.data} />
           {!ready && (
             <div className="flex items-center gap-2">
               <Checkbox

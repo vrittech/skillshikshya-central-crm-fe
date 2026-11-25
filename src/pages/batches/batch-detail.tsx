@@ -153,7 +153,6 @@ export default function BatchDetailPage() {
                 canAddCost={hasPerm("course.add_batchcost")}
                 canVoidCost={hasPerm("course.change_batchcost")}
                 canClose={canChange}
-                canComplete={hasPerm("lead.change_enrollment")}
               />
             </TabsContent>
           </div>

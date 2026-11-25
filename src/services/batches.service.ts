@@ -96,7 +96,7 @@ export const courseBatchesService = {
     return data;
   },
 
-  /** Close with a reason. With open checklist items the server refuses unless closeAnyway. */
+  /** Close with a reason; students in the batch are marked completed. Open items need closeAnyway. */
   async close(id: number, reason: string, closeAnyway = false) {
     const { data } = await api.post<BatchMoney>(`/course-batches/${id}/close/`, {
       reason,
@@ -108,15 +108,6 @@ export const courseBatchesService = {
   /** What is still open before the batch can close. */
   async closeCheck(id: number) {
     const { data } = await api.get<BatchCloseCheck>(`/course-batches/${id}/close-check/`);
-    return data;
-  },
-
-  /** Mark students still studying completed: these enrollments, or all of them. */
-  async completeStudents(id: number, reason: string, enrollments?: number[]) {
-    const { data } = await api.post<{ completed: number[]; checklist: BatchCloseCheck }>(
-      `/course-batches/${id}/complete-students/`,
-      { reason, ...(enrollments ? { enrollments } : {}) },
-    );
     return data;
   },
 

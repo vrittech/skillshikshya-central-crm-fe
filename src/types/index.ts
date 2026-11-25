@@ -338,12 +338,14 @@ export interface BatchClosing {
 export interface BatchClosingChecklist {
   ready: boolean;
   closed_anyway: boolean;
-  students: string[];
+  pending: string[];
   attendance_none_taken: boolean;
   attendance_missing: string[];
   teams: string[];
   owing_count: number;
   owing_total: string;
+  /** Students the close marked completed, with their status before it. */
+  completed?: { enrollment: number; before: string }[];
 }
 
 interface BatchCheckPerson {
@@ -358,8 +360,10 @@ export interface BatchCloseCheck {
   batch: number;
   status: CourseBatchStatus;
   ready: boolean;
-  /** Still studying (confirmed, active) in the batch, or still pending for it. */
-  students: (BatchCheckPerson & { status: string; status_display: string })[];
+  /** Sitting in the batch (confirmed, active): closing marks them completed. */
+  completing: (BatchCheckPerson & { status: string; status_display: string })[];
+  /** Still pending for the batch: open until cancelled or moved. */
+  pending: (BatchCheckPerson & { status: string; status_display: string })[];
   attendance: {
     days: number;
     last_day: string | null;

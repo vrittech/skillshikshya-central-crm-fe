@@ -208,22 +208,6 @@ export function useBatchCloseCheck(id: number | null, enabled = true) {
   });
 }
 
-export function useCompleteBatchStudents() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: ({ id, reason, enrollments }: { id: number; reason: string; enrollments?: number[] }) =>
-      courseBatchesService.completeStudents(id, reason, enrollments),
-    onSuccess: (data, { id }) => {
-      toast.success(`${data.completed.length} marked completed`);
-      qc.setQueryData(["course-batches", "close-check", id], data.checklist);
-      for (const key of ["course-batches", "teams", "lead", "enrollments", "students"]) {
-        void qc.invalidateQueries({ queryKey: [key] });
-      }
-    },
-    onError: (e) => toast.error(apiErrorMessage(e, "Could not mark them completed")),
-  });
-}
-
 export function useBatchAttendance(id: number | null, date: string | null) {
   return useQuery({
     queryKey: ["course-batches", "attendance", id, date],

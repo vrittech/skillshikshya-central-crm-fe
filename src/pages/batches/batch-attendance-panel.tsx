@@ -103,7 +103,7 @@ function Register({
           </div>
           <p className="text-muted-foreground pb-2 text-xs">
             {register.days.length
-              ? `${register.days.length} days · Last ${formatDate(register.days[0])}`
+              ? `${register.days.length} ${register.days.length === 1 ? "day" : "days"} · Last ${formatDate(register.days[0])}`
               : "No attendance yet"}
           </p>
         </div>

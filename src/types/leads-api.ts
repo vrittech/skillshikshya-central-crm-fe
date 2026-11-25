@@ -560,7 +560,13 @@ export type ApiHistoryAction =
   | "write_off"
   | "void_payment"
   | "cancel_invoice"
-  | "change_due_dates";
+  | "change_due_dates"
+  | "give_licence"
+  | "free_licence"
+  | "pause_licence"
+  | "resume_licence"
+  | "complete"
+  | "undo_complete";
 
 /** One row of an enrollment's reason trail — GET .../enrollments/{id}/history/. */
 export interface ApiEnrollmentHistory {

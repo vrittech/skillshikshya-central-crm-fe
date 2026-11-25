@@ -222,7 +222,7 @@ function AddCostDialog({
 /** What was still open when a batch was closed anyway. */
 function openItems(c: BatchClosingChecklist) {
   const parts: string[] = [];
-  if (c.students.length) parts.push(`Students ${c.students.length}`);
+  if (c.pending.length) parts.push(`Pending ${c.pending.length}`);
   if (c.attendance_none_taken) parts.push("Attendance not taken");
   else if (c.attendance_missing.length) parts.push(`Attendance ${c.attendance_missing.length}`);
   if (c.teams.length) parts.push(`Teams ${c.teams.length}`);
@@ -237,13 +237,11 @@ export function BatchMoneyPanel({
   canAddCost,
   canVoidCost,
   canClose,
-  canComplete,
 }: {
   batch: CourseBatch;
   canAddCost: boolean;
   canVoidCost: boolean;
   canClose: boolean;
-  canComplete: boolean;
 }) {
   const { data: money, isLoading } = useBatchMoney(batch.id);
   const [adding, setAdding] = useState(false);
@@ -304,6 +302,11 @@ export function BatchMoneyPanel({
                 <p className="text-muted-foreground text-xs">
                   {c.created_by_name} · {c.reason}
                 </p>
+                {!!c.checklist?.completed?.length && (
+                  <p className="text-muted-foreground text-xs">
+                    {c.checklist.completed.length} marked completed
+                  </p>
+                )}
                 {c.checklist?.closed_anyway && (
                   <p className="text-xs text-amber-600 dark:text-amber-400">
                     Closed anyway · {openItems(c.checklist)}
@@ -352,7 +355,6 @@ export function BatchMoneyPanel({
         batch={batch}
         open={closing === "close"}
         onClose={() => setClosing(null)}
-        canComplete={canComplete}
       />
       <ReasonDialog
         open={closing === "reopen"}
