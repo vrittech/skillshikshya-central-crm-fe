@@ -1,5 +1,5 @@
 import { CreditCard, Search } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { ListPager } from "@/components/list-pager";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useDataSource } from "@/context/data-source";
@@ -20,6 +21,7 @@ import { formatDateTime, formatNPR } from "@/lib/leads-format";
 import { cn } from "@/lib/utils";
 import { PaymentDialog } from "@/pages/leads/components/enrollment-dialogs";
 import { PaymentActions } from "@/pages/leads/components/payment-actions";
+import type { ApiPaymentMethod, ApiPaymentStatus } from "@/types/leads-api";
 
 const STATUS_TONE: Record<string, string> = {
   successful: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
@@ -29,36 +31,36 @@ const STATUS_TONE: Record<string, string> = {
   voided: "bg-muted text-muted-foreground",
 };
 
+const STATUSES: ApiPaymentStatus[] = ["pending", "successful", "failed", "refunded", "voided"];
+
+const METHODS: { value: ApiPaymentMethod; label: string }[] = [
+  { value: "cash", label: "Cash" },
+  { value: "esewa", label: "eSewa" },
+  { value: "khalti", label: "Khalti" },
+  { value: "bank_transfer", label: "Bank Transfer" },
+  { value: "card", label: "Card" },
+  { value: "connectips", label: "ConnectIPS" },
+];
+
 export default function PaymentsPage() {
   const navigate = useNavigate();
   const { isMock, source } = useDataSource();
   const { can } = useRole();
-  const { rows, isLoading } = usePayments();
   const [search, setSearch] = useState("");
-  const [status, setStatus] = useState("all");
-  const [method, setMethod] = useState("all");
+  const [status, setStatus] = useState<ApiPaymentStatus | "all">("all");
+  const [method, setMethod] = useState<ApiPaymentMethod | "all">("all");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
   const [payOpen, setPayOpen] = useState(false);
   const canEdit = source === "api" && can("payment.manage");
-
-  const statuses = useMemo(() => [...new Set(rows.map((r) => r.status))].sort(), [rows]);
-  const methods = useMemo(() => [...new Set(rows.map((r) => r.method))].sort(), [rows]);
-
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return rows.filter((r) => {
-      if (status !== "all" && r.status !== status) return false;
-      if (method !== "all" && r.method !== method) return false;
-      if (q && !`${r.leadName} ${r.courseName ?? ""} ${r.reference ?? ""} ${r.method}`.toLowerCase().includes(q))
-        return false;
-      return true;
-    });
-  }, [rows, search, status, method]);
-
-  // Ledger total of successful payments in the current view.
-  const total = useMemo(
-    () => filtered.filter((r) => r.status === "successful").reduce((s, r) => s + r.amount, 0),
-    [filtered],
-  );
+  // Successful total for the filters across every page, not just this one.
+  const { rows, count, successfulTotal, isLoading } = usePayments({
+    page,
+    pageSize,
+    search,
+    status: status === "all" ? undefined : status,
+    method: method === "all" ? undefined : method,
+  });
 
   return (
     <div className="space-y-6">
@@ -74,42 +76,59 @@ export default function PaymentsPage() {
         <div className="relative max-w-sm min-w-[13rem] flex-1">
           <Search className="text-muted-foreground absolute top-2.5 left-3 size-4" />
           <Input
-            placeholder="Search by lead, course, method, or reference"
+            placeholder="Search by lead, course, or reference"
             className="rounded-full pl-9"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setPage(1);
+            }}
           />
         </div>
-        <Select value={status} onValueChange={setStatus}>
+        <Select
+          value={status}
+          onValueChange={(v) => {
+            setStatus(v as ApiPaymentStatus | "all");
+            setPage(1);
+          }}
+        >
           <SelectTrigger className="w-40">
             <SelectValue placeholder="All statuses" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All statuses</SelectItem>
-            {statuses.map((s) => (
+            {STATUSES.map((s) => (
               <SelectItem key={s} value={s} className="capitalize">
                 {s}
               </SelectItem>
             ))}
           </SelectContent>
         </Select>
-        <Select value={method} onValueChange={setMethod}>
+        <Select
+          value={method}
+          onValueChange={(v) => {
+            setMethod(v as ApiPaymentMethod | "all");
+            setPage(1);
+          }}
+        >
           <SelectTrigger className="w-40">
             <SelectValue placeholder="All methods" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All methods</SelectItem>
-            {methods.map((m) => (
-              <SelectItem key={m} value={m} className="capitalize">
-                {m.replace(/_/g, " ")}
+            {METHODS.map((m) => (
+              <SelectItem key={m.value} value={m.value}>
+                {m.label}
               </SelectItem>
             ))}
           </SelectContent>
         </Select>
         <div className="ml-auto flex items-center gap-3 text-right">
           <div>
-            <p className="text-muted-foreground text-xs">Successful (this view)</p>
-            <p className="font-headline text-lg font-semibold tabular-nums">{formatNPR(total)}</p>
+            <p className="text-muted-foreground text-xs">Successful</p>
+            <p className="font-headline text-lg font-semibold tabular-nums">
+              {formatNPR(successfulTotal)}
+            </p>
           </div>
           {source === "api" && can("enrollment.manage") && (
             <Button variant="brand" onClick={() => setPayOpen(true)}>
@@ -144,7 +163,7 @@ export default function PaymentsPage() {
                     </TableCell>
                   </TableRow>
                 ))}
-              {!isLoading && filtered.length === 0 && (
+              {!isLoading && rows.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={canEdit ? 9 : 8} className="py-14 text-center">
                     <CreditCard className="text-muted-foreground mx-auto size-8 opacity-40" />
@@ -152,7 +171,7 @@ export default function PaymentsPage() {
                   </TableCell>
                 </TableRow>
               )}
-              {filtered.map((p) => (
+              {rows.map((p) => (
                 <TableRow
                   key={p.id}
                   className={cn(p.leadId && "cursor-pointer")}
@@ -161,7 +180,9 @@ export default function PaymentsPage() {
                   <TableCell className="font-semibold">{p.leadName}</TableCell>
                   <TableCell className="text-muted-foreground">{p.courseName || "—"}</TableCell>
                   <TableCell className="text-right tabular-nums font-medium">{formatNPR(p.amount)}</TableCell>
-                  <TableCell className="capitalize">{p.method.replace(/_/g, " ")}</TableCell>
+                  <TableCell>
+                    {METHODS.find((m) => m.value === p.method)?.label ?? p.method.replace(/_/g, " ")}
+                  </TableCell>
                   <TableCell className="text-muted-foreground font-mono text-xs">{p.reference || "—"}</TableCell>
                   <TableCell>
                     <Badge
@@ -195,6 +216,17 @@ export default function PaymentsPage() {
             </TableBody>
           </Table>
         </div>
+        <ListPager
+          page={page}
+          pageSize={pageSize}
+          count={count}
+          noun="payments"
+          onPage={setPage}
+          onPageSize={(n) => {
+            setPageSize(n);
+            setPage(1);
+          }}
+        />
       </div>
 
       <PaymentDialog open={payOpen} onClose={() => setPayOpen(false)} allowLeadPick />

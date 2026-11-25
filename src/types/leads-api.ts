@@ -625,12 +625,28 @@ export interface ApiFollowupListRow {
   assigned_to: number | null;
   assigned_to_name?: string;
   scheduled_at: string;
+  /** By Nepal days: before today, today, or after today. */
+  due?: ApiFollowupDue;
   purpose: string | null;
   status: ApiFollowupStatus;
   enrollment?: number | null;
   enrollment_course_name?: string | null;
   branch?: number | null;
   branch_name?: string;
+}
+
+export type ApiFollowupDue = "overdue" | "today" | "upcoming";
+
+export interface ApiFollowupSummary {
+  overdue: number;
+  today: number;
+  upcoming: number;
+  total: number;
+}
+
+export interface ApiPaymentSummary {
+  count: number;
+  successful_total: string;
 }
 
 export interface ApiEnrollmentListRow {

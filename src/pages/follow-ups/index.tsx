@@ -1,5 +1,5 @@
 import { CalendarClock, Check, Plus, Search } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -11,6 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { ListPager } from "@/components/list-pager";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useDataSource } from "@/context/data-source";
@@ -78,35 +79,27 @@ export default function FollowUpsPage() {
   const { isMock } = useDataSource();
   const { can } = useRole();
   const canComplete = can("leads.log_activity");
-  const { rows, isLoading } = useFollowUps();
   const [search, setSearch] = useState("");
   const [view, setView] = useState<"all" | "overdue" | "today" | "upcoming">("all");
   const [kind, setKind] = useState<"all" | "payment" | "other">("all");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const { rows, count, counts, isLoading } = useFollowUps({
+    page,
+    pageSize,
+    search,
+    due: view === "all" ? undefined : view,
+    kind: kind === "all" ? undefined : kind,
+  });
 
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return rows.filter(
-      (r) =>
-        (kind === "all" || (kind === "payment") === !!r.payment) &&
-        (!q ||
-          `${r.leadName} ${r.phone} ${r.purpose ?? ""} ${r.assignedToName ?? ""}`
-            .toLowerCase()
-            .includes(q)),
-    );
-  }, [rows, search, kind]);
-
-  const grouped = useMemo(
-    () => ({
-      overdue: filtered.filter((r) => r.bucket === "overdue"),
-      today: filtered.filter((r) => r.bucket === "today"),
-      upcoming: filtered.filter((r) => r.bucket === "upcoming"),
-    }),
-    [filtered],
-  );
-
+  // This page's rows, grouped; the section counts are for every page.
+  const grouped = {
+    overdue: rows.filter((r) => r.bucket === "overdue"),
+    today: rows.filter((r) => r.bucket === "today"),
+    upcoming: rows.filter((r) => r.bucket === "upcoming"),
+  };
   const sections = BUCKETS.filter((b) => view === "all" || b.key === view);
-  const visibleCount = sections.reduce((n, b) => n + grouped[b.key].length, 0);
 
   return (
     <div className="space-y-6">
@@ -121,16 +114,28 @@ export default function FollowUpsPage() {
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-3">
-          <Tabs value={view} onValueChange={(v) => setView(v as typeof view)}>
+          <Tabs
+            value={view}
+            onValueChange={(v) => {
+              setView(v as typeof view);
+              setPage(1);
+            }}
+          >
             <TabsList>
-              <TabsTrigger value="all">All ({filtered.length})</TabsTrigger>
-              <TabsTrigger value="overdue">Overdue ({grouped.overdue.length})</TabsTrigger>
-              <TabsTrigger value="today">Today ({grouped.today.length})</TabsTrigger>
-              <TabsTrigger value="upcoming">Upcoming ({grouped.upcoming.length})</TabsTrigger>
+              <TabsTrigger value="all">All ({counts.total})</TabsTrigger>
+              <TabsTrigger value="overdue">Overdue ({counts.overdue})</TabsTrigger>
+              <TabsTrigger value="today">Today ({counts.today})</TabsTrigger>
+              <TabsTrigger value="upcoming">Upcoming ({counts.upcoming})</TabsTrigger>
             </TabsList>
           </Tabs>
           {!isMock && (
-            <Select value={kind} onValueChange={(v) => setKind(v as typeof kind)}>
+            <Select
+              value={kind}
+              onValueChange={(v) => {
+                setKind(v as typeof kind);
+                setPage(1);
+              }}
+            >
               <SelectTrigger className="h-9 w-36">
                 <SelectValue />
               </SelectTrigger>
@@ -153,7 +158,10 @@ export default function FollowUpsPage() {
             placeholder="Search by lead, phone, purpose, or counselor"
             className="rounded-full pl-9"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setPage(1);
+            }}
           />
         </div>
       </div>
@@ -164,7 +172,7 @@ export default function FollowUpsPage() {
             <Skeleton key={i} className="h-16 w-full rounded-xl" />
           ))}
         </div>
-      ) : visibleCount === 0 ? (
+      ) : count === 0 ? (
         <div className="text-muted-foreground rounded-2xl border border-dashed py-16 text-center">
           <CalendarClock className="mx-auto size-8 opacity-40" />
           <p className="mt-2 text-sm">
@@ -183,7 +191,7 @@ export default function FollowUpsPage() {
               >
                 <div className="flex items-center justify-between border-b px-4 py-2.5">
                   <h2 className={cn("text-sm font-semibold", tone)}>{label}</h2>
-                  <span className="text-muted-foreground text-xs font-medium">{items.length}</span>
+                  <span className="text-muted-foreground text-xs font-medium">{counts[key]}</span>
                 </div>
                 <div className="divide-border divide-y">
                   {items.map((row) => (
@@ -193,6 +201,17 @@ export default function FollowUpsPage() {
               </section>
             );
           })}
+          <ListPager
+            page={page}
+            pageSize={pageSize}
+            count={count}
+            noun="follow-ups"
+            onPage={setPage}
+            onPageSize={(n) => {
+              setPageSize(n);
+              setPage(1);
+            }}
+          />
         </div>
       )}
 

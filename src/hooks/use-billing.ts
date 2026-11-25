@@ -3,7 +3,12 @@ import { useDataSource } from "@/context/data-source";
 import { ALL_LEADS } from "@/data/mock-leads";
 import { useDebouncedValue } from "@/lib/use-debounced-value";
 import { globalListsService } from "@/services/global-lists.service";
-import type { ApiEnrollmentStatus, ApiSeatState } from "@/types/leads-api";
+import type {
+  ApiEnrollmentStatus,
+  ApiPaymentMethod,
+  ApiPaymentStatus,
+  ApiSeatState,
+} from "@/types/leads-api";
 
 export interface EnrollmentRow {
   id: string;
@@ -117,19 +122,42 @@ export function useEnrollments({ page, pageSize, search, status, seat }: Enrollm
   return { rows, count, isLoading: isApi && query.isLoading };
 }
 
-/** Global payments ledger — `GET /api/payments/` (live) or mock leads' payments. */
-export function usePayments() {
+export interface PaymentListParams {
+  page: number;
+  pageSize: number;
+  search: string;
+  status?: ApiPaymentStatus;
+  method?: ApiPaymentMethod;
+}
+
+/**
+ * Global payments ledger, one page at a time, with the count and successful
+ * total for the filters across every page. Live data is searched, filtered
+ * and paged by `GET /api/payments/`; mock data is done here.
+ */
+export function usePayments({ page, pageSize, search, status, method }: PaymentListParams) {
   const { source } = useDataSource();
   const isApi = source === "api";
+  const q = useDebouncedValue(search.trim(), 300);
+  const filters = { search: q || undefined, status, payment_method: method };
 
   const query = useQuery({
-    queryKey: ["payments", "list"],
+    queryKey: ["payments", "list", { page, pageSize, ...filters }],
     enabled: isApi,
-    queryFn: () => globalListsService.payments({ ordering: "-payment_date", page_size: 100 }),
+    queryFn: () =>
+      globalListsService.payments({ ordering: "-payment_date", page, page_size: pageSize, ...filters }),
+    placeholderData: keepPreviousData,
+  });
+  const summary = useQuery({
+    queryKey: ["payments", "summary", filters],
+    enabled: isApi,
+    queryFn: () => globalListsService.paymentsSummary(filters),
     placeholderData: keepPreviousData,
   });
 
   let rows: PaymentRow[];
+  let count: number;
+  let successfulTotal: number;
   if (isApi) {
     rows = (query.data?.results ?? []).map((p) => ({
       id: String(p.id),
@@ -144,8 +172,10 @@ export function usePayments() {
       status: p.status,
       receivedBy: p.received_by_name,
     }));
+    count = query.data?.count ?? 0;
+    successfulTotal = Number(summary.data?.successful_total ?? 0);
   } else {
-    rows = ALL_LEADS.flatMap((l) =>
+    const all: PaymentRow[] = ALL_LEADS.flatMap((l) =>
       l.payments.map((p) => ({
         id: p.id,
         leadId: l.id,
@@ -159,7 +189,20 @@ export function usePayments() {
         receivedBy: p.receivedBy,
       })),
     );
-    rows.sort((a, b) => new Date(b.paidAt).getTime() - new Date(a.paidAt).getTime());
+    all.sort((a, b) => new Date(b.paidAt).getTime() - new Date(a.paidAt).getTime());
+    const needle = q.toLowerCase();
+    const matched = all.filter(
+      (r) =>
+        (!status || r.status === status) &&
+        (!method || r.method === method) &&
+        (!needle ||
+          `${r.leadName} ${r.courseName ?? ""} ${r.reference ?? ""}`.toLowerCase().includes(needle)),
+    );
+    count = matched.length;
+    successfulTotal = matched
+      .filter((r) => r.status === "successful")
+      .reduce((s, r) => s + r.amount, 0);
+    rows = matched.slice((page - 1) * pageSize, page * pageSize);
   }
-  return { rows, isLoading: isApi && query.isLoading };
+  return { rows, count, successfulTotal, isLoading: isApi && query.isLoading };
 }

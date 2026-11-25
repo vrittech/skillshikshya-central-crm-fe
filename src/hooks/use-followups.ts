@@ -4,10 +4,12 @@ import { useDataSource } from "@/context/data-source";
 import { ALL_LEADS } from "@/data/mock-leads";
 import { apiErrorMessage } from "@/lib/api";
 import { isDueToday, isOverdue } from "@/lib/leads-format";
+import { useDebouncedValue } from "@/lib/use-debounced-value";
 import { globalListsService } from "@/services/global-lists.service";
 import { leadsService } from "@/services/leads.service";
+import type { ApiFollowupDue, ApiFollowupSummary } from "@/types/leads-api";
 
-export type FollowUpBucket = "overdue" | "today" | "upcoming";
+export type FollowUpBucket = ApiFollowupDue;
 
 export interface FollowUpRow {
   key: string;
@@ -31,24 +33,55 @@ function bucketOf(dueAt: string): FollowUpBucket {
   return "upcoming";
 }
 
-/** Global follow-up queue — `GET /api/followups/` (live) or mock leads' follow-ups. */
-export function useFollowUps() {
+export interface FollowUpListParams {
+  page: number;
+  pageSize: number;
+  search: string;
+  due?: FollowUpBucket;
+  /** Payment follow-ups (made by the reminder job) or the others. */
+  kind?: "payment" | "other";
+}
+
+/**
+ * Global follow-up queue: open follow-ups (pending or missed), soonest first,
+ * one page at a time, with overdue / today / upcoming counts across every page.
+ * Live data is filtered and paged by `GET /api/followups/`; mock data is done here.
+ */
+export function useFollowUps({ page, pageSize, search, due, kind }: FollowUpListParams) {
   const { source } = useDataSource();
   const isApi = source === "api";
+  const q = useDebouncedValue(search.trim(), 300);
+  const filters = {
+    open: true,
+    search: q || undefined,
+    payment: kind ? kind === "payment" : undefined,
+  };
 
   const query = useQuery({
-    queryKey: ["followups", "queue"],
+    queryKey: ["followups", "queue", { page, pageSize, due, ...filters }],
     enabled: isApi,
-    queryFn: () => globalListsService.followups({ ordering: "scheduled_at", page_size: 100 }),
+    queryFn: () =>
+      globalListsService.followups({
+        ordering: "scheduled_at",
+        page,
+        page_size: pageSize,
+        due,
+        ...filters,
+      }),
+    placeholderData: keepPreviousData,
+  });
+  const summary = useQuery({
+    queryKey: ["followups", "summary", filters],
+    enabled: isApi,
+    queryFn: () => globalListsService.followupsSummary(filters),
     placeholderData: keepPreviousData,
   });
 
   let rows: FollowUpRow[];
+  let count: number;
+  let counts: ApiFollowupSummary;
   if (isApi) {
-    rows = (query.data?.results ?? [])
-      // Only actionable follow-ups belong in the queue.
-      .filter((f) => f.status === "pending" || f.status === "missed")
-      .map((f) => ({
+    rows = (query.data?.results ?? []).map((f) => ({
         key: `fu-${f.id}`,
         leadId: String(f.lead),
         leadApiId: f.lead,
@@ -60,10 +93,12 @@ export function useFollowUps() {
         assignedToName: f.assigned_to_name,
         payment: f.enrollment != null,
         courseName: f.enrollment_course_name ?? undefined,
-        bucket: bucketOf(f.scheduled_at),
+        bucket: f.due ?? bucketOf(f.scheduled_at),
       }));
+    count = query.data?.count ?? 0;
+    counts = summary.data ?? { overdue: 0, today: 0, upcoming: 0, total: 0 };
   } else {
-    rows = ALL_LEADS.flatMap((lead) =>
+    const all: FollowUpRow[] = ALL_LEADS.flatMap((lead) =>
       lead.followUps
         .filter((f) => f.status === "pending" || f.status === "overdue")
         .map((f) => ({
@@ -79,10 +114,28 @@ export function useFollowUps() {
           bucket: bucketOf(f.dueAt),
         })),
     );
+    all.sort((a, b) => new Date(a.dueAt).getTime() - new Date(b.dueAt).getTime());
+    const needle = q.toLowerCase();
+    const matched = all.filter(
+      (r) =>
+        !needle ||
+        `${r.leadName} ${r.phone} ${r.purpose ?? ""} ${r.assignedToName ?? ""}`
+          .toLowerCase()
+          .includes(needle),
+    );
+    const inBucket = (b: FollowUpBucket) => matched.filter((r) => r.bucket === b).length;
+    counts = {
+      overdue: inBucket("overdue"),
+      today: inBucket("today"),
+      upcoming: inBucket("upcoming"),
+      total: matched.length,
+    };
+    const shown = due ? matched.filter((r) => r.bucket === due) : matched;
+    count = shown.length;
+    rows = shown.slice((page - 1) * pageSize, page * pageSize);
   }
-  rows.sort((a, b) => new Date(a.dueAt).getTime() - new Date(b.dueAt).getTime());
 
-  return { rows, isLoading: isApi && query.isLoading, isApi };
+  return { rows, count, counts, isLoading: isApi && query.isLoading, isApi };
 }
 
 /** Mark a follow-up completed (PATCH the nested endpoint). Recomputes lead_score BE-side. */

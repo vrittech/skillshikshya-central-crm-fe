@@ -10,6 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { ListPager } from "@/components/list-pager";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useDataSource } from "@/context/data-source";
@@ -44,6 +45,8 @@ export default function StudentsPage() {
   const [search, setSearch] = useState("");
   const [debounced, setDebounced] = useState("");
   const [status, setStatus] = useState("all");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
   const [formOpen, setFormOpen] = useState(false);
   const [detailId, setDetailId] = useState<number | null>(null);
   const [exporting, setExporting] = useState(false);
@@ -55,12 +58,12 @@ export default function StudentsPage() {
 
   const params = useMemo(
     () => ({
-      page: 1,
-      page_size: 100,
+      page,
+      page_size: pageSize,
       search: debounced || undefined,
       status: status === "all" ? undefined : status,
     }),
-    [debounced, status],
+    [page, pageSize, debounced, status],
   );
 
   const { data, isLoading } = useStudents(params);
@@ -118,10 +121,19 @@ export default function StudentsPage() {
                 placeholder="Search students, ID, phone..."
                 className="rounded-full pl-9"
                 value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                onChange={(e) => {
+                  setSearch(e.target.value);
+                  setPage(1);
+                }}
               />
             </div>
-            <Select value={status} onValueChange={setStatus}>
+            <Select
+              value={status}
+              onValueChange={(v) => {
+                setStatus(v);
+                setPage(1);
+              }}
+            >
               <SelectTrigger className="h-9 min-w-[10rem]">
                 <SelectValue />
               </SelectTrigger>
@@ -190,6 +202,17 @@ export default function StudentsPage() {
               ))}
             </TableBody>
           </Table>
+          <ListPager
+            page={page}
+            pageSize={pageSize}
+            count={data?.count ?? 0}
+            noun="students"
+            onPage={setPage}
+            onPageSize={(n) => {
+              setPageSize(n);
+              setPage(1);
+            }}
+          />
         </div>
       )}
 
