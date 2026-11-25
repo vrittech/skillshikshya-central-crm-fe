@@ -22,7 +22,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/context/auth";
 import { useDataSource } from "@/context/data-source";
 import { CALL_OUTCOMES, COUNSELORS, counselorName } from "@/data/lead-lookups";
-import { formatDateToNepalIso, toNepalIso } from "@/lib/leads-format";
+import { formatDateToNepalIso, formatDuration, toNepalIso } from "@/lib/leads-format";
 import { useAddCall, useAddFollowup, useAssignLead } from "@/hooks/use-leads";
 import { useCounselors } from "@/hooks/use-users";
 
@@ -79,6 +79,19 @@ const REMINDER_OFFSETS_MS: Record<FollowUpForm["reminder"], number> = {
   "1d": 24 * 60 * 60_000,
 };
 
+function parseCallDuration(raw: string): number | null {
+  const value = raw.trim().toLowerCase();
+  if (!value) return 0;
+  if (/^\d+$/.test(value)) return Number(value);
+  const clock = value.match(/^(\d+):(\d{1,2})$/);
+  if (clock) return Number(clock[1]) * 60 + Number(clock[2]);
+  const compact = value.match(/^(\d+)m(\d+)s$/);
+  if (compact) return Number(compact[1]) * 60 + Number(compact[2]);
+  const dotted = value.match(/^(\d+)\.(\d+)$/);
+  if (dotted) return Number(dotted[1]) * 60 + Number(dotted[2].slice(0, 2).padStart(2, "0"));
+  return null;
+}
+
 /**
  * All lead quick-actions live here. This is the static phase: the forms are
  * laid out with the fields the real workflow needs, but Save only shows a
@@ -95,6 +108,7 @@ export function LeadActionDialogs({ action, lead, onClose }: Props) {
   const [call, setCall] = useState<CallForm>(EMPTY_CALL);
   const [fu, setFu] = useState<FollowUpForm>(EMPTY_FU);
   const [assignTo, setAssignTo] = useState("");
+  const [durationError, setDurationError] = useState("");
 
   // Pre-select the current owner when the Assign dialog opens.
   useEffect(() => {
@@ -102,6 +116,7 @@ export function LeadActionDialogs({ action, lead, onClose }: Props) {
   }, [action, lead?.assignedTo]);
   const setC = <K extends keyof CallForm>(k: K, v: CallForm[K]) =>
     setCall((c) => ({ ...c, [k]: v }));
+  const parsedDuration = parseCallDuration(call.duration);
   const setF = <K extends keyof FollowUpForm>(k: K, v: FollowUpForm[K]) =>
     setFu((f) => ({ ...f, [k]: v }));
 
@@ -118,6 +133,12 @@ export function LeadActionDialogs({ action, lead, onClose }: Props) {
   }
 
   function submitCall() {
+    const parsedDuration = parseCallDuration(call.duration);
+    if (call.duration.trim() && parsedDuration == null) {
+      setDurationError("Enter a duration like 4:19, 4.19, 4m19s or 259 seconds.");
+      return;
+    }
+    setDurationError("");
     // Mock path (or a lead with no backend id) can't persist — keep the toast.
     if (isMock || lead?.apiId == null) {
       done("Call logged");
@@ -130,7 +151,7 @@ export function LeadActionDialogs({ action, lead, onClose }: Props) {
         caller: user?.id ?? null,
         direction: call.direction,
         outcome: call.outcome || null,
-        duration_seconds: call.duration ? Math.round(Number(call.duration) * 60) : null,
+        duration_seconds: call.duration.trim() ? parsedDuration : null,
         recording_url: call.recording.trim() || null,
         notes: call.notes.trim() || null,
         next_followup_at: call.nextFollowUp ? toNepalIso(call.nextFollowUp) : null,
@@ -215,14 +236,16 @@ export function LeadActionDialogs({ action, lead, onClose }: Props) {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
-                <Label>Duration (minutes)</Label>
+                <Label htmlFor="call-duration">Duration</Label>
                 <Input
-                  type="number"
-                  min={0}
-                  placeholder="e.g. 4"
+                  id="call-duration"
+                  placeholder="MM:SS, e.g. 4:19"
                   value={call.duration}
-                  onChange={(e) => setC("duration", e.target.value)}
+                  aria-invalid={Boolean(durationError)}
+                  onChange={(e) => { setC("duration", e.target.value); setDurationError(""); }}
                 />
+                <p className="text-muted-foreground text-xs">MM:SS · 4:19 · 4m19s · seconds{call.duration.trim() && parsedDuration != null ? ` — ${formatDuration(parsedDuration)}` : ""}</p>
+                {durationError && <p className="text-destructive text-xs" role="alert">{durationError}</p>}
               </div>
               <div className="grid gap-2">
                 <Label>Recording link</Label>

@@ -210,6 +210,10 @@ export interface ApiLeadCall {
   created_by?: number | null;
   created_by_name?: string;
   created_at: string;
+  seconds_used?: number;
+  remaining_seconds?: number | null;
+  minutes_used?: number;
+  remaining_minutes?: number | null;
 }
 
 export type ApiActivityType =
