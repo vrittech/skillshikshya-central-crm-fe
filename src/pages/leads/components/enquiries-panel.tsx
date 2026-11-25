@@ -11,6 +11,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -21,6 +22,7 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
+import { type RecordedAudio, VoiceRecorder } from "@/components/voice-recorder";
 import { useAuth } from "@/context/auth";
 import { useCourses } from "@/hooks/use-courses";
 import {
@@ -39,6 +41,7 @@ import {
   nextStage,
   stageLabel,
 } from "@/lib/enquiries";
+import { fieldErrorsOf } from "@/lib/api";
 import { formatDate, formatDateTime } from "@/lib/leads-format";
 import { cn } from "@/lib/utils";
 import type {
@@ -121,6 +124,10 @@ function EnquiryCard({
           <p className="text-muted-foreground text-xs">
             {[...meta, formatDate(enquiry.created_at)].join(" · ")}
           </p>
+          {enquiry.about && <p className="text-sm font-medium">{enquiry.about}</p>}
+          {enquiry.description && (
+            <p className="text-muted-foreground text-sm whitespace-pre-line">{enquiry.description}</p>
+          )}
           {enquiry.stage === "lost" && (
             <p className="text-sm">
               {enquiry.lost_reason_display}
@@ -189,49 +196,145 @@ function AddEnquiryDialog({
   onClose: () => void;
 }) {
   const [course, setCourse] = useState("");
+  const [about, setAbout] = useState("");
+  const [description, setDescription] = useState("");
+  const [recording, setRecording] = useState<RecordedAudio | null>(null);
+  const [recorderBusy, setRecorderBusy] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const coursesQ = useCourses(1, 100, "");
   const add = useAddEnquiry(leadId);
 
   useEffect(() => {
-    if (open) setCourse("");
+    if (open) {
+      setCourse("");
+      setAbout("");
+      setDescription("");
+      setRecording(null);
+      setErrors({});
+    }
   }, [open]);
+
+  const clear = (key: string) => setErrors((e) => ({ ...e, [key]: "" }));
+
+  function save() {
+    const e: Record<string, string> = {};
+    if (!course) e.course = "Select a course.";
+    if (!about.trim()) e.about = "Enter what the enquiry is about.";
+    if (!description.trim() && !recording) e.description = "Write a description or record one.";
+    setErrors(e);
+    if (Object.values(e).some(Boolean)) return;
+    add.mutate(
+      {
+        course: Number(course),
+        about: about.trim(),
+        description: description.trim(),
+        recording: recording ? { blob: recording.blob, seconds: recording.seconds } : null,
+      },
+      {
+        onSuccess: onClose,
+        onError: (err) => {
+          const fields = fieldErrorsOf(err);
+          if (Object.keys(fields).length) setErrors(fields);
+        },
+      },
+    );
+  }
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle>Add enquiry</DialogTitle>
         </DialogHeader>
-        <div className="grid gap-2 py-2">
-          <Label required>Course</Label>
-          <Select value={course || undefined} onValueChange={setCourse}>
-            <SelectTrigger>
-              <SelectValue placeholder="Select course" />
-            </SelectTrigger>
-            <SelectContent>
-              {(coursesQ.data?.results ?? []).map((c) => (
-                <SelectItem key={c.id} value={String(c.id)}>
-                  {c.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        <div className="grid gap-4 py-2">
+          <div className="grid gap-2">
+            <Label htmlFor="enquiry-course" required>
+              Course
+            </Label>
+            <Select
+              value={course || undefined}
+              onValueChange={(v) => {
+                setCourse(v);
+                clear("course");
+              }}
+            >
+              <SelectTrigger id="enquiry-course" aria-invalid={!!errors.course}>
+                <SelectValue placeholder="Select course" />
+              </SelectTrigger>
+              <SelectContent>
+                {(coursesQ.data?.results ?? []).map((c) => (
+                  <SelectItem key={c.id} value={String(c.id)}>
+                    {c.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <FieldError text={errors.course} />
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="enquiry-about" required>
+              Enquiry about
+            </Label>
+            <Input
+              id="enquiry-about"
+              maxLength={255}
+              aria-invalid={!!errors.about}
+              value={about}
+              onChange={(e) => {
+                setAbout(e.target.value);
+                clear("about");
+              }}
+            />
+            <FieldError text={errors.about} />
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="enquiry-description" required>
+              Description
+            </Label>
+            <Textarea
+              id="enquiry-description"
+              rows={3}
+              aria-invalid={!!errors.description}
+              value={description}
+              onChange={(e) => {
+                setDescription(e.target.value);
+                clear("description");
+              }}
+            />
+            <div className="text-muted-foreground flex items-center gap-3 text-xs">
+              <span className="bg-border h-px flex-1" />
+              or record
+              <span className="bg-border h-px flex-1" />
+            </div>
+            <VoiceRecorder
+              value={recording}
+              onChange={(r) => {
+                setRecording(r);
+                clear("description");
+                clear("recording");
+              }}
+              onBusyChange={setRecorderBusy}
+              disabled={add.isPending}
+            />
+            <FieldError text={errors.description || errors.recording} />
+          </div>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>
             Back
           </Button>
-          <Button
-            variant="brand"
-            disabled={!course || add.isPending}
-            onClick={() => add.mutate(Number(course), { onSuccess: onClose })}
-          >
+          <Button variant="brand" disabled={recorderBusy || add.isPending} onClick={save}>
             {add.isPending ? "Saving…" : "Add"}
           </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
   );
+}
+
+function FieldError({ text }: { text?: string }) {
+  if (!text) return null;
+  return <p className="text-destructive text-sm">{text}</p>;
 }
 
 function LostDialog({

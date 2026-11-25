@@ -69,7 +69,14 @@ export interface LeadListParams {
   from_date?: string;
   /** Created on or before, `YYYY-MM-DD`. */
   to_date?: string;
+  /** Leads with an enrollment in this status, e.g. "pending". */
+  enrollment_status?: string;
   ordering?: string;
+}
+
+/** Counts for the cards on the lead list (GET /api/leads/summary/). */
+export interface LeadSummary {
+  pending_enrollment: number;
 }
 
 /** Query params accepted by GET /api/leads/{id}/calls/ (see lead_app_calls_api_guide.md). */
@@ -86,6 +93,10 @@ export interface CallListParams {
 export const leadsService = {
   async list(params: LeadListParams = {}) {
     const { data } = await api.get<Paginated<ApiLead>>("/leads/", { params });
+    return data;
+  },
+  async summary() {
+    const { data } = await api.get<LeadSummary>("/leads/summary/");
     return data;
   },
   async get(id: number) {

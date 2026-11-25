@@ -1,4 +1,4 @@
-import { CalendarClock, GraduationCap, Sparkles, TriangleAlert } from "lucide-react";
+import { CalendarClock, GraduationCap, Hourglass, Sparkles, TriangleAlert } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import type { LeadListItem } from "@/types/leads";
@@ -19,7 +19,19 @@ function leadsCreatedInWindow(leads: LeadListItem[], startMs: number, endMs: num
   }).length;
 }
 
-export function LeadSummaryCards({ leads }: { leads: LeadListItem[] }) {
+export function LeadSummaryCards({
+  leads,
+  pendingEnrollment,
+  pendingActive,
+  onPendingClick,
+}: {
+  leads: LeadListItem[];
+  /** Leads whose enrollment is pending, not yet confirmed; undefined while unknown. */
+  pendingEnrollment?: number;
+  /** The list below shows only those leads. */
+  pendingActive: boolean;
+  onPendingClick: () => void;
+}) {
   const newLeads = leads.filter((l) => l.status === "new").length;
   const dueToday = leads.filter((l) => isDueToday(l.nextFollowUpAt)).length;
   const overdue = leads.filter(
@@ -99,7 +111,38 @@ export function LeadSummaryCards({ leads }: { leads: LeadListItem[] }) {
   };
 
   return (
-    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+      <button
+        type="button"
+        aria-pressed={pendingActive}
+        onClick={onPendingClick}
+        className="focus-visible:ring-brand/50 rounded-xl text-left outline-none focus-visible:ring-[3px]"
+      >
+        <Card
+          className={cn(
+            "hover:border-brand/60 h-full gap-2 py-5 transition-colors",
+            pendingActive && "border-brand ring-brand/30 ring-2",
+          )}
+        >
+          <CardHeader className="flex-row items-center justify-between">
+            <CardDescription className="font-mono text-[11px] font-medium tracking-wider uppercase">
+              Enrollment pending
+            </CardDescription>
+            <Hourglass className="size-4 text-amber-600 dark:text-amber-400" />
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <p className="font-headline text-2xl font-semibold">{pendingEnrollment ?? "—"}</p>
+            <span
+              className={cn(
+                "inline-flex w-fit rounded-full px-2 py-0.5 text-xs font-semibold",
+                pendingActive ? "bg-brand text-brand-foreground" : deltaClass.warn,
+              )}
+            >
+              {pendingActive ? "Showing list" : "View list"}
+            </span>
+          </CardContent>
+        </Card>
+      </button>
       {cards.map((c) => (
         <Card key={c.label} className="gap-2 py-5">
           <CardHeader className="flex-row items-center justify-between">

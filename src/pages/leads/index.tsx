@@ -52,6 +52,7 @@ import {
   buildApiParams,
   useBulkAssignLeads,
   useBulkDeleteLeads,
+  useLeadSummary,
   useLeadsList,
 } from "@/hooks/use-leads";
 import { useUsers } from "@/hooks/use-users";
@@ -128,6 +129,8 @@ export default function LeadsPage() {
     isMock && !canViewAll ? { ...filters, assignedTo: CURRENT_COUNSELOR_ID } : filters;
 
   const { items, count, isLoading } = useLeadsList(effectiveFilters, page, pageSize);
+  const summaryQ = useLeadSummary(apiEnabled);
+  const pendingActive = filters.enrollment === "pending";
   const bulkDelete = useBulkDeleteLeads();
   const bulkAssign = useBulkAssignLeads();
 
@@ -223,7 +226,7 @@ export default function LeadsPage() {
             {!canViewAll && isMock && " Showing leads assigned to you."}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button variant="outline" onClick={() => toast.info("Import is coming soon.")}>
             <Upload /> Import
           </Button>
@@ -243,7 +246,12 @@ export default function LeadsPage() {
         </div>
       </div>
 
-      <LeadSummaryCards leads={summaryLeads} />
+      <LeadSummaryCards
+        leads={summaryLeads}
+        pendingEnrollment={isMock ? 0 : summaryQ.data?.pending_enrollment}
+        pendingActive={pendingActive}
+        onPendingClick={() => updateFilters({ ...filters, enrollment: pendingActive ? "all" : "pending" })}
+      />
 
       <div className="bg-card overflow-hidden rounded-2xl border shadow-[0_1px_3px_0_rgba(0,0,0,0.05),0_1px_2px_-1px_rgba(0,0,0,0.05)]">
         <div className="border-b p-4">

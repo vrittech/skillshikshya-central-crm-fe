@@ -36,7 +36,7 @@ export function PhoneMatchBox({
     let added = 0;
     for (const course of courses) {
       try {
-        await enquiriesService.add(match.id, course);
+        await enquiriesService.add(match.id, { course, about: "", description: "", recording: null });
         added += 1;
       } catch (e) {
         toast.error(apiErrorMessage(e, "Could not add the enquiry"));

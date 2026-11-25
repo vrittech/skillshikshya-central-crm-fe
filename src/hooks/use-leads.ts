@@ -74,12 +74,15 @@ export function buildApiParams(
   if (f.createdDate) p.created_date = f.createdDate;
   if (f.dateFrom) p.from_date = f.dateFrom;
   if (f.dateTo) p.to_date = f.dateTo;
+  if (f.enrollment !== "all") p.enrollment_status = f.enrollment;
   return p;
 }
 
 /** Client-side matcher for the mock dataset (string codes). */
 export function mockMatch(l: LeadListItem, f: LeadFilterState): boolean {
   if (l.isArchived) return false;
+  // Mock leads carry no enrollments.
+  if (f.enrollment !== "all") return false;
   if (f.status !== "all" && l.status !== f.status) return false;
   if (f.source !== "all" && l.source !== f.source) return false;
   if (f.type !== "all" && l.leadType !== f.type) return false;
@@ -111,6 +114,15 @@ export interface LeadsListResult {
   count: number;
   isLoading: boolean;
   isFetching: boolean;
+}
+
+/** Counts for the lead list cards, over every lead the user can see. */
+export function useLeadSummary(enabled: boolean) {
+  return useQuery({
+    queryKey: ["leads", "summary"],
+    queryFn: () => leadsService.summary(),
+    enabled,
+  });
 }
 
 export function useLeadsList(

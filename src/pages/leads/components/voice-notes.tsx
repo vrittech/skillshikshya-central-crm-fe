@@ -1,5 +1,5 @@
-import { Loader2, Mic, Play, RotateCcw, Square, Trash2 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { Loader2, Play, Trash2 } from "lucide-react";
+import { useEffect, useState } from "react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -21,22 +21,13 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { type RecordedAudio, VoiceRecorder, WaveformPlayer } from "@/components/voice-recorder";
 import { useAuth } from "@/context/auth";
 import { useAddVoiceNote, useDeleteVoiceNote } from "@/hooks/use-voice-notes";
+import { peaksFromBlob } from "@/lib/audio-waveform";
 import { formatClock, formatDateTime } from "@/lib/leads-format";
 import { voiceNotesService } from "@/services/voice-notes.service";
 import type { ApiVoiceNote } from "@/types/leads-api";
-
-const MAX_SECONDS = 10 * 60;
-// Chrome and Firefox record webm or ogg; Safari records mp4.
-const TYPES = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg;codecs=opus"];
-
-function pickType() {
-  if (typeof MediaRecorder === "undefined") return null;
-  return TYPES.find((t) => MediaRecorder.isTypeSupported(t)) ?? "";
-}
-
-type Stage = "idle" | "recording" | "done" | "blocked";
 
 /** Record a voice note in the browser, listen back, then save it. */
 export function RecordVoiceNoteDialog({
@@ -52,151 +43,47 @@ export function RecordVoiceNoteDialog({
   open: boolean;
   onClose: () => void;
 }) {
-  const [stage, setStage] = useState<Stage>("idle");
-  const [seconds, setSeconds] = useState(0);
-  const [audio, setAudio] = useState<Blob | null>(null);
-  const [url, setUrl] = useState<string | null>(null);
+  const [audio, setAudio] = useState<RecordedAudio | null>(null);
+  const [busy, setBusy] = useState(false);
   const [note, setNote] = useState("");
-  const recorder = useRef<MediaRecorder | null>(null);
-  const stream = useRef<MediaStream | null>(null);
-  const timer = useRef<number | null>(null);
-  const startedAt = useRef(0);
   const add = useAddVoiceNote(leadId);
 
-  function stopTracks() {
-    if (timer.current != null) window.clearInterval(timer.current);
-    timer.current = null;
-    stream.current?.getTracks().forEach((t) => t.stop());
-    stream.current = null;
-  }
-
-  function reset() {
-    if (recorder.current?.state === "recording") {
-      recorder.current.onstop = null;
-      recorder.current.stop();
-    }
-    recorder.current = null;
-    stopTracks();
-    setStage("idle");
-    setSeconds(0);
-    setAudio(null);
-    setNote("");
-    setUrl((old) => {
-      if (old) URL.revokeObjectURL(old);
-      return null;
-    });
-  }
-
   useEffect(() => {
-    if (!open) reset();
-    return reset;
-    // reset only touches refs and setters
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (!open) {
+      setAudio(null);
+      setNote("");
+      setBusy(false);
+    }
   }, [open]);
-
-  async function start() {
-    const type = pickType();
-    if (type === null || !navigator.mediaDevices?.getUserMedia) {
-      setStage("blocked");
-      return;
-    }
-    try {
-      stream.current = await navigator.mediaDevices.getUserMedia({ audio: true });
-    } catch {
-      setStage("blocked");
-      return;
-    }
-    const chunks: Blob[] = [];
-    const rec = new MediaRecorder(stream.current, type ? { mimeType: type } : undefined);
-    rec.ondataavailable = (e) => {
-      if (e.data.size > 0) chunks.push(e.data);
-    };
-    rec.onstop = () => {
-      stopTracks();
-      const blob = new Blob(chunks, { type: rec.mimeType || type || "audio/webm" });
-      setAudio(blob);
-      setUrl(URL.createObjectURL(blob));
-      setSeconds(Math.max(1, Math.round((Date.now() - startedAt.current) / 1000)));
-      setStage("done");
-    };
-    recorder.current = rec;
-    startedAt.current = Date.now();
-    setSeconds(0);
-    rec.start();
-    setStage("recording");
-    timer.current = window.setInterval(() => {
-      const s = Math.floor((Date.now() - startedAt.current) / 1000);
-      setSeconds(s);
-      if (s >= MAX_SECONDS) rec.stop();
-    }, 250);
-  }
-
-  function stop() {
-    if (recorder.current?.state === "recording") recorder.current.stop();
-  }
-
-  function again() {
-    reset();
-    void start();
-  }
 
   function save() {
     if (!audio) return;
     add.mutate(
-      { audio, enquiry: enquiryId, durationSeconds: seconds, note: note.trim() },
+      { audio: audio.blob, enquiry: enquiryId, durationSeconds: audio.seconds, note: note.trim() },
       { onSuccess: onClose },
     );
   }
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle>Voice note</DialogTitle>
           {title && <DialogDescription>{title}</DialogDescription>}
         </DialogHeader>
 
         <div className="grid gap-4 py-2">
-          {stage === "blocked" && (
-            <p className="text-destructive text-sm">Microphone not available.</p>
-          )}
-
-          {(stage === "idle" || stage === "blocked") && (
-            <Button variant="outline" className="h-16 text-base" onClick={() => void start()}>
-              <Mic className="size-5" /> Record
-            </Button>
-          )}
-
-          {stage === "recording" && (
-            <div className="flex items-center justify-between gap-3 rounded-xl border p-4">
-              <span className="flex items-center gap-2 font-mono text-lg tabular-nums">
-                <span className="size-2.5 animate-pulse rounded-full bg-red-500" />
-                {formatClock(seconds)}
-              </span>
-              <Button variant="destructive" onClick={stop}>
-                <Square className="size-4" /> Stop
-              </Button>
+          <VoiceRecorder value={audio} onChange={setAudio} onBusyChange={setBusy} disabled={add.isPending} />
+          {audio && (
+            <div className="grid gap-2">
+              <Label htmlFor="voice-note-text">Note</Label>
+              <Input
+                id="voice-note-text"
+                maxLength={255}
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+              />
             </div>
-          )}
-
-          {stage === "done" && url && (
-            <>
-              <div className="flex items-center gap-2">
-                <audio controls src={url} className="h-10 w-full" />
-                <span className="text-muted-foreground font-mono text-sm tabular-nums">
-                  {formatClock(seconds)}
-                </span>
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="voice-note-text">Note</Label>
-                <Input
-                  id="voice-note-text"
-                  maxLength={255}
-                  value={note}
-                  onChange={(e) => setNote(e.target.value)}
-                />
-              </div>
-            </>
           )}
         </div>
 
@@ -204,16 +91,9 @@ export function RecordVoiceNoteDialog({
           <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>
-          {stage === "done" && (
-            <Button variant="outline" onClick={again} disabled={add.isPending}>
-              <RotateCcw /> Record again
-            </Button>
-          )}
-          {stage === "done" && (
-            <Button variant="brand" onClick={save} disabled={add.isPending}>
-              {add.isPending ? "Saving…" : "Save"}
-            </Button>
-          )}
+          <Button variant="brand" onClick={save} disabled={!audio || busy || add.isPending}>
+            {add.isPending ? "Saving…" : "Save"}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -222,15 +102,15 @@ export function RecordVoiceNoteDialog({
 
 /** Loads the recording on first play; recordings are private, so they come through the CRM. */
 export function VoiceNotePlayer({ leadId, id, seconds }: { leadId: number; id: number; seconds?: number | null }) {
-  const [url, setUrl] = useState<string | null>(null);
+  const [loaded, setLoaded] = useState<{ url: string; peaks: number[] } | null>(null);
   const [loading, setLoading] = useState(false);
   const [failed, setFailed] = useState(false);
 
   useEffect(
     () => () => {
-      if (url) URL.revokeObjectURL(url);
+      if (loaded) URL.revokeObjectURL(loaded.url);
     },
-    [url],
+    [loaded],
   );
 
   async function load() {
@@ -238,7 +118,8 @@ export function VoiceNotePlayer({ leadId, id, seconds }: { leadId: number; id: n
     setFailed(false);
     try {
       const blob = await voiceNotesService.audio(leadId, id);
-      setUrl(URL.createObjectURL(blob));
+      const peaks = await peaksFromBlob(blob);
+      setLoaded({ url: URL.createObjectURL(blob), peaks });
     } catch {
       setFailed(true);
     } finally {
@@ -246,7 +127,17 @@ export function VoiceNotePlayer({ leadId, id, seconds }: { leadId: number; id: n
     }
   }
 
-  if (url) return <audio controls autoPlay src={url} className="h-9 w-full max-w-xs" />;
+  if (loaded) {
+    return (
+      <WaveformPlayer
+        src={loaded.url}
+        peaks={loaded.peaks}
+        seconds={seconds}
+        autoPlay
+        className="w-full max-w-md p-2"
+      />
+    );
+  }
   return (
     <Button size="sm" variant="outline" onClick={() => void load()} disabled={loading}>
       {loading ? <Loader2 className="animate-spin" /> : <Play />}

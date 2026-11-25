@@ -283,6 +283,8 @@ export interface ApiCourseInterest {
   lead: number;
   course: number;
   course_name?: string;
+  about?: string;
+  description?: string;
   is_primary: boolean;
   interest_level: ApiInterestLevel;
   created_at?: string;

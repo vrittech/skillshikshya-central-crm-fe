@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { apiErrorMessage } from "@/lib/api";
-import { enquiriesService } from "@/services/enquiries.service";
+import { apiErrorMessage, fieldErrorsOf } from "@/lib/api";
+import { type NewEnquiry, enquiriesService } from "@/services/enquiries.service";
 import type { ApiEnquiryStage, ApiLostReason } from "@/types/leads-api";
 
 export function useEnquiries(leadId?: number) {
@@ -30,12 +30,17 @@ function refresh(qc: ReturnType<typeof useQueryClient>) {
 export function useAddEnquiry(leadId: number) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (course: number) => enquiriesService.add(leadId, course),
+    mutationFn: (v: NewEnquiry) => enquiriesService.add(leadId, v),
     onSuccess: () => {
       toast.success("Enquiry added");
       refresh(qc);
     },
-    onError: (e) => toast.error(apiErrorMessage(e, "Could not add the enquiry")),
+    onError: (e) => {
+      // Field errors show next to the fields in the form.
+      if (Object.keys(fieldErrorsOf(e)).length === 0) {
+        toast.error(apiErrorMessage(e, "Could not add the enquiry"));
+      }
+    },
   });
 }
 
