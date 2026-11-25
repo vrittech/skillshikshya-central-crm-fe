@@ -4,7 +4,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { apiErrorMessage } from "@/lib/api";
-import { enquiriesService } from "@/services/enquiries.service";
+import { type NewEnquiry, enquiriesService } from "@/services/enquiries.service";
 import type { ApiPhoneMatch } from "@/types/leads-api";
 import { StagePill } from "./enquiries-panel";
 
@@ -16,6 +16,8 @@ import { StagePill } from "./enquiries-panel";
 export function PhoneMatchBox({
   matches,
   courses,
+  details,
+  checkDetails,
   creating,
   saving,
   onSaveAnyway,
@@ -23,6 +25,10 @@ export function PhoneMatchBox({
   matches: ApiPhoneMatch[];
   /** The courses picked on the form, added as enquiries on Add enquiry. */
   courses: number[];
+  /** What was asked, for the first course's enquiry (the primary course). */
+  details?: Omit<NewEnquiry, "course"> | null;
+  /** Checks the form's enquiry fields; false stops the add. */
+  checkDetails?: () => boolean;
   creating: boolean;
   saving: boolean;
   onSaveAnyway: () => void;
@@ -32,11 +38,13 @@ export function PhoneMatchBox({
   const [adding, setAdding] = useState<number | null>(null);
 
   async function addTo(match: ApiPhoneMatch) {
+    if (checkDetails && !checkDetails()) return;
     setAdding(match.id);
     let added = 0;
-    for (const course of courses) {
+    for (const [i, course] of courses.entries()) {
+      const extra = i === 0 && details ? details : { about: "", description: "", recording: null };
       try {
-        await enquiriesService.add(match.id, { course, about: "", description: "", recording: null });
+        await enquiriesService.add(match.id, { course, ...extra });
         added += 1;
       } catch (e) {
         toast.error(apiErrorMessage(e, "Could not add the enquiry"));

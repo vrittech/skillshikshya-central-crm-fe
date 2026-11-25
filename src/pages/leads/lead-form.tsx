@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import { apiErrorMessage } from "@/lib/api";
+import { type RecordedAudio, VoiceRecorder } from "@/components/voice-recorder";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Combobox } from "@/components/ui/combobox";
@@ -55,6 +56,7 @@ import {
 import { useCreateLead, useLead, usePhoneMatch, useUpdateLead } from "@/hooks/use-leads";
 import { useCounselors } from "@/hooks/use-users";
 import { leadsService } from "@/services/leads.service";
+import { voiceNotesService } from "@/services/voice-notes.service";
 import { BranchDialog } from "@/pages/branches/branch-dialog";
 import { phoneMatchOf } from "@/lib/phone-match";
 import type { ApiBranch, ApiLeadPayload, ApiPhoneMatch } from "@/types/leads-api";
@@ -516,7 +518,47 @@ export default function LeadFormPage() {
 
   const createLead = useCreateLead();
   const updateLead = useUpdateLead();
-  const saving = createLead.isPending || updateLead.isPending;
+  // What the person asked about: on a new lead, for the primary course's enquiry.
+  const [enquiryAbout, setEnquiryAbout] = useState("");
+  const [enquiryDescription, setEnquiryDescription] = useState("");
+  const [recording, setRecording] = useState<RecordedAudio | null>(null);
+  const [recorderBusy, setRecorderBusy] = useState(false);
+  const [savingRecording, setSavingRecording] = useState(false);
+  const [enquiryErrors, setEnquiryErrors] = useState<{ about?: string; description?: string }>({});
+  const askEnquiry = !editing && !!form.primary_course;
+  const saving = createLead.isPending || updateLead.isPending || savingRecording;
+
+  /** On a new lead with a course: what it is about, and a description typed or recorded. */
+  function checkEnquiry(): boolean {
+    if (!askEnquiry) return true;
+    const e: { about?: string; description?: string } = {};
+    if (!enquiryAbout.trim()) e.about = "Enter what the enquiry is about.";
+    if (!enquiryDescription.trim() && !recording) e.description = "Write a description or record one.";
+    setEnquiryErrors(e);
+    if (e.about || e.description) {
+      toast.error("Please fix the errors and try again.");
+      return false;
+    }
+    return true;
+  }
+
+  /** Attach the recorded description to the new lead's enquiry. */
+  async function saveRecording(leadId: number, enquiryId: number | null | undefined) {
+    if (!askEnquiry || !recording || enquiryId == null) return;
+    setSavingRecording(true);
+    try {
+      await voiceNotesService.create(leadId, {
+        audio: recording.blob,
+        enquiry: enquiryId,
+        durationSeconds: recording.seconds,
+        note: "",
+      });
+    } catch (e) {
+      toast.error(apiErrorMessage(e, "Could not save the recording"));
+    } finally {
+      setSavingRecording(false);
+    }
+  }
 
   const num = (v: string) => (v ? Number(v) : null);
 
@@ -549,6 +591,7 @@ export default function LeadFormPage() {
       toast.error("Lead type is required.");
       return;
     }
+    if (!checkEnquiry()) return;
 
     const customData: LeadCustomData = {
       preferredLearningMode: (form.cd_learning_mode as LearningMode) || undefined,
@@ -598,10 +641,16 @@ export default function LeadFormPage() {
       // mock edit — no persistence
       updateLead.mutate({ id: 0, payload }, { onSuccess: () => done(id) });
     } else {
+      const withEnquiry: ApiLeadPayload = askEnquiry
+        ? { ...payload, enquiry_about: enquiryAbout.trim(), enquiry_description: enquiryDescription.trim() }
+        : payload;
       createLead.mutate(
-        allowDuplicatePhone ? { ...payload, allow_duplicate_phone: true } : payload,
+        allowDuplicatePhone ? { ...withEnquiry, allow_duplicate_phone: true } : withEnquiry,
         {
-          onSuccess: (lead) => syncThenDone(lead?.id, lead?.id),
+          onSuccess: (lead) => {
+            if (!lead) return syncThenDone();
+            void saveRecording(lead.id, lead.primary_enquiry).finally(() => syncThenDone(lead.id, lead.id));
+          },
           onError: (e) => {
             const matches = phoneMatchOf(e);
             if (!matches) return;
@@ -650,6 +699,16 @@ export default function LeadFormPage() {
             <PhoneMatchBox
               matches={phoneMatches}
               courses={pickedCourses}
+              details={
+                askEnquiry
+                  ? {
+                      about: enquiryAbout.trim(),
+                      description: enquiryDescription.trim(),
+                      recording: recording ? { blob: recording.blob, seconds: recording.seconds } : null,
+                    }
+                  : null
+              }
+              checkDetails={checkEnquiry}
               creating={!editing}
               saving={saving}
               onSaveAnyway={() => save(true)}
@@ -869,6 +928,54 @@ export default function LeadFormPage() {
             />
           </Field>
         </div>
+        {askEnquiry && (
+          <>
+            <div className="sm:col-span-2">
+              <Field label="Enquiry about" required>
+                <Input
+                  maxLength={255}
+                  aria-invalid={!!enquiryErrors.about}
+                  value={enquiryAbout}
+                  onChange={(e) => {
+                    setEnquiryAbout(e.target.value);
+                    setEnquiryErrors((er) => ({ ...er, about: undefined }));
+                  }}
+                />
+                {enquiryErrors.about && <p className="text-destructive text-sm">{enquiryErrors.about}</p>}
+              </Field>
+            </div>
+            <div className="sm:col-span-2">
+              <Field label="Description" required>
+                <Textarea
+                  rows={3}
+                  aria-invalid={!!enquiryErrors.description}
+                  value={enquiryDescription}
+                  onChange={(e) => {
+                    setEnquiryDescription(e.target.value);
+                    setEnquiryErrors((er) => ({ ...er, description: undefined }));
+                  }}
+                />
+                <div className="text-muted-foreground flex items-center gap-3 text-xs">
+                  <span className="bg-border h-px flex-1" />
+                  or record
+                  <span className="bg-border h-px flex-1" />
+                </div>
+                <VoiceRecorder
+                  value={recording}
+                  onChange={(r) => {
+                    setRecording(r);
+                    setEnquiryErrors((er) => ({ ...er, description: undefined }));
+                  }}
+                  onBusyChange={setRecorderBusy}
+                  disabled={saving}
+                />
+                {enquiryErrors.description && (
+                  <p className="text-destructive text-sm">{enquiryErrors.description}</p>
+                )}
+              </Field>
+            </div>
+          </>
+        )}
         {isMock && (
           <p className="text-muted-foreground sm:col-span-2 text-xs">
             Additional courses aren’t persisted in mock preview — switch to Live to save them.
@@ -934,7 +1041,7 @@ export default function LeadFormPage() {
           <Button variant="outline" onClick={() => navigate(editing ? `/leads/${id}` : "/leads")}>
             Cancel
           </Button>
-          <Button variant="brand" onClick={() => save()} disabled={saving}>
+          <Button variant="brand" onClick={() => save()} disabled={saving || recorderBusy}>
             {saving ? "Saving…" : editing ? "Save Changes" : "Save Lead"}
           </Button>
         </div>
