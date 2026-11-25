@@ -46,6 +46,8 @@ import {
 import { cn } from "@/lib/utils";
 import { formatDateTime } from "@/lib/leads-format";
 import { useOrbitChatSyncState, useUpdateOrbitChatSync } from "@/hooks/use-orbitchat";
+import { EmailSettingsPanel } from "./email-settings";
+import { StorageSettingsPanel } from "./storage-settings";
 
 type Section =
   | "sources"
@@ -56,7 +58,9 @@ type Section =
   | "types"
   | "learning_modes"
   | "institutions"
-  | "integrations";
+  | "integrations"
+  | "storage"
+  | "email";
 
 const SECTIONS: { key: Section; label: string }[] = [
   { key: "sources", label: "Lead Sources" },
@@ -68,6 +72,8 @@ const SECTIONS: { key: Section; label: string }[] = [
   { key: "learning_modes", label: "Learning Modes" },
   { key: "institutions", label: "Institutions" },
   { key: "integrations", label: "Integrations" },
+  { key: "storage", label: "Cloud storage" },
+  { key: "email", label: "Email" },
 ];
 
 /* ------------------------------------------------------------ field schema */
@@ -463,6 +469,8 @@ export default function SettingsPage() {
 
   const isTypes = section === "types";
   const isIntegrations = section === "integrations";
+  // Cloud storage and Email have their own panels, not the list + editor.
+  const isSystem = section === "storage" || section === "email";
   const { user } = useAuth();
   // OrbitChat sync-state is staff-only per the API guide.
   const canManageIntegrations = isApi && !!user?.is_staff;
@@ -504,7 +512,21 @@ export default function SettingsPage() {
           </div>
         </Card>
 
-        {isIntegrations ? (
+        {isSystem ? (
+          canManageIntegrations ? (
+            section === "storage" ? (
+              <StorageSettingsPanel />
+            ) : (
+              <EmailSettingsPanel />
+            )
+          ) : (
+            <Card>
+              <CardContent className="text-muted-foreground py-10 text-center text-sm">
+                {isApi ? "Only administrators can manage this." : "Switch the data source to Live to edit."}
+              </CardContent>
+            </Card>
+          )
+        ) : isIntegrations ? (
           <Card>
             <CardHeader>
               <div>
@@ -574,7 +596,7 @@ export default function SettingsPage() {
         )}
       </div>
 
-      {!isTypes && !isIntegrations && (
+      {!isTypes && !isIntegrations && !isSystem && (
         <EditorDialog
           open={editorOpen}
           onClose={() => {
