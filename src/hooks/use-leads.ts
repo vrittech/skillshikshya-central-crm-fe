@@ -194,7 +194,9 @@ export function useLead(routeId?: string): LeadDetailResult {
         ...acts.results.map(adaptApiActivity),
       ].sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
       ui.followUps = fus.results.map(adaptApiFollowup);
-      if (interests.results.length) ui.courseInterests = interests.results.map(adaptApiCourseInterest);
+      // Enquiries without a course are not course interests.
+      const withCourse = interests.results.filter((ci) => ci.course != null);
+      if (withCourse.length) ui.courseInterests = withCourse.map(adaptApiCourseInterest);
 
       // `enrollments` is ordered newest-first, so results[0] is the latest one;
       // it feeds the hero/summary. The Enrollment tab lists them all via

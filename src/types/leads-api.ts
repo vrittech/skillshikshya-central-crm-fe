@@ -281,7 +281,7 @@ export type ApiLostReason =
 export interface ApiCourseInterest {
   id: number;
   lead: number;
-  course: number;
+  course: number | null;
   course_name?: string;
   about?: string;
   description?: string;

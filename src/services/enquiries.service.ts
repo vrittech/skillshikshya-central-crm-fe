@@ -16,13 +16,13 @@ const EXTENSION: Record<string, string> = {
 };
 
 export interface NewEnquiry {
-  course: number;
+  course?: number;
   about: string;
   description: string;
   recording: { blob: Blob; seconds: number } | null;
 }
 
-/** A lead's enquiries, one per course, each with its own stage. */
+/** A lead's enquiries, each with its own stage. */
 export const enquiriesService = {
   async list(leadId: number) {
     const { data } = await api.get<Paginated<ApiCourseInterest>>(base(leadId), {
@@ -35,7 +35,7 @@ export const enquiriesService = {
   async add(leadId: number, v: NewEnquiry) {
     if (!v.recording) {
       const { data } = await api.post<ApiCourseInterest>(base(leadId), {
-        course: v.course,
+        ...(v.course != null && { course: v.course }),
         about: v.about,
         description: v.description,
       });
@@ -43,7 +43,7 @@ export const enquiriesService = {
     }
     const type = v.recording.blob.type.split(";")[0] || "audio/webm";
     const form = new FormData();
-    form.append("course", String(v.course));
+    if (v.course != null) form.append("course", String(v.course));
     form.append("about", v.about);
     form.append("description", v.description);
     form.append(

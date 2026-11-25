@@ -399,7 +399,10 @@ export default function LeadFormPage() {
     let existingNonPrimary: { id: number; course: number }[] = [];
     try {
       const res = await leadsService.courseInterests(leadApiId);
-      existingNonPrimary = res.results.filter((r) => !r.is_primary).map((r) => ({ id: r.id, course: r.course }));
+      // Enquiries without a course are left alone.
+      existingNonPrimary = res.results.flatMap((r) =>
+        !r.is_primary && r.course != null ? [{ id: r.id, course: r.course }] : [],
+      );
     } catch {
       /* best effort — leave as empty and only add */
     }
