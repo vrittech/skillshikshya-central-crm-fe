@@ -147,8 +147,6 @@ export interface ApiLead {
 
   custom_data?: Record<string, unknown>;
   enrollment_summary?: ApiEnrollmentSummary | null;
-  /** The enquiry for the primary course. */
-  primary_enquiry?: number | null;
 
   // denormalized read-only labels (present on detail; may be partial on list)
   status_name?: string;
@@ -170,9 +168,6 @@ export interface ApiLead {
 export interface ApiLeadPayload {
   full_name?: string;
   phone?: string;
-  /** New lead only: go on the primary course's enquiry. */
-  enquiry_about?: string;
-  enquiry_description?: string;
   /** Save even when another lead has this phone number. */
   allow_duplicate_phone?: boolean;
   secondary_phone?: string | null;
