@@ -6,6 +6,7 @@ import { Combobox } from "@/components/ui/combobox";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -31,6 +32,7 @@ import {
   useLeadEnrollments,
 } from "@/hooks/use-leads";
 import type {
+  ApiDuePart,
   ApiEnrollment,
   ApiEnrollmentPayload,
   ApiEnrollmentStatus,
@@ -38,8 +40,10 @@ import type {
   ApiPaymentPayload,
   ApiPaymentStatus,
 } from "@/types/leads-api";
-import { toNepalIso } from "@/lib/leads-format";
-import { batchOption, takesNoOne } from "@/lib/seats";
+import { partsAreValid, splitEvenly } from "@/lib/due-dates";
+import { formatNPR, toNepalIso } from "@/lib/leads-format";
+import { batchOption, localToday, takesNoOne } from "@/lib/seats";
+import { DuePartsEditor } from "./due-dates";
 
 const ENR_STATUS: ApiEnrollmentStatus[] = [
   "pending",
@@ -109,8 +113,11 @@ export function EnrollmentDialog({
     enrollment?.batch != null && !batches.some((b) => b.id === enrollment.batch);
   const addEnrollment = useAddEnrollment(effectiveLeadId);
   const updateEnrollment = useUpdateEnrollment(leadId);
-  const confirm = useConfirmEnrollment();
-  const saving = addEnrollment.isPending || updateEnrollment.isPending || confirm.isPending;
+  // "Save and confirm" opens Confirm (with the first payment) for the new enrollment.
+  const [confirming, setConfirming] = useState<{ leadId: number; enrollment: ApiEnrollment } | null>(
+    null,
+  );
+  const saving = addEnrollment.isPending || updateEnrollment.isPending;
 
   useEffect(() => {
     if (!open) return;
@@ -183,175 +190,308 @@ export function EnrollmentDialog({
       onSuccess: (created) => {
         onCreated?.(created);
         onClose();
-        // "Save and confirm": the lead becomes a student right away.
+        // "Save and confirm": take the first payment and confirm right away.
         if (confirmAfter && effectiveLeadId != null) {
-          confirm.mutate({ leadId: effectiveLeadId, id: created.id });
+          setConfirming({ leadId: effectiveLeadId, enrollment: created });
         }
       },
     });
   }
 
   return (
-    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>{isEdit ? "Edit enrollment" : "Create enrollment"}</DialogTitle>
-        </DialogHeader>
-        <div className="grid gap-4 py-2 sm:grid-cols-2">
-          {needsLead && (
-            <div className="grid gap-2 sm:col-span-2">
-              <Label required>Lead</Label>
-              <Combobox
-                value={pickedLeadId}
-                onChange={setPickedLeadId}
-                onSearchChange={setLeadSearch}
-                options={leadOptionsQ.options}
-                loading={leadOptionsQ.isLoading && !!leadSearch}
-                placeholder="Search leads by name or phone…"
-                searchPlaceholder="Type to search…"
-                emptyText="No leads match."
-              />
-            </div>
-          )}
-          <div className="grid gap-2 sm:col-span-2">
-            <Label required>Course</Label>
-            <Select
-              disabled={seatLocked}
-              value={f.course != null ? String(f.course) : undefined}
-              onValueChange={(v) => {
-                setF((p) => ({
-                  ...p,
-                  course: Number(v),
-                  batch: undefined,
-                }));
-              }}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select course" />
-              </SelectTrigger>
-              <SelectContent>
-                {courses.map((c) => (
-                  <SelectItem key={c.id} value={String(c.id)}>
-                    {c.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="grid min-w-0 gap-2 sm:col-span-2">
-            <Label>Course Batch</Label>
-            <Select
-              value={f.batch != null ? String(f.batch) : undefined}
-              onValueChange={(v) => {
-                setF((p) => ({
-                  ...p,
-                  batch: Number(v),
-                }));
-              }}
-              disabled={seatLocked || !f.course || batchesQ.isLoading}
-            >
-              <SelectTrigger className="min-w-0 [&>span]:text-ellipsis">
-                <SelectValue placeholder={f.course ? "Select course batch" : "Select a course first"} />
-              </SelectTrigger>
-              <SelectContent>
-                {savedBatchMissing && enrollment?.batch != null && (
-                  <SelectItem value={String(enrollment.batch)}>
-                    {enrollment.batch_name ?? `Batch #${enrollment.batch}`}
-                  </SelectItem>
-                )}
-                {batches.map((b) => (
-                  <SelectItem
-                    key={b.id}
-                    value={String(b.id)}
-                    disabled={takesNoOne(b) && b.id !== enrollment?.batch}
-                  >
-                    {batchOption(b)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {!seatLocked && chosenBatch && takesNoOne(chosenBatch) && (
-              <p className="text-xs text-amber-600 dark:text-amber-400">
-                {chosenBatch.capacity == null ? "This batch has no seats set." : "This batch is full."}
-              </p>
+    <>
+      <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{isEdit ? "Edit enrollment" : "Create enrollment"}</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-2 sm:grid-cols-2">
+            {needsLead && (
+              <div className="grid gap-2 sm:col-span-2">
+                <Label required>Lead</Label>
+                <Combobox
+                  value={pickedLeadId}
+                  onChange={setPickedLeadId}
+                  onSearchChange={setLeadSearch}
+                  options={leadOptionsQ.options}
+                  loading={leadOptionsQ.isLoading && !!leadSearch}
+                  placeholder="Search leads by name or phone…"
+                  searchPlaceholder="Type to search…"
+                  emptyText="No leads match."
+                />
+              </div>
             )}
-          </div>
-          <div className="grid gap-2">
-            <Label>Enrollment date</Label>
-            <Input type="date" value={f.enrollment_date ?? ""} onChange={(e) => set("enrollment_date", e.target.value)} />
-          </div>
-          {isEdit && (
-            <div className="grid gap-2">
-              <Label>Status</Label>
-              {/* Confirm, cancel and reinstate are buttons on the card, not options here. */}
+            <div className="grid gap-2 sm:col-span-2">
+              <Label required>Course</Label>
               <Select
-                value={f.status ?? "pending"}
-                onValueChange={(v) => set("status", v as ApiEnrollmentStatus)}
-                disabled={wasCancelled || wasPending}
+                disabled={seatLocked}
+                value={f.course != null ? String(f.course) : undefined}
+                onValueChange={(v) => {
+                  setF((p) => ({
+                    ...p,
+                    course: Number(v),
+                    batch: undefined,
+                  }));
+                }}
               >
                 <SelectTrigger>
-                  <SelectValue />
+                  <SelectValue placeholder="Select course" />
                 </SelectTrigger>
                 <SelectContent>
-                  {ENR_STATUS.filter(
-                    (s) => (wasCancelled || s !== "cancelled") && (wasPending || s !== "pending"),
-                  ).map((s) => (
-                    <SelectItem key={s} value={s} className="capitalize">
-                      {s.replace(/_/g, " ")}
+                  {courses.map((c) => (
+                    <SelectItem key={c.id} value={String(c.id)}>
+                      {c.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
+            <div className="grid min-w-0 gap-2 sm:col-span-2">
+              <Label>Course Batch</Label>
+              <Select
+                value={f.batch != null ? String(f.batch) : undefined}
+                onValueChange={(v) => {
+                  setF((p) => ({
+                    ...p,
+                    batch: Number(v),
+                  }));
+                }}
+                disabled={seatLocked || !f.course || batchesQ.isLoading}
+              >
+                <SelectTrigger className="min-w-0 [&>span]:text-ellipsis">
+                  <SelectValue placeholder={f.course ? "Select course batch" : "Select a course first"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {savedBatchMissing && enrollment?.batch != null && (
+                    <SelectItem value={String(enrollment.batch)}>
+                      {enrollment.batch_name ?? `Batch #${enrollment.batch}`}
+                    </SelectItem>
+                  )}
+                  {batches.map((b) => (
+                    <SelectItem
+                      key={b.id}
+                      value={String(b.id)}
+                      disabled={takesNoOne(b) && b.id !== enrollment?.batch}
+                    >
+                      {batchOption(b)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {!seatLocked && chosenBatch && takesNoOne(chosenBatch) && (
+                <p className="text-xs text-amber-600 dark:text-amber-400">
+                  {chosenBatch.capacity == null ? "This batch has no seats set." : "This batch is full."}
+                </p>
+              )}
+            </div>
+            <div className="grid gap-2">
+              <Label>Enrollment date</Label>
+              <Input type="date" value={f.enrollment_date ?? ""} onChange={(e) => set("enrollment_date", e.target.value)} />
+            </div>
+            {isEdit && (
+              <div className="grid gap-2">
+                <Label>Status</Label>
+                {/* Confirm, cancel and reinstate are buttons on the card, not options here. */}
+                <Select
+                  value={f.status ?? "pending"}
+                  onValueChange={(v) => set("status", v as ApiEnrollmentStatus)}
+                  disabled={wasCancelled || wasPending}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ENR_STATUS.filter(
+                      (s) => (wasCancelled || s !== "cancelled") && (wasPending || s !== "pending"),
+                    ).map((s) => (
+                      <SelectItem key={s} value={s} className="capitalize">
+                        {s.replace(/_/g, " ")}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            {/* The price is fixed once confirmed or paid; later changes are money entries with a reason. */}
+            <div className="grid gap-2">
+              <Label htmlFor="enrollment-listed-fee">Listed fee</Label>
+              <Input id="enrollment-listed-fee" type="number" value={f.listed_fee ?? ""} readOnly disabled />
+            </div>
+            <div className="grid gap-2">
+              <Label>Standard discount</Label>
+              <Input type="number" value={f.standard_discount ?? ""} disabled={priceLocked} onChange={(e) => set("standard_discount", e.target.value)} />
+            </div>
+            <div className="grid gap-2">
+              <Label>Additional discount</Label>
+              <Input type="number" value={f.additional_discount ?? ""} disabled={priceLocked} onChange={(e) => set("additional_discount", e.target.value)} />
+            </div>
+            <div className="grid gap-2">
+              <Label>Agreed amount</Label>
+              <Input
+                type="number"
+                value={agreedEdited ? (f.agreed_amount ?? "") : agreedAuto}
+                disabled={priceLocked}
+                onChange={(e) => {
+                  setAgreedEdited(true);
+                  set("agreed_amount", e.target.value);
+                }}
+              />
+            </div>
+            <div className="grid gap-2 sm:col-span-2">
+              <Label>Remarks</Label>
+              <Textarea rows={2} value={f.remarks ?? ""} onChange={(e) => set("remarks", e.target.value)} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={onClose}>
+              Cancel
+            </Button>
+            {isEdit ? (
+              <Button variant="brand" onClick={() => submit()} disabled={saving}>
+                {saving ? "Saving…" : "Save Changes"}
+              </Button>
+            ) : (
+              <>
+                <Button variant="outline" onClick={() => submit()} disabled={saving}>
+                  Save as pending
+                </Button>
+                <Button variant="brand" onClick={() => submit(true)} disabled={saving}>
+                  {saving ? "Saving…" : "Save and confirm"}
+                </Button>
+              </>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <ConfirmEnrollmentDialog
+        leadId={confirming?.leadId}
+        enrollment={confirming?.enrollment ?? null}
+        onClose={() => setConfirming(null)}
+      />
+    </>
+  );
+}
+
+/**
+ * Confirm a pending enrollment: the lead becomes a student. Something must be
+ * paid first, so when nothing is paid the first payment is taken here, in the
+ * same step as the confirm.
+ */
+export function ConfirmEnrollmentDialog({
+  leadId,
+  enrollment,
+  onClose,
+}: {
+  leadId?: number;
+  enrollment: ApiEnrollment | null;
+  onClose: () => void;
+}) {
+  const confirm = useConfirmEnrollment();
+  const [parts, setParts] = useState<ApiDuePart[]>([]);
+  const [amount, setAmount] = useState("");
+  const [method, setMethod] = useState<ApiPaymentMethod>("esewa");
+  const [reference, setReference] = useState("");
+  const open = enrollment != null;
+  const agreed = Number(enrollment?.agreed_amount ?? 0);
+  const paid = Number(enrollment?.total_paid ?? 0) - Number(enrollment?.refunds_total ?? 0);
+  const needsPayment = agreed > 0 && paid <= 0;
+
+  useEffect(() => {
+    if (!open) return;
+    setParts(splitEvenly(agreed, 1, localToday()));
+    setAmount("");
+    setMethod("esewa");
+    setReference("");
+  }, [open, agreed]);
+
+  const amountOk = !needsPayment || Number(amount) > 0;
+  const valid = amountOk && (agreed <= 0 || partsAreValid(parts, agreed));
+
+  function submit() {
+    if (!enrollment || leadId == null) return;
+    confirm.mutate(
+      {
+        leadId,
+        id: enrollment.id,
+        dueDates: agreed > 0 ? parts : undefined,
+        firstPayment: needsPayment
+          ? { amount, payment_method: method, transaction_reference: reference.trim() || undefined }
+          : undefined,
+      },
+      { onSuccess: onClose },
+    );
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Confirm enrollment</DialogTitle>
+          {enrollment && (
+            <DialogDescription>
+              {[enrollment.lead_name, enrollment.course_name, enrollment.batch_name, formatNPR(agreed)]
+                .filter(Boolean)
+                .join(" · ")}
+            </DialogDescription>
           )}
-          {/* The price is fixed once confirmed or paid; later changes are money entries with a reason. */}
-          <div className="grid gap-2">
-            <Label htmlFor="enrollment-listed-fee">Listed fee</Label>
-            <Input id="enrollment-listed-fee" type="number" value={f.listed_fee ?? ""} readOnly disabled />
-          </div>
-          <div className="grid gap-2">
-            <Label>Standard discount</Label>
-            <Input type="number" value={f.standard_discount ?? ""} disabled={priceLocked} onChange={(e) => set("standard_discount", e.target.value)} />
-          </div>
-          <div className="grid gap-2">
-            <Label>Additional discount</Label>
-            <Input type="number" value={f.additional_discount ?? ""} disabled={priceLocked} onChange={(e) => set("additional_discount", e.target.value)} />
-          </div>
-          <div className="grid gap-2">
-            <Label>Agreed amount</Label>
-            <Input
-              type="number"
-              value={agreedEdited ? (f.agreed_amount ?? "") : agreedAuto}
-              disabled={priceLocked}
-              onChange={(e) => {
-                setAgreedEdited(true);
-                set("agreed_amount", e.target.value);
-              }}
-            />
-          </div>
-          <div className="grid gap-2 sm:col-span-2">
-            <Label>Remarks</Label>
-            <Textarea rows={2} value={f.remarks ?? ""} onChange={(e) => set("remarks", e.target.value)} />
-          </div>
+        </DialogHeader>
+        <div className="grid gap-4 py-2">
+          {needsPayment ? (
+            <div className="grid gap-3 rounded-xl border p-3 sm:grid-cols-2">
+              <p className="text-sm font-semibold sm:col-span-2">First payment</p>
+              <div className="grid gap-2">
+                <Label htmlFor="first-payment-amount" required>
+                  Amount
+                </Label>
+                <Input
+                  id="first-payment-amount"
+                  type="number"
+                  min={0}
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="first-payment-method">Method</Label>
+                <Select value={method} onValueChange={(v) => setMethod(v as ApiPaymentMethod)}>
+                  <SelectTrigger id="first-payment-method">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PAY_METHODS.map((m) => (
+                      <SelectItem key={m} value={m} className="capitalize">
+                        {m.replace(/_/g, " ")}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2 sm:col-span-2">
+                <Label htmlFor="first-payment-reference">Transaction reference</Label>
+                <Input
+                  id="first-payment-reference"
+                  value={reference}
+                  onChange={(e) => setReference(e.target.value)}
+                />
+              </div>
+            </div>
+          ) : (
+            paid > 0 && (
+              <div className="flex items-center justify-between rounded-xl border px-3 py-2 text-sm">
+                <span className="text-muted-foreground">Paid</span>
+                <span className="font-semibold tabular-nums">{formatNPR(paid)}</span>
+              </div>
+            )
+          )}
+          {agreed > 0 && <DuePartsEditor total={agreed} parts={parts} onChange={setParts} />}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>
-            Cancel
+            Back
           </Button>
-          {isEdit ? (
-            <Button variant="brand" onClick={() => submit()} disabled={saving}>
-              {saving ? "Saving…" : "Save Changes"}
-            </Button>
-          ) : (
-            <>
-              <Button variant="outline" onClick={() => submit()} disabled={saving}>
-                Save as pending
-              </Button>
-              <Button variant="brand" onClick={() => submit(true)} disabled={saving}>
-                {saving ? "Saving…" : "Save and confirm"}
-              </Button>
-            </>
-          )}
+          <Button variant="brand" disabled={!valid || confirm.isPending} onClick={submit}>
+            {confirm.isPending ? "Confirming…" : "Confirm enrollment"}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

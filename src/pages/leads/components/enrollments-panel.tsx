@@ -11,7 +11,7 @@ import {
   Receipt,
   RotateCcw,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { ReasonDialog } from "@/components/reason-dialog";
@@ -34,7 +34,6 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
-  useConfirmEnrollment,
   useEnrollmentHistory,
   useEnrollmentPayments,
   useEnrollmentStatusAction,
@@ -42,13 +41,12 @@ import {
   useLeadPayments,
   useMakeFeeInvoice,
 } from "@/hooks/use-leads";
-import { daysText, dueSummary, partsAreValid, splitEvenly } from "@/lib/due-dates";
+import { daysText, dueSummary } from "@/lib/due-dates";
 import { changeText } from "@/lib/history-format";
 import { formatDate, formatDateTime, formatNPR } from "@/lib/leads-format";
-import { canSit, enrolledBatchIfDifferent, localToday, seatText } from "@/lib/seats";
+import { canSit, enrolledBatchIfDifferent, seatText } from "@/lib/seats";
 import { cn } from "@/lib/utils";
 import type {
-  ApiDuePart,
   ApiEnrollment,
   ApiEnrollmentStatus,
   ApiPayment,
@@ -56,8 +54,8 @@ import type {
   ApiSeatAction,
 } from "@/types/leads-api";
 import { AdjustmentDialog } from "./adjustment-dialog";
-import { ChangeDueDatesDialog, DueDatesList, DuePartsEditor, ReminderList } from "./due-dates";
-import { EnrollmentDialog, PaymentDialog } from "./enrollment-dialogs";
+import { ChangeDueDatesDialog, DueDatesList, ReminderList } from "./due-dates";
+import { ConfirmEnrollmentDialog, EnrollmentDialog, PaymentDialog } from "./enrollment-dialogs";
 import { PaymentActions } from "./payment-actions";
 import { SeatButtons, SeatDialog, SeatHistoryList } from "./seat-actions";
 import { TeamsLicenceLine } from "./teams-licence";
@@ -262,12 +260,10 @@ export function EnrollmentCard({
   const toggle = (s: Section) =>
     setOpenSections((open) => (open.includes(s) ? open.filter((x) => x !== s) : [s, ...open]));
   const [dueOpen, setDueOpen] = useState(false);
-  const [confirmParts, setConfirmParts] = useState<ApiDuePart[]>([]);
   const feeInvoice = useMakeFeeInvoice(leadId);
   const [seatAction, setSeatAction] = useState<ApiSeatAction | null>(null);
   const [statusAction, setStatusAction] = useState<"cancel" | "reinstate" | null>(null);
   const statusMutation = useEnrollmentStatusAction(leadId);
-  const confirm = useConfirmEnrollment();
   const [confirmOpen, setConfirmOpen] = useState(false);
   const isCancelled = enrollment.status === "cancelled";
   const isPending = enrollment.status === "pending";
@@ -286,10 +282,6 @@ export function EnrollmentCard({
   const enrolledBatch = enrolledBatchIfDifferent(enrollment);
   const dueRows = enrollment.due_dates ?? [];
   const { lateAmount, daysLate, next } = dueSummary(dueRows);
-
-  useEffect(() => {
-    if (confirmOpen) setConfirmParts(splitEvenly(agreed, 1, localToday()));
-  }, [confirmOpen, agreed]);
 
   return (
     <div className="rounded-2xl border p-4">
@@ -486,41 +478,11 @@ export function EnrollmentCard({
         enrollment={enrollment}
       />
 
-      <Dialog open={confirmOpen} onOpenChange={(o) => !o && setConfirmOpen(false)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Confirm enrollment</DialogTitle>
-            <DialogDescription>
-              {[enrollment.lead_name, enrollment.course_name, enrollment.batch_name, formatNPR(agreed)]
-                .filter(Boolean)
-                .join(" · ")}
-            </DialogDescription>
-          </DialogHeader>
-          {agreed > 0 && (
-            <div className="py-2">
-              <DuePartsEditor total={agreed} parts={confirmParts} onChange={setConfirmParts} />
-            </div>
-          )}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setConfirmOpen(false)}>
-              Back
-            </Button>
-            <Button
-              variant="brand"
-              disabled={confirm.isPending || (agreed > 0 && !partsAreValid(confirmParts, agreed))}
-              onClick={() =>
-                leadId != null &&
-                confirm.mutate(
-                  { leadId, id: enrollment.id, dueDates: agreed > 0 ? confirmParts : undefined },
-                  { onSuccess: () => setConfirmOpen(false) },
-                )
-              }
-            >
-              {confirm.isPending ? "Confirming…" : "Confirm enrollment"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ConfirmEnrollmentDialog
+        leadId={leadId}
+        enrollment={confirmOpen ? enrollment : null}
+        onClose={() => setConfirmOpen(false)}
+      />
 
       <ReasonDialog
         open={statusAction != null}

@@ -39,6 +39,7 @@ import type {
   ApiSeatAction,
   ApiSeatActionBody,
   ApiDuePart,
+  ApiFirstPayment,
   EnrollmentListParams,
   PaymentListParams,
 } from "@/types/leads-api";
@@ -640,12 +641,29 @@ export function useAddAdjustment(leadId?: number, enrollmentId?: number) {
 export function useConfirmEnrollment() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ leadId, id, dueDates }: { leadId: number; id: number; dueDates?: ApiDuePart[] }) =>
-      leadsService.confirmEnrollment(leadId, id, dueDates),
+    mutationFn: ({
+      leadId,
+      id,
+      dueDates,
+      firstPayment,
+    }: {
+      leadId: number;
+      id: number;
+      dueDates?: ApiDuePart[];
+      firstPayment?: ApiFirstPayment;
+    }) => leadsService.confirmEnrollment(leadId, id, dueDates, firstPayment),
     onSuccess: () => {
       toast.success("Enrollment confirmed");
-      // Confirm also takes a seat, so batch seat counts change.
-      for (const key of ["lead", "leads", "enrollments", "invoices", "students", "course-batches"]) {
+      // Confirm also takes a seat and may record the first payment.
+      for (const key of [
+        "lead",
+        "leads",
+        "enrollments",
+        "invoices",
+        "students",
+        "course-batches",
+        "payments",
+      ]) {
         void qc.invalidateQueries({ queryKey: [key] });
       }
     },

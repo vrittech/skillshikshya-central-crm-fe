@@ -21,6 +21,7 @@ import type {
   ApiSeatAction,
   ApiSeatActionBody,
   ApiDuePart,
+  ApiFirstPayment,
   ApiReminderLog,
 } from "@/types/leads-api";
 import type { ApiInvoice } from "@/types/invoices";
@@ -167,12 +168,21 @@ export const leadsService = {
     return data;
   },
   /** Cancel with a reason — the only way to cancel; PATCH refuses it. */
-  /** Confirm a pending enrollment. This makes the lead a student and sends the fee invoice. */
-  async confirmEnrollment(leadId: number, id: number, dueDates?: ApiDuePart[]) {
-    const { data } = await api.post<ApiEnrollment>(
-      `/leads/${leadId}/enrollments/${id}/confirm/`,
-      dueDates?.length ? { due_dates: dueDates } : {},
-    );
+  /**
+   * Confirm a pending enrollment. This makes the lead a student and sends the
+   * fee invoice. Something must be paid first: firstPayment records it in the
+   * same step.
+   */
+  async confirmEnrollment(
+    leadId: number,
+    id: number,
+    dueDates?: ApiDuePart[],
+    firstPayment?: ApiFirstPayment,
+  ) {
+    const { data } = await api.post<ApiEnrollment>(`/leads/${leadId}/enrollments/${id}/confirm/`, {
+      ...(dueDates?.length ? { due_dates: dueDates } : {}),
+      ...(firstPayment ? { first_payment: firstPayment } : {}),
+    });
     return data;
   },
 

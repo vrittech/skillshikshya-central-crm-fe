@@ -494,6 +494,13 @@ export interface EnrollmentListParams {
 export type ApiPaymentStatus = "pending" | "successful" | "failed" | "refunded" | "voided";
 export type ApiPaymentMethod = "cash" | "esewa" | "khalti" | "bank_transfer" | "card" | "connectips";
 
+/** The payment taken with Confirm when nothing is paid yet. */
+export interface ApiFirstPayment {
+  amount: string;
+  payment_method: ApiPaymentMethod;
+  transaction_reference?: string;
+}
+
 export interface ApiPayment {
   id: number;
   enrollment?: number;
