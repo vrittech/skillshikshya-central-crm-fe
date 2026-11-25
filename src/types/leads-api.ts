@@ -1020,3 +1020,73 @@ export interface ApiTimelineItem {
   before: Record<string, unknown> | null;
   after: Record<string, unknown> | null;
 }
+
+/* ------------------------------------------------------- import / export */
+
+export type ApiLeadFileType = "csv" | "xlsx";
+
+/** The import file, what to do with duplicates, and defaults for blank cells (ids). */
+export interface ApiLeadImportOptions {
+  file: File;
+  duplicates?: "skip" | "import";
+  default_lead_type?: number;
+  default_source?: number;
+  default_status?: number;
+  default_priority?: number;
+  default_course?: number;
+  default_branch?: number;
+  default_counselor?: number;
+}
+
+export interface ApiLeadImportMatch {
+  id: number;
+  reference_number: string;
+  full_name: string;
+  branch_name: string | null;
+}
+
+export interface ApiLeadImportRow {
+  /** Row number in the file (the header is row 1). */
+  row: number;
+  status: "ready" | "duplicate" | "error";
+  full_name: string;
+  phone: string;
+  email: string;
+  course: string;
+  branch: string;
+  counselor: string;
+  errors: string[];
+  warnings: string[];
+  /** Leads already in the CRM with this phone. */
+  matches: ApiLeadImportMatch[];
+  /** An earlier row of the file with the same phone. */
+  same_as_row: number | null;
+}
+
+export interface ApiLeadImportPreview {
+  file_name: string;
+  total: number;
+  ready: number;
+  duplicates: number;
+  errors: number;
+  columns: { header: string; column: string }[];
+  ignored: string[];
+  rows: ApiLeadImportRow[];
+}
+
+export interface ApiLeadImportResultRow {
+  row: number;
+  full_name: string;
+  status: "created" | "skipped" | "failed";
+  message?: string;
+  lead_id?: number;
+  reference_number?: string;
+}
+
+export interface ApiLeadImportResult {
+  file_name: string;
+  created: number;
+  skipped: number;
+  failed: number;
+  rows: ApiLeadImportResultRow[];
+}

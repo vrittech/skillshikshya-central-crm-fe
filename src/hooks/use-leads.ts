@@ -40,6 +40,7 @@ import type {
   ApiSeatActionBody,
   ApiDuePart,
   ApiFirstPayment,
+  ApiLeadImportOptions,
   EnrollmentListParams,
   PaymentListParams,
 } from "@/types/leads-api";
@@ -849,3 +850,22 @@ export function useEnrollmentPage(id?: number) {
   });
 }
 
+
+/** Checks an import file and says what would happen. Saves nothing. */
+export function useLeadImportPreview() {
+  return useMutation({
+    mutationFn: (options: ApiLeadImportOptions) => leadsService.importPreview(options),
+  });
+}
+
+/** Imports the rows that pass; the lead list and notifications refresh after. */
+export function useImportLeads() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (options: ApiLeadImportOptions) => leadsService.importLeads(options),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["leads"] });
+      void qc.invalidateQueries({ queryKey: ["notifications"] });
+    },
+  });
+}

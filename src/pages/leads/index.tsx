@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight, Download, Plus, Trash2, Upload } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, Download, Plus, Trash2, Upload } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
@@ -21,6 +21,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -56,8 +62,10 @@ import {
   useLeadsList,
 } from "@/hooks/use-leads";
 import { useUsers } from "@/hooks/use-users";
+import { apiErrorMessage } from "@/lib/api";
 import { leadsService } from "@/services/leads.service";
 import type { LeadListItem } from "@/types/leads";
+import type { ApiLeadFileType } from "@/types/leads-api";
 import { LeadActionDialogs, type LeadAction } from "./components/lead-action-dialogs";
 import {
   DEFAULT_FILTERS,
@@ -65,6 +73,7 @@ import {
   type LeadFilterOptions,
   type LeadFilterState,
 } from "./components/lead-filters";
+import { LeadImportDialog } from "./components/lead-import-dialog";
 import { LeadSummaryCards } from "./components/lead-summary-cards";
 import { LeadTable } from "./components/lead-table";
 
@@ -87,6 +96,8 @@ export default function LeadsPage() {
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const [bulkAssignOpen, setBulkAssignOpen] = useState(false);
   const [bulkAssignTo, setBulkAssignTo] = useState("");
+  const [importOpen, setImportOpen] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   // Codes (mock) and numeric IDs (api) aren't interchangeable — reset on switch.
   useEffect(() => {
@@ -200,12 +211,28 @@ export default function LeadsPage() {
     });
   }
 
-  function exportCsv() {
+  /** Downloads the leads the filters show, or only the selected ones (`ids`). */
+  async function exportLeads(fileType: ApiLeadFileType, ids?: number[]) {
     if (isMock) {
-      toast.info("Export CSV", { description: "Switch to the live data source to export." });
+      toast.info("Export", { description: "Switch to the live data source to export." });
       return;
     }
-    window.open(leadsService.exportCsvUrl(buildApiParams(effectiveFilters, 1, 100, "-created_at")), "_blank");
+    setExporting(true);
+    try {
+      await leadsService.exportLeads(buildApiParams(effectiveFilters, 1, pageSize, "-created_at"), fileType, ids);
+    } catch (e) {
+      toast.error(apiErrorMessage(e, "Could not export the leads"));
+    } finally {
+      setExporting(false);
+    }
+  }
+
+  function startImport() {
+    if (isMock) {
+      toast.info("Import", { description: "Switch to the live data source to import." });
+      return;
+    }
+    setImportOpen(true);
   }
 
   const activeLead: LeadListItem | null = actionId
@@ -227,12 +254,22 @@ export default function LeadsPage() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Button variant="outline" onClick={() => toast.info("Import is coming soon.")}>
-            <Upload /> Import
-          </Button>
-          <Button variant="outline" onClick={exportCsv}>
-            <Download /> Export
-          </Button>
+          {can("leads.import") && (
+            <Button variant="outline" onClick={startImport}>
+              <Upload /> Import
+            </Button>
+          )}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" disabled={exporting}>
+                <Download /> {exporting ? "Exporting…" : "Export"} <ChevronDown className="opacity-60" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onSelect={() => void exportLeads("csv")}>CSV</DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => void exportLeads("xlsx")}>Excel</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           {can("recycle_bin.view") && (
             <Button variant="outline" onClick={() => navigate("/leads/recycle-bin")}>
               <Trash2 /> Recycle bin
@@ -283,6 +320,17 @@ export default function LeadsPage() {
                   {bulkDelete.isPending ? "Deleting…" : "Delete"}
                 </Button>
               )}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button size="sm" variant="outline" disabled={selectedApiIds.length === 0 || exporting}>
+                    <Download /> Export <ChevronDown className="opacity-60" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onSelect={() => void exportLeads("csv", selectedApiIds)}>CSV</DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => void exportLeads("xlsx", selectedApiIds)}>Excel</DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
               <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())}>
                 Clear
               </Button>
@@ -440,6 +488,7 @@ export default function LeadsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      <LeadImportDialog open={importOpen} onClose={() => setImportOpen(false)} options={options} />
     </div>
   );
 }

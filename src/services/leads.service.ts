@@ -1,4 +1,5 @@
 import { api } from "@/lib/api";
+import { fileNameFrom, saveBlob } from "@/lib/download";
 import type { Paginated } from "@/types";
 import type {
   ApiAdjustment,
@@ -23,6 +24,10 @@ import type {
   ApiDuePart,
   ApiFirstPayment,
   ApiReminderLog,
+  ApiLeadFileType,
+  ApiLeadImportOptions,
+  ApiLeadImportPreview,
+  ApiLeadImportResult,
 } from "@/types/leads-api";
 import type { ApiInvoice } from "@/types/invoices";
 
@@ -327,11 +332,44 @@ export const leadsService = {
   },
 
   /** Absolute URL for the CSV export (opened in a new tab; cookies authenticate). */
-  exportCsvUrl(params: LeadListParams = {}) {
-    const qs = new URLSearchParams(
-      Object.entries(params).flatMap(([k, v]) => (v == null ? [] : [[k, String(v)]])),
-    );
-    const q = qs.toString();
-    return `/api/leads/export_csv/${q ? `?${q}` : ""}`;
+  /** Downloads the leads the list shows (its filters, not its page), or only `ids`. */
+  async exportLeads(params: LeadListParams, fileType: ApiLeadFileType, ids?: number[]) {
+    const query: Record<string, unknown> = { ...params, file_type: fileType };
+    delete query.page;
+    delete query.page_size;
+    if (ids?.length) query.ids = ids.join(",");
+    const res = await api.get<Blob>("/leads/export_csv/", { params: query, responseType: "blob" });
+    saveBlob(res.data, fileNameFrom(res.headers["content-disposition"], `leads.${fileType}`));
+  },
+  /** The import template: CSV, or Excel with dropdowns of the CRM's lists. */
+  async importTemplate(fileType: ApiLeadFileType) {
+    const res = await api.get<Blob>("/leads/import-template/", {
+      params: { file_type: fileType },
+      responseType: "blob",
+    });
+    saveBlob(res.data, fileNameFrom(res.headers["content-disposition"], `lead-import-template.${fileType}`));
+  },
+  /** Checks a file and says what an import would do. Saves nothing. */
+  async importPreview(options: ApiLeadImportOptions) {
+    const { data } = await api.post<ApiLeadImportPreview>("/leads/import/preview/", importForm(options), {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+    return data;
+  },
+  /** Saves the rows that pass; duplicates only with duplicates: "import". */
+  async importLeads(options: ApiLeadImportOptions) {
+    const { data } = await api.post<ApiLeadImportResult>("/leads/import/", importForm(options), {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+    return data;
   },
 };
+
+function importForm(options: ApiLeadImportOptions) {
+  const form = new FormData();
+  for (const [key, value] of Object.entries(options)) {
+    if (value == null || value === "") continue;
+    form.append(key, value instanceof File ? value : String(value));
+  }
+  return form;
+}

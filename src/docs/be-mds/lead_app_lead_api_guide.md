@@ -407,7 +407,7 @@ See [Notifications API Guide](lead_app_notifications_api_guide.md) for reading/c
 | Filter → param mapping | `buildApiParams()` in `src/hooks/use-leads.ts` |
 | Filter UI (incl. created-date range → `from_date`/`to_date`) | `src/pages/leads/components/lead-filters.tsx` |
 | Archive / restore / purge / recycle bin | `src/hooks/use-leads.ts` · `src/pages/leads/recycle-bin.tsx` |
-| CSV export | `leadsService.exportCsvUrl()` — opened in a new tab so cookies authenticate the download |
+| Export | `leadsService.exportLeads(params, "csv" \| "xlsx", ids?)` — downloaded through the API client, so an expired session refreshes first |
 
 **Not yet used by the frontend:** `created_date`, `campaign__in`, `branch__in`, `province__in`,
 `city__in`, `lead_type__in`, `lead_score__lte`, `expected_revenue__gte/lte`,
