@@ -189,7 +189,10 @@ function FilterToggle({
   );
 }
 
-/** Search, then every filter in one row above the list; the row scrolls sideways. */
+/**
+ * Search and the date filters on top, every other filter below. Both rows
+ * wrap onto more lines, so nothing scrolls sideways.
+ */
 export function LeadFilters({ value, onChange, options, showScopeToggles = true }: Props) {
   const set = <K extends keyof LeadFilterState>(key: K, v: LeadFilterState[K]) =>
     onChange({ ...value, [key]: v });
@@ -197,17 +200,22 @@ export function LeadFilters({ value, onChange, options, showScopeToggles = true 
 
   return (
     <div className="space-y-3">
-      <div className="relative">
-        <Search className="text-muted-foreground absolute top-2.5 left-3 size-4" />
-        <Input
-          placeholder="Search by name, phone, email, or lead ID"
-          className="rounded-full pl-9"
-          value={value.search}
-          onChange={(e) => set("search", e.target.value)}
-        />
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative min-w-64 flex-1">
+          <Search className="text-muted-foreground absolute top-2.5 left-3 size-4" />
+          <Input
+            placeholder="Search by name, phone, email, or lead ID"
+            className="rounded-full pl-9"
+            value={value.search}
+            onChange={(e) => set("search", e.target.value)}
+          />
+        </div>
+        <FilterDate label="Created on" value={value.createdDate} onChange={(v) => set("createdDate", v)} />
+        <FilterDate label="From" value={value.dateFrom} max={value.dateTo || undefined} onChange={(v) => set("dateFrom", v)} />
+        <FilterDate label="To" value={value.dateTo} min={value.dateFrom || undefined} onChange={(v) => set("dateTo", v)} />
       </div>
 
-      <div className="-mx-4 flex items-center gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:thin]">
+      <div className="flex flex-wrap items-center gap-2">
         <FilterSelect label="Status" value={value.status} onChange={(v) => set("status", v)} allLabel="All statuses" options={options.statuses} />
         <FilterSelect label="Enrollment" value={value.enrollment} onChange={(v) => set("enrollment", v)} allLabel="All enrollments" options={ENROLLMENT_STATUSES} />
         <FilterSelect label="Source" value={value.source} onChange={(v) => set("source", v)} allLabel="All sources" options={options.sources} />
@@ -222,9 +230,6 @@ export function LeadFilters({ value, onChange, options, showScopeToggles = true 
           extra={showScopeToggles ? [{ value: "unassigned", label: "Unassigned" }] : undefined}
         />
         <FilterSelect label="Priority" value={value.priority} onChange={(v) => set("priority", v)} allLabel="All priorities" options={options.priorities} />
-        <FilterDate label="Created on" value={value.createdDate} onChange={(v) => set("createdDate", v)} />
-        <FilterDate label="From" value={value.dateFrom} max={value.dateTo || undefined} onChange={(v) => set("dateFrom", v)} />
-        <FilterDate label="To" value={value.dateTo} min={value.dateFrom || undefined} onChange={(v) => set("dateTo", v)} />
         <FilterToggle active={value.overdueOnly} onClick={() => set("overdueOnly", !value.overdueOnly)}>
           Overdue
         </FilterToggle>
