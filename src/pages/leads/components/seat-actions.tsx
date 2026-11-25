@@ -1,7 +1,7 @@
 import { ArrowRightLeft, LogIn, Pause, Play } from "lucide-react";
 import { useEffect, useState } from "react";
 import { ReasonDialog } from "@/components/reason-dialog";
-import { Button } from "@/components/ui/button";
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -18,7 +18,7 @@ import { batchOption, canSit, localToday, placementTitle, takesNoOne } from "@/l
 import type { ApiEnrollment, ApiSeatAction } from "@/types/leads-api";
 
 /** Change batch and Pause for a seated student, Resume for a paused one, Add to batch otherwise. */
-export function SeatButtons({
+export function SeatMenuItems({
   enrollment,
   onAction,
 }: {
@@ -29,26 +29,26 @@ export function SeatButtons({
   if (enrollment.seat_state === "seated") {
     return (
       <>
-        <Button size="sm" variant="outline" onClick={() => onAction("move")}>
-          <ArrowRightLeft /> Change batch
-        </Button>
-        <Button size="sm" variant="outline" onClick={() => onAction("pause")}>
-          <Pause /> Pause
-        </Button>
+        <DropdownMenuItem onSelect={() => onAction("move")}>
+          <ArrowRightLeft className="size-4" /> Change batch
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => onAction("pause")}>
+          <Pause className="size-4" /> Pause
+        </DropdownMenuItem>
       </>
     );
   }
   if (enrollment.seat_state === "paused") {
     return (
-      <Button size="sm" variant="outline" onClick={() => onAction("resume")}>
-        <Play /> Resume
-      </Button>
+      <DropdownMenuItem onSelect={() => onAction("resume")}>
+        <Play className="size-4" /> Resume
+      </DropdownMenuItem>
     );
   }
   return (
-    <Button size="sm" variant="outline" onClick={() => onAction("join")}>
-      <LogIn /> Add to batch
-    </Button>
+    <DropdownMenuItem onSelect={() => onAction("join")}>
+      <LogIn className="size-4" /> Add to batch
+    </DropdownMenuItem>
   );
 }
 

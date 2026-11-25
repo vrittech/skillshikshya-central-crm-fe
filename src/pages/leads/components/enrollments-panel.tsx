@@ -2,17 +2,17 @@ import {
   Ban,
   BadgeCheck,
   CalendarClock,
-  ChevronDown,
   ChevronRight,
   Coins,
   FileText,
+  MoreHorizontal,
   PencilLine,
   Plus,
   Receipt,
   RotateCcw,
 } from "lucide-react";
-import { useState } from "react";
-import { Link } from "react-router-dom";
+import { type ReactNode, useEffect, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { ReasonDialog } from "@/components/reason-dialog";
 import { Badge } from "@/components/ui/badge";
@@ -25,6 +25,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Select,
   SelectContent,
@@ -57,7 +64,7 @@ import { AdjustmentDialog } from "./adjustment-dialog";
 import { ChangeDueDatesDialog, DueDatesList, ReminderList } from "./due-dates";
 import { ConfirmEnrollmentDialog, EnrollmentDialog, PaymentDialog } from "./enrollment-dialogs";
 import { PaymentActions } from "./payment-actions";
-import { SeatButtons, SeatDialog, SeatHistoryList } from "./seat-actions";
+import { SeatDialog, SeatHistoryList, SeatMenuItems } from "./seat-actions";
 import { TeamsLicenceLine } from "./teams-licence";
 
 /* ------------------------------------------------------------ status tones */
@@ -221,19 +228,73 @@ function EnrollmentHistoryList({ leadId, enrollment }: { leadId?: number; enroll
 
 /* -------------------------------------------------------- enrollment card */
 
-type Section = "payments" | "due" | "reminders" | "history" | "seats";
+type Section = "fee" | "payments" | "due" | "reminders" | "seats" | "history";
 
 const SECTION_LABEL: Record<Section, string> = {
+  fee: "Fee details",
   payments: "Payments",
   due: "Due dates",
   reminders: "Reminders",
-  history: "History",
   seats: "Batch history",
+  history: "History",
 };
 
+function Stat({ label: l, value, tone }: { label: string; value: string; tone?: string }) {
+  return (
+    <div className="min-w-0 px-3 py-2.5">
+      <p className="text-muted-foreground truncate text-xs">{l}</p>
+      <p className={cn("mt-0.5 truncate text-base font-semibold tabular-nums", tone)}>{value}</p>
+    </div>
+  );
+}
+
+/** A section that opens and closes, with a short summary on the right. */
+function SectionRow({
+  title,
+  summary,
+  summaryTone,
+  open,
+  onToggle,
+  children,
+}: {
+  title: string;
+  summary?: string | null;
+  summaryTone?: string;
+  open: boolean;
+  onToggle: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <div className="border-t">
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={onToggle}
+        className="hover:bg-muted/40 flex w-full items-center gap-2 px-4 py-3 text-left transition-colors"
+      >
+        <ChevronRight
+          className={cn(
+            "text-muted-foreground size-4 shrink-0 transition-transform",
+            open && "rotate-90",
+          )}
+        />
+        <span className="text-sm font-medium">{title}</span>
+        {summary && (
+          <span
+            className={cn("text-muted-foreground ml-auto min-w-0 truncate text-xs", summaryTone)}
+          >
+            {summary}
+          </span>
+        )}
+      </button>
+      {open && <div className="px-4 pb-4">{children}</div>}
+    </div>
+  );
+}
+
 /**
- * One enrollment with its money, sections and actions. The last section
- * opened shows first. On its own page (`page`) every section starts open.
+ * One enrollment: what is owed and paid up top, everything else in sections
+ * that open on click. On its own page (`page`) every section starts open.
  */
 export function EnrollmentCard({
   leadId,
@@ -250,15 +311,16 @@ export function EnrollmentCard({
 }) {
   const [payOpen, setPayOpen] = useState(false);
   const sections: Section[] = [
+    "fee",
     "payments",
     ...(canSit(enrollment) ? (["due", "reminders"] as const) : []),
-    "history",
     ...(canSit(enrollment) || !!enrollment.placements?.length ? (["seats"] as const) : []),
+    "history",
   ];
   const [openSections, setOpenSections] = useState<Section[]>(page ? sections : []);
   const isOpen = (s: Section) => openSections.includes(s);
   const toggle = (s: Section) =>
-    setOpenSections((open) => (open.includes(s) ? open.filter((x) => x !== s) : [s, ...open]));
+    setOpenSections((open) => (open.includes(s) ? open.filter((x) => x !== s) : [...open, s]));
   const [dueOpen, setDueOpen] = useState(false);
   const feeInvoice = useMakeFeeInvoice(leadId);
   const [seatAction, setSeatAction] = useState<ApiSeatAction | null>(null);
@@ -282,173 +344,213 @@ export function EnrollmentCard({
   const enrolledBatch = enrolledBatchIfDifferent(enrollment);
   const dueRows = enrollment.due_dates ?? [];
   const { lateAmount, daysLate, next } = dueSummary(dueRows);
+  const canInvoice = leadId != null && canSit(enrollment) && enrollment.has_fee_invoice === false;
+
+  const summaries: Partial<Record<Section, string | null>> = {
+    fee: `Agreed ${formatNPR(agreed)}`,
+    due:
+      lateAmount > 0
+        ? `Late ${formatNPR(lateAmount)}`
+        : next?.due_on
+          ? `Next ${formatDate(next.due_on)}`
+          : dueRows.length
+            ? "All paid"
+            : null,
+    seats: seatText(enrollment),
+  };
 
   return (
-    <div className="rounded-2xl border p-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          {page ? (
-            <p className="font-headline text-lg font-semibold">{enrollment.course_name ?? "Course"}</p>
-          ) : (
-            <Link
-              to={`/enrollments/${enrollment.id}`}
-              className="font-headline text-lg font-semibold hover:underline"
-            >
-              {enrollment.course_name ?? "Course"}
-            </Link>
+    <div className="overflow-hidden rounded-2xl border">
+      <div className="p-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              {page ? (
+                <p className="font-headline text-lg font-semibold">
+                  {enrollment.course_name ?? "Course"}
+                </p>
+              ) : (
+                <Link
+                  to={`/enrollments/${enrollment.id}`}
+                  className="font-headline text-lg font-semibold hover:underline"
+                >
+                  {enrollment.course_name ?? "Course"}
+                </Link>
+              )}
+              <StatusPill status={enrollment.status} />
+              {enrollment.is_full_paid && <Badge variant="brand">Fully paid</Badge>}
+            </div>
+            <p className="text-muted-foreground mt-0.5 text-sm">
+              {seatText(enrollment)} · Enrolled{" "}
+              {formatDate(enrollment.enrollment_date ?? undefined)}
+              {enrollment.branch_name ? ` · ${enrollment.branch_name}` : ""}
+            </p>
+          </div>
+          {canManage && (
+            <div className="flex items-center gap-2">
+              {isPending && leadId != null && (
+                <Button size="sm" variant="brand" onClick={() => setConfirmOpen(true)}>
+                  <BadgeCheck /> Confirm
+                </Button>
+              )}
+              {!isCancelled && (
+                <Button size="sm" variant="outline" onClick={() => setPayOpen(true)}>
+                  <Receipt /> Add Payment
+                </Button>
+              )}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button size="icon" variant="outline" className="size-8" aria-label="More actions">
+                    <MoreHorizontal />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48">
+                  {leadId != null && canSit(enrollment) && (
+                    <>
+                      <SeatMenuItems enrollment={enrollment} onAction={setSeatAction} />
+                      <DropdownMenuSeparator />
+                    </>
+                  )}
+                  {isCancelled && (
+                    <DropdownMenuItem onSelect={() => setPayOpen(true)}>
+                      <Receipt /> Add Payment
+                    </DropdownMenuItem>
+                  )}
+                  <DropdownMenuItem onSelect={() => setAdjustOpen(true)}>
+                    <Coins /> Money entry
+                  </DropdownMenuItem>
+                  {canInvoice && (
+                    <DropdownMenuItem
+                      disabled={feeInvoice.isPending}
+                      onSelect={() => feeInvoice.mutate(enrollment.id)}
+                    >
+                      <FileText /> Create fee invoice
+                    </DropdownMenuItem>
+                  )}
+                  <DropdownMenuItem onSelect={onEdit}>
+                    <PencilLine /> Edit
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  {isCancelled ? (
+                    <DropdownMenuItem onSelect={() => setStatusAction("reinstate")}>
+                      <RotateCcw /> Reinstate
+                    </DropdownMenuItem>
+                  ) : (
+                    <DropdownMenuItem
+                      variant="destructive"
+                      onSelect={() => setStatusAction("cancel")}
+                    >
+                      <Ban /> Cancel enrollment
+                    </DropdownMenuItem>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           )}
-          <p className="text-muted-foreground text-sm">
-            {seatText(enrollment)} · Enrolled {formatDate(enrollment.enrollment_date ?? undefined)}
-            {enrollment.branch_name ? ` · ${enrollment.branch_name}` : ""}
-          </p>
         </div>
-        <div className="flex items-center gap-2">
-          <StatusPill status={enrollment.status} />
-          {enrollment.is_full_paid && <Badge variant="brand">Fully paid</Badge>}
-        </div>
-      </div>
 
-      <div className="mt-4 grid gap-x-8 sm:grid-cols-2">
-        <div>
-          <Fee label="Listed fee" value={formatNPR(Number(enrollment.listed_fee))} />
-          <Fee label="Standard discount" value={formatNPR(Number(enrollment.standard_discount))} />
-          <Fee
-            label="Additional discount"
-            value={formatNPR(Number(enrollment.additional_discount))}
-          />
-          <Fee label="Agreed amount" value={formatNPR(agreed)} strong />
-        </div>
-        <div>
-          {extras > 0 && <Fee label="Extra charges" value={`+ ${formatNPR(extras)}`} />}
-          {discounts > 0 && <Fee label="Later discounts" value={`− ${formatNPR(discounts)}`} />}
-          {writeOffs > 0 && <Fee label="Written off" value={`− ${formatNPR(writeOffs)}`} />}
-          <Fee label="Paid" value={formatNPR(paid)} />
-          {refunds > 0 && <Fee label="Refunded" value={`+ ${formatNPR(refunds)}`} />}
-          <Fee
+        <div className="mt-4 grid grid-cols-3 divide-x rounded-xl border">
+          <Stat label="Total fee" value={formatNPR(due)} />
+          <Stat label="Paid" value={formatNPR(netPaid)} />
+          <Stat
             label={remaining < 0 ? "Credit" : "Remaining"}
             value={formatNPR(Math.abs(remaining))}
-            strong
+            tone={lateAmount > 0 ? "text-destructive" : undefined}
           />
-          {enrolledBatch && <Fee label="Enrolled batch" value={enrolledBatch} />}
-          {enrollment.student_name && <Fee label="Student" value={enrollment.student_name} />}
-          {enrollment.created_by_name && (
-            <Fee label="Created by" value={enrollment.created_by_name} />
-          )}
         </div>
+
+        <div className="bg-muted mt-3 h-1.5 overflow-hidden rounded-full">
+          <div
+            className={cn("h-full rounded-full", remaining <= 0 ? "bg-emerald-500" : "bg-brand")}
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+        <p className="text-muted-foreground mt-1.5 text-xs">
+          {pct}% collected
+          {lateAmount > 0 ? (
+            <span className="text-destructive">
+              {" "}
+              · Late {formatNPR(lateAmount)} · {daysText(daysLate)}
+            </span>
+          ) : next?.due_on ? (
+            ` · Next due ${formatDate(next.due_on)}: ${formatNPR(Number(next.left))}`
+          ) : (
+            ""
+          )}
+        </p>
+
+        {leadId != null && <TeamsLicenceLine enrollment={enrollment} canManage={canManage} />}
       </div>
 
-      <div className="bg-muted mt-3 h-1.5 overflow-hidden rounded-full">
-        <div
-          className={cn("h-full rounded-full", remaining <= 0 ? "bg-emerald-500" : "bg-brand")}
-          style={{ width: `${pct}%` }}
-        />
-      </div>
-      <p className="text-muted-foreground mt-1 text-xs">
-        {pct}% collected
-        {lateAmount > 0 ? (
-          <span className="text-destructive">
-            {" "}
-            · Late {formatNPR(lateAmount)} · {daysText(daysLate)}
-          </span>
-        ) : next?.due_on ? (
-          ` · Next due ${formatDate(next.due_on)}: ${formatNPR(Number(next.left))}`
-        ) : (
-          ""
-        )}
-      </p>
-
-      {leadId != null && <TeamsLicenceLine enrollment={enrollment} canManage={canManage} />}
-
-      {enrollment.remarks && (
-        <p className="text-muted-foreground mt-3 text-sm">{enrollment.remarks}</p>
-      )}
-
-      <div className="mt-4 flex flex-wrap items-center gap-2">
-        {sections.map((s, i) => (
-          <Button
-            key={s}
-            size="sm"
-            variant="ghost"
-            aria-expanded={isOpen(s)}
-            className={cn("text-muted-foreground", i === 0 && "-ml-2", isOpen(s) && "text-foreground")}
-            onClick={() => toggle(s)}
-          >
-            {isOpen(s) ? <ChevronDown /> : <ChevronRight />} {SECTION_LABEL[s]}
-          </Button>
-        ))}
-        <div className="grow" />
-        {canManage && (
-          <>
-            {isPending && leadId != null && (
-              <Button size="sm" variant="brand" onClick={() => setConfirmOpen(true)}>
-                <BadgeCheck /> Confirm
-              </Button>
-            )}
-            {leadId != null && <SeatButtons enrollment={enrollment} onAction={setSeatAction} />}
-            <Button size="sm" variant="outline" onClick={() => setPayOpen(true)}>
-              <Receipt /> Add Payment
-            </Button>
-            <Button size="sm" variant="outline" onClick={() => setAdjustOpen(true)}>
-              <Coins /> Money entry
-            </Button>
-            {leadId != null && canSit(enrollment) && enrollment.has_fee_invoice === false && (
-              <Button
-                size="sm"
-                variant="outline"
-                disabled={feeInvoice.isPending}
-                onClick={() => feeInvoice.mutate(enrollment.id)}
-              >
-                <FileText /> Create fee invoice
-              </Button>
-            )}
-            <Button size="sm" variant="outline" onClick={onEdit}>
-              <PencilLine /> Edit
-            </Button>
-            {isCancelled ? (
-              <Button size="sm" variant="outline" onClick={() => setStatusAction("reinstate")}>
-                <RotateCcw /> Reinstate
-              </Button>
-            ) : (
-              <Button
-                size="sm"
-                variant="outline"
-                className="text-destructive"
-                onClick={() => setStatusAction("cancel")}
-              >
-                <Ban /> Cancel
-              </Button>
-            )}
-          </>
-        )}
-      </div>
-
-      {openSections
-        .filter((s) => sections.includes(s))
-        .map((s) => (
-          <div key={s} className="mt-1 border-t pt-3">
-            <p className="text-muted-foreground mb-1 text-xs font-semibold tracking-wide uppercase">
-              {SECTION_LABEL[s]}
-            </p>
-            {s === "payments" && (
-              <EnrollmentPayments leadId={leadId} enrollment={enrollment} canManage={canManage} />
-            )}
-            {s === "due" && (
-              <>
-                <DueDatesList rows={dueRows} />
-                {canManage && leadId != null && (
-                  <div className="mt-2 flex justify-end">
-                    <Button size="sm" variant="outline" onClick={() => setDueOpen(true)}>
-                      <CalendarClock /> Change due dates
-                    </Button>
-                  </div>
-                )}
-              </>
-            )}
-            {s === "reminders" && <ReminderList leadId={leadId} enrollmentId={enrollment.id} />}
-            {s === "history" && <EnrollmentHistoryList leadId={leadId} enrollment={enrollment} />}
-            {s === "seats" && <SeatHistoryList enrollment={enrollment} />}
-          </div>
-        ))}
+      {sections.map((s) => (
+        <SectionRow
+          key={s}
+          title={SECTION_LABEL[s]}
+          summary={summaries[s]}
+          summaryTone={s === "due" && lateAmount > 0 ? "text-destructive" : undefined}
+          open={isOpen(s)}
+          onToggle={() => toggle(s)}
+        >
+          {s === "fee" && (
+            <>
+              <div className="grid gap-x-8 sm:grid-cols-2">
+                <div>
+                  <Fee label="Listed fee" value={formatNPR(Number(enrollment.listed_fee))} />
+                  <Fee
+                    label="Standard discount"
+                    value={formatNPR(Number(enrollment.standard_discount))}
+                  />
+                  <Fee
+                    label="Additional discount"
+                    value={formatNPR(Number(enrollment.additional_discount))}
+                  />
+                  <Fee label="Agreed amount" value={formatNPR(agreed)} strong />
+                </div>
+                <div>
+                  {extras > 0 && <Fee label="Extra charges" value={`+ ${formatNPR(extras)}`} />}
+                  {discounts > 0 && (
+                    <Fee label="Later discounts" value={`− ${formatNPR(discounts)}`} />
+                  )}
+                  {writeOffs > 0 && <Fee label="Written off" value={`− ${formatNPR(writeOffs)}`} />}
+                  <Fee label="Paid" value={formatNPR(paid)} />
+                  {refunds > 0 && <Fee label="Refunded" value={`+ ${formatNPR(refunds)}`} />}
+                  <Fee
+                    label={remaining < 0 ? "Credit" : "Remaining"}
+                    value={formatNPR(Math.abs(remaining))}
+                    strong
+                  />
+                  {enrolledBatch && <Fee label="Enrolled batch" value={enrolledBatch} />}
+                  {enrollment.student_name && <Fee label="Student" value={enrollment.student_name} />}
+                  {enrollment.created_by_name && (
+                    <Fee label="Created by" value={enrollment.created_by_name} />
+                  )}
+                </div>
+              </div>
+              {enrollment.remarks && (
+                <p className="text-muted-foreground mt-3 text-sm">{enrollment.remarks}</p>
+              )}
+            </>
+          )}
+          {s === "payments" && (
+            <EnrollmentPayments leadId={leadId} enrollment={enrollment} canManage={canManage} />
+          )}
+          {s === "due" && (
+            <>
+              <DueDatesList rows={dueRows} />
+              {canManage && leadId != null && (
+                <div className="mt-2 flex justify-end">
+                  <Button size="sm" variant="outline" onClick={() => setDueOpen(true)}>
+                    <CalendarClock /> Change due dates
+                  </Button>
+                </div>
+              )}
+            </>
+          )}
+          {s === "reminders" && <ReminderList leadId={leadId} enrollmentId={enrollment.id} />}
+          {s === "seats" && <SeatHistoryList enrollment={enrollment} />}
+          {s === "history" && <EnrollmentHistoryList leadId={leadId} enrollment={enrollment} />}
+        </SectionRow>
+      ))}
 
       <SeatDialog
         leadId={leadId}
@@ -505,7 +607,76 @@ export function EnrollmentCard({
 
 /* --------------------------------------------------------------- the panel */
 
-/** Enrollment tab (live path) — every enrollment of the lead. Money records can't be deleted. */
+const GROUPS: { title: string; statuses: ApiEnrollmentStatus[] }[] = [
+  { title: "Pending", statuses: ["pending"] },
+  { title: "Confirmed", statuses: ["confirmed", "active", "completed"] },
+  { title: "Closed", statuses: ["cancelled", "dropped_out", "transferred"] },
+];
+
+/** The money line in the list: what is agreed, what is left, or why it closed. */
+function listMoney(e: ApiEnrollment) {
+  const netPaid = Number(e.total_paid) - Number(e.refunds_total ?? 0);
+  const remaining = Number(e.remaining_amount);
+  if (e.status === "pending") {
+    const agreed = formatNPR(Number(e.agreed_amount));
+    return netPaid > 0 ? `${agreed} · ${formatNPR(netPaid)} paid` : agreed;
+  }
+  if (!canSit(e)) return label(e.status);
+  if (remaining > 0) return `${formatNPR(remaining)} left`;
+  if (remaining < 0) return `${formatNPR(-remaining)} credit`;
+  return "Fully paid";
+}
+
+function listBatch(e: ApiEnrollment) {
+  if (canSit(e) && e.seat_state === "paused") return "Paused";
+  return (canSit(e) ? e.current_batch_name : e.batch_name) || "No batch";
+}
+
+function EnrollmentListItem({
+  enrollment: e,
+  selected,
+  onSelect,
+}: {
+  enrollment: ApiEnrollment;
+  selected: boolean;
+  onSelect: () => void;
+}) {
+  const late = canSit(e) && dueSummary(e.due_dates ?? []).lateAmount > 0;
+  const extraStatus = e.status === "active" || e.status === "completed";
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      aria-current={selected || undefined}
+      className={cn(
+        "w-full rounded-xl border px-3 py-2.5 text-left transition-colors",
+        selected
+          ? "border-brand/40 bg-brand/5 ring-brand/20 ring-1"
+          : "hover:bg-muted/50 border-transparent",
+      )}
+    >
+      <p className="truncate text-sm font-medium">{e.course_name ?? "Course"}</p>
+      <p className="text-muted-foreground truncate text-xs">
+        {listBatch(e)} · {formatDate(e.enrollment_date ?? undefined)}
+        {extraStatus ? ` · ${label(e.status)}` : ""}
+      </p>
+      <p
+        className={cn(
+          "mt-1 text-xs font-medium",
+          late ? "text-destructive" : "text-foreground/80",
+          !canSit(e) && e.status !== "pending" && "text-muted-foreground capitalize",
+        )}
+      >
+        {listMoney(e)}
+      </p>
+    </button>
+  );
+}
+
+/**
+ * Enrollment tab (live path): the lead's enrollments on the left, grouped by
+ * status, and the one picked on the right. The pick is kept in the URL.
+ */
 export function EnrollmentsPanel({
   leadId,
   primaryCourseId,
@@ -516,49 +687,114 @@ export function EnrollmentsPanel({
   canManage: boolean;
 }) {
   const { enrollments, isLoading } = useLeadEnrollments(leadId);
+  const [searchParams, setSearchParams] = useSearchParams();
   const [createOpen, setCreateOpen] = useState(false);
   const [editing, setEditing] = useState<ApiEnrollment | null>(null);
+  // The ids before "New Enrollment", so the new one can be picked once it shows up.
+  const [idsBefore, setIdsBefore] = useState<number[] | null>(null);
+
+  const pickedId = Number(searchParams.get("enrollment"));
+  const selected =
+    enrollments.find((e) => e.id === pickedId) ??
+    enrollments.find((e) => e.status === "pending") ??
+    enrollments.find((e) => canSit(e)) ??
+    enrollments[0];
+
+  const select = (id: number) =>
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.set("tab", "enrollment");
+        next.set("enrollment", String(id));
+        return next;
+      },
+      { replace: true },
+    );
+
+  useEffect(() => {
+    if (!idsBefore) return;
+    const added = enrollments.find((e) => !idsBefore.includes(e.id));
+    if (!added) return;
+    setIdsBefore(null);
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.set("tab", "enrollment");
+        next.set("enrollment", String(added.id));
+        return next;
+      },
+      { replace: true },
+    );
+  }, [enrollments, idsBefore, setSearchParams]);
+
+  const startCreate = () => {
+    setIdsBefore(enrollments.map((e) => e.id));
+    setCreateOpen(true);
+  };
 
   if (isLoading) {
     return (
-      <div className="space-y-3">
-        <Skeleton className="h-40 w-full rounded-2xl" />
-        <Skeleton className="h-40 w-full rounded-2xl" />
+      <div className="@container">
+        <div className="grid gap-4 @3xl:grid-cols-[16rem_minmax(0,1fr)]">
+          <div className="space-y-2">
+            <Skeleton className="h-16 w-full rounded-xl" />
+            <Skeleton className="h-16 w-full rounded-xl" />
+          </div>
+          <Skeleton className="h-64 w-full rounded-2xl" />
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-4">
-      {enrollments.length > 0 ? (
-        <>
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="text-muted-foreground text-sm">
-              {enrollments.length} enrollment{enrollments.length > 1 ? "s" : ""}
-            </p>
-            {canManage && (
-              <Button size="sm" variant="outline" onClick={() => setCreateOpen(true)}>
-                <Plus /> New Enrollment
-              </Button>
-            )}
+    <div className="@container">
+      {enrollments.length > 0 && selected ? (
+        <div className="grid items-start gap-4 @3xl:grid-cols-[16rem_minmax(0,1fr)]">
+          <div className="space-y-4">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-sm font-medium">
+                Enrollments{" "}
+                <span className="text-muted-foreground font-normal">{enrollments.length}</span>
+              </p>
+              {canManage && (
+                <Button size="sm" variant="outline" onClick={startCreate}>
+                  <Plus /> New Enrollment
+                </Button>
+              )}
+            </div>
+            {GROUPS.map((g) => {
+              const rows = enrollments.filter((e) => g.statuses.includes(e.status));
+              if (!rows.length) return null;
+              return (
+                <div key={g.title} className="space-y-1">
+                  <p className="text-muted-foreground px-1 text-xs font-medium">
+                    {g.title} · {rows.length}
+                  </p>
+                  {rows.map((e) => (
+                    <EnrollmentListItem
+                      key={e.id}
+                      enrollment={e}
+                      selected={e.id === selected.id}
+                      onSelect={() => select(e.id)}
+                    />
+                  ))}
+                </div>
+              );
+            })}
           </div>
-          <div className="space-y-3">
-            {enrollments.map((e) => (
-              <EnrollmentCard
-                key={e.id}
-                leadId={leadId}
-                enrollment={e}
-                canManage={canManage}
-                onEdit={() => setEditing(e)}
-              />
-            ))}
-          </div>
-        </>
+          <EnrollmentCard
+            key={selected.id}
+            leadId={leadId}
+            enrollment={selected}
+            canManage={canManage}
+            onEdit={() => setEditing(selected)}
+          />
+        </div>
       ) : (
         <div className="py-8 text-center">
           <p className="text-muted-foreground text-sm">This lead is not enrolled yet.</p>
           {canManage && (
-            <Button size="sm" variant="outline" className="mt-3" onClick={() => setCreateOpen(true)}>
+            <Button size="sm" variant="outline" className="mt-3" onClick={startCreate}>
               <Plus /> Create Enrollment
             </Button>
           )}
