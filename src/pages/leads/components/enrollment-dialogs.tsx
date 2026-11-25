@@ -89,9 +89,8 @@ export function EnrollmentDialog({
   const needsLead = allowLeadPick && !isEdit;
   const [pickedLeadId, setPickedLeadId] = useState<string>("");
   const [leadSearch, setLeadSearch] = useState("");
-  // The fee follows the course, and the agreed amount follows the fee, until
+  // The listed fee is the course price. The agreed amount follows it until
   // the user types their own value.
-  const [listedEdited, setListedEdited] = useState(false);
   const [agreedEdited, setAgreedEdited] = useState(false);
   const effectiveLeadId = leadId ?? (pickedLeadId ? Number(pickedLeadId) : undefined);
 
@@ -117,7 +116,6 @@ export function EnrollmentDialog({
     if (!open) return;
     setPickedLeadId("");
     setLeadSearch("");
-    setListedEdited(!!enrollment);
     // On edit, the agreed amount keeps following the fee if it still equals fee minus discounts.
     const agreedFollowsFee =
       enrollment != null &&
@@ -155,13 +153,14 @@ export function EnrollmentDialog({
     });
   }, [open, primaryCourseId, enrollment]);
 
-  // Fill the listed fee from the course price (also for a preselected course,
-  // once the course list has loaded).
+  // The listed fee is the price set on the course (also for a preselected
+  // course, once the course list has loaded). The server sets it the same way.
+  const courseChanged = f.course != null && f.course !== enrollment?.course;
   useEffect(() => {
-    if (!open || priceLocked || listedEdited || f.course == null) return;
+    if (!open || f.course == null || (isEdit && !courseChanged)) return;
     const course = courses.find((c) => c.id === f.course);
     if (course) setF((p) => ({ ...p, listed_fee: String(Number(course.full_amount || 0)) }));
-  }, [open, priceLocked, listedEdited, f.course, courses]);
+  }, [open, isEdit, courseChanged, f.course, courses]);
 
   const set = <K extends keyof ApiEnrollmentPayload>(k: K, v: ApiEnrollmentPayload[K]) =>
     setF((p) => ({ ...p, [k]: v }));
@@ -220,8 +219,6 @@ export function EnrollmentDialog({
               disabled={seatLocked}
               value={f.course != null ? String(f.course) : undefined}
               onValueChange={(v) => {
-                // A new course brings its own price, even after a typed fee.
-                setListedEdited(false);
                 setF((p) => ({
                   ...p,
                   course: Number(v),
@@ -309,16 +306,8 @@ export function EnrollmentDialog({
           )}
           {/* The price is fixed once confirmed or paid; later changes are money entries with a reason. */}
           <div className="grid gap-2">
-            <Label>Listed fee</Label>
-            <Input
-              type="number"
-              value={f.listed_fee ?? ""}
-              disabled={priceLocked}
-              onChange={(e) => {
-                setListedEdited(true);
-                set("listed_fee", e.target.value);
-              }}
-            />
+            <Label htmlFor="enrollment-listed-fee">Listed fee</Label>
+            <Input id="enrollment-listed-fee" type="number" value={f.listed_fee ?? ""} readOnly disabled />
           </div>
           <div className="grid gap-2">
             <Label>Standard discount</Label>
