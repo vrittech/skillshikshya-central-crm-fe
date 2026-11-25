@@ -729,7 +729,7 @@ export function useEnrollmentStatusAction(leadId?: number) {
       void qc.invalidateQueries({ queryKey: ["lead"] });
       void qc.invalidateQueries({ queryKey: ["leads"] });
       void qc.invalidateQueries({ queryKey: ["enrollments"] });
-      // Cancel frees the seat and the Teams licence.
+      // Cancel frees the seat; the Teams licence then shows "Action required".
       void qc.invalidateQueries({ queryKey: ["course-batches"] });
       void qc.invalidateQueries({ queryKey: ["teams"] });
     },

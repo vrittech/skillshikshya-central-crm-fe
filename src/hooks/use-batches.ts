@@ -163,7 +163,7 @@ function useBatchMoneyAction<V>(
     onSuccess: (money) => {
       toast.success(done);
       qc.setQueryData(["course-batches", "money", money.batch], money);
-      // Closing frees the students' Teams licences.
+      // Closing changes the state of the students' Teams licences.
       for (const key of ["course-batches", "reports", "teams", "lead", "enrollments"]) {
         void qc.invalidateQueries({ queryKey: [key] });
       }

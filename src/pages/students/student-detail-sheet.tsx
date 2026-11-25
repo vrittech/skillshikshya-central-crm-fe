@@ -24,6 +24,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/context/auth";
 import { useCourses } from "@/hooks/use-courses";
+import { useTeamsLicences } from "@/hooks/use-teams";
 import { openInvoicePdf, useResendInvoice, useStudentInvoices } from "@/hooks/use-invoices";
 import {
   useAttendanceProfile,
@@ -36,6 +37,7 @@ import {
 import { formatDate, formatDateTime, formatNPR } from "@/lib/leads-format";
 import { cn } from "@/lib/utils";
 import type { ApiAttendanceStatus, ApiStudentStatus } from "@/types/leads-api";
+import { TeamsStateBadge } from "../leads/components/teams-licence";
 
 const STATUS_TONE: Record<ApiStudentStatus, string> = {
   active: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
@@ -52,6 +54,35 @@ function Stat({ label, value }: { label: string; value: string | number }) {
         {label}
       </p>
       <p className="font-headline mt-1 text-xl font-semibold tabular-nums">{value}</p>
+    </div>
+  );
+}
+
+/** The Teams accounts the student holds now, with their state. */
+function TeamsAccounts({ studentId }: { studentId: number }) {
+  const { data } = useTeamsLicences({ student: studentId, open: true, page_size: 10 });
+  const licences = data?.results ?? [];
+  if (licences.length === 0) return null;
+  return (
+    <div>
+      <p className="mb-1 text-sm font-semibold">Teams account</p>
+      <ul className="divide-border divide-y rounded-xl border">
+        {licences.map((l) => (
+          <li key={l.id} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2.5">
+            <div className="min-w-0">
+              <p className="font-mono text-sm">{l.account}</p>
+              <p className="text-muted-foreground text-xs">
+                {l.course_name}
+                {l.batch_name ? ` · ${l.batch_name}` : ""} · Given {formatDate(l.assigned_at)}
+                {l.details_sent_at ? ` · Details sent ${formatDate(l.details_sent_at)}` : ""}
+              </p>
+            </div>
+            {l.state && (
+              <TeamsStateBadge state={l.state.state} label={l.state.label} reason={l.state.reason} />
+            )}
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
@@ -424,6 +455,8 @@ export function StudentDetailSheet({
                 {student.notes && (
                   <p className="text-muted-foreground rounded-xl border p-3 text-sm">{student.notes}</p>
                 )}
+
+                <TeamsAccounts studentId={student.id} />
 
                 <div>
                   <p className="mb-1 text-sm font-semibold">Recent payments</p>

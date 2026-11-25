@@ -354,9 +354,15 @@ export interface ApiEnrollment {
   /** The Teams licence the student holds now, or null. */
   teams_licence?: {
     id: number;
+    teams_account: number | null;
     account: string;
     assigned_at: string;
     paused_at?: string | null;
+    details_sent_at?: string | null;
+    details_sent_to?: string;
+    state: ApiTeamsState;
+    state_label: string;
+    reason: string;
   } | null;
   enrollment_date: string | null;
   status: ApiEnrollmentStatus;
@@ -838,6 +844,9 @@ export interface ApiUpload {
 
 /* ------------------------------------------------------------ Teams licences */
 
+/** Worked out from the student's enrollment. Retired accounts are not counted. */
+export type ApiTeamsState = "ready" | "in_use" | "safe_to_remove" | "action_required" | "retired";
+
 export interface ApiTeamsLicence {
   id: number;
   enrollment: number;
@@ -847,6 +856,7 @@ export interface ApiTeamsLicence {
   course_name: string;
   /** The batch the student sits in now. */
   batch_name: string | null;
+  teams_account: number | null;
   account: string;
   assigned_by: number;
   assigned_by_name: string;
@@ -855,17 +865,66 @@ export interface ApiTeamsLicence {
   released_by: number | null;
   released_by_name: string | null;
   release_reason: string | null;
-  /** Set while the student is paused: the licence is kept for them. */
+  /** Set while the student is paused. */
   paused_at: string | null;
+  details_sent_at: string | null;
+  details_sent_to: string;
+  /** Null once taken back. */
+  state: { state: ApiTeamsState; label: string; reason: string } | null;
+  /** Only when sign-in details were emailed with this request. */
+  email?: { status: "sent" | "failed" | "skipped" | "queued"; to: string; error: string };
 }
 
-/** total and free are null when no total is set (admin site, Teams licence settings). */
+export interface ApiTeamsAccountLicence {
+  id: number;
+  /** In use at another branch: no student details. */
+  other_branch: boolean;
+  enrollment?: number;
+  enrollment_status?: ApiEnrollmentStatus;
+  lead?: number;
+  student_id?: string | null;
+  name?: string;
+  email?: string | null;
+  course_name?: string;
+  batch_name?: string | null;
+  branch_name?: string | null;
+  assigned_at?: string;
+  assigned_by_name?: string | null;
+  paused_at?: string | null;
+  details_sent_at?: string | null;
+  details_sent_to?: string;
+}
+
+export interface ApiTeamsAccount {
+  id: number;
+  email: string;
+  /** Empty: any branch may give it. */
+  branch: number | null;
+  branch_name: string | null;
+  is_active: boolean;
+  state: ApiTeamsState;
+  state_label: string;
+  reason: string;
+  retired_at: string | null;
+  licence: ApiTeamsAccountLicence | null;
+}
+
+export interface ApiTeamsAccountParams {
+  state?: ApiTeamsState;
+  search?: string;
+  /** Accounts that can be given at this branch (its own and the shared ones). */
+  give_at?: number;
+  branch_id?: number;
+}
+
 export interface ApiTeamsSummary {
-  total: number | null;
+  /** Active accounts. */
+  total: number;
+  ready: number;
   in_use: number;
-  /** Kept for paused students; not free. */
-  paused: number;
-  free: number | null;
+  safe_to_remove: number;
+  action_required: number;
+  retired: number;
 }
 
 export interface ApiTeamsLicenceParams {
@@ -876,6 +935,7 @@ export interface ApiTeamsLicenceParams {
   open?: boolean;
   enrollment?: number;
   batch?: number;
+  student?: number;
   branch_id?: number;
 }
 
