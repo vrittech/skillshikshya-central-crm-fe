@@ -328,9 +328,76 @@ export interface BatchClosing {
   owed: string | null;
   costs: string | null;
   profit: string | null;
+  /** Close rows: what the close checklist still had open. */
+  checklist?: BatchClosingChecklist | null;
   created_by: number;
   created_by_name: string;
   created_at: string;
+}
+
+export interface BatchClosingChecklist {
+  ready: boolean;
+  closed_anyway: boolean;
+  students: string[];
+  attendance_none_taken: boolean;
+  attendance_missing: string[];
+  teams: string[];
+  owing_count: number;
+  owing_total: string;
+}
+
+interface BatchCheckPerson {
+  enrollment: number;
+  lead: number;
+  name: string;
+  student_id: string | null;
+}
+
+/** GET /course-batches/{id}/close-check/ */
+export interface BatchCloseCheck {
+  batch: number;
+  status: CourseBatchStatus;
+  ready: boolean;
+  /** Still studying (confirmed, active) in the batch, or still pending for it. */
+  students: (BatchCheckPerson & { status: string; status_display: string })[];
+  attendance: {
+    days: number;
+    last_day: string | null;
+    none_taken: boolean;
+    missing: (BatchCheckPerson & { missing: number; dates: string[] })[];
+    ready: boolean;
+  };
+  teams: (BatchCheckPerson & {
+    licence: number;
+    account: string;
+    state: string;
+    state_display: string;
+    reason: string;
+  })[];
+  owing: { count: number; total: string; people: (BatchCheckPerson & { owed: string })[] };
+}
+
+export type AttendanceMark = "present" | "absent";
+
+export interface BatchRegisterRow extends BatchCheckPerson {
+  /** Student record id; null when the enrollment has none, so it can't be marked. */
+  student: number | null;
+  since: string | null;
+  status: AttendanceMark | null;
+  present: number;
+  absent: number;
+  total: number;
+}
+
+/** GET /course-batches/{id}/attendance/?date= */
+export interface BatchRegister {
+  batch: number;
+  date: string;
+  today: string;
+  closed: boolean;
+  /** Days with any mark in the batch, newest first. */
+  days: string[];
+  students: BatchRegisterRow[];
 }
 
 /** GET /course-batches/{id}/money/ */

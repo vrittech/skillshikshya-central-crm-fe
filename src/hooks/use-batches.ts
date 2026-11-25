@@ -4,6 +4,7 @@ import { apiErrorMessage } from "@/lib/api";
 import { batchesService, courseBatchesService } from "@/services/batches.service";
 import { globalListsService } from "@/services/global-lists.service";
 import type {
+  AttendanceMark,
   BatchCostPayload,
   BatchListParams,
   BatchMoney,
@@ -192,10 +193,64 @@ export function useVoidBatchCost() {
 
 export function useCloseBatch() {
   return useBatchMoneyAction(
-    ({ id, reason }: { id: number; reason: string }) => courseBatchesService.close(id, reason),
+    ({ id, reason, closeAnyway }: { id: number; reason: string; closeAnyway?: boolean }) =>
+      courseBatchesService.close(id, reason, closeAnyway),
     "Batch closed",
     "Could not close the batch",
   );
+}
+
+export function useBatchCloseCheck(id: number | null, enabled = true) {
+  return useQuery({
+    queryKey: ["course-batches", "close-check", id],
+    queryFn: () => courseBatchesService.closeCheck(id as number),
+    enabled: id != null && enabled,
+  });
+}
+
+export function useCompleteBatchStudents() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, reason, enrollments }: { id: number; reason: string; enrollments?: number[] }) =>
+      courseBatchesService.completeStudents(id, reason, enrollments),
+    onSuccess: (data, { id }) => {
+      toast.success(`${data.completed.length} marked completed`);
+      qc.setQueryData(["course-batches", "close-check", id], data.checklist);
+      for (const key of ["course-batches", "teams", "lead", "enrollments", "students"]) {
+        void qc.invalidateQueries({ queryKey: [key] });
+      }
+    },
+    onError: (e) => toast.error(apiErrorMessage(e, "Could not mark them completed")),
+  });
+}
+
+export function useBatchAttendance(id: number | null, date: string | null) {
+  return useQuery({
+    queryKey: ["course-batches", "attendance", id, date],
+    queryFn: () => courseBatchesService.attendance(id as number, date ?? undefined),
+    enabled: id != null,
+  });
+}
+
+export function useMarkBatchAttendance() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      id,
+      ...payload
+    }: {
+      id: number;
+      date: string;
+      marks: { student: number; status: AttendanceMark }[];
+    }) => courseBatchesService.markAttendance(id, payload),
+    onSuccess: (register) => {
+      toast.success("Attendance saved");
+      qc.setQueryData(["course-batches", "attendance", register.batch, register.date], register);
+      void qc.invalidateQueries({ queryKey: ["course-batches", "close-check", register.batch] });
+      void qc.invalidateQueries({ queryKey: ["student"] });
+    },
+    onError: (e) => toast.error(apiErrorMessage(e, "Could not save attendance")),
+  });
 }
 
 export function useReopenBatch() {

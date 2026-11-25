@@ -12,6 +12,7 @@ import { useCourseBatch } from "@/hooks/use-batches";
 import { formatDate } from "@/lib/leads-format";
 import { batchShift } from "@/lib/time-slots";
 import type { CourseBatch } from "@/types";
+import { BatchAttendancePanel } from "./batch-attendance-panel";
 import { BatchMoneyPanel } from "./batch-money-panel";
 import { BatchStudentsPanel } from "./batch-students-panel";
 import { CourseBatchDialog } from "./course-batch-dialog";
@@ -132,11 +133,19 @@ export default function BatchDetailPage() {
         <Tabs defaultValue="students">
           <TabsList className="h-auto w-full justify-start gap-1 rounded-none border-b bg-transparent p-2">
             <TabsTrigger value="students">Students</TabsTrigger>
+            <TabsTrigger value="attendance">Attendance</TabsTrigger>
             <TabsTrigger value="money">Money</TabsTrigger>
           </TabsList>
           <div className="p-5">
             <TabsContent value="students">
               <BatchStudentsPanel batchId={batch.id} />
+            </TabsContent>
+            <TabsContent value="attendance">
+              <BatchAttendancePanel
+                batch={batch}
+                canMark={hasPerm("student.add_attendance")}
+                canChange={hasPerm("student.change_attendance")}
+              />
             </TabsContent>
             <TabsContent value="money">
               <BatchMoneyPanel
@@ -144,6 +153,7 @@ export default function BatchDetailPage() {
                 canAddCost={hasPerm("course.add_batchcost")}
                 canVoidCost={hasPerm("course.change_batchcost")}
                 canClose={canChange}
+                canComplete={hasPerm("lead.change_enrollment")}
               />
             </TabsContent>
           </div>

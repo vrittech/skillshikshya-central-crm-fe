@@ -23,15 +23,22 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
   useAddBatchCost,
   useBatchMoney,
-  useCloseBatch,
   useReopenBatch,
   useVoidBatchCost,
 } from "@/hooks/use-batches";
 import { COST_KINDS, FIGURE_ROWS, figureText } from "@/lib/batch-money";
 import { formatDate, formatDateTime, formatNPR } from "@/lib/leads-format";
 import { localToday } from "@/lib/seats";
+import { BatchCloseDialog } from "./batch-close-dialog";
 import { cn } from "@/lib/utils";
-import type { BatchCost, BatchCostKind, BatchFigures, BatchMoney, CourseBatch } from "@/types";
+import type {
+  BatchClosingChecklist,
+  BatchCost,
+  BatchCostKind,
+  BatchFigures,
+  BatchMoney,
+  CourseBatch,
+} from "@/types";
 
 /* ------------------------------------------------------------ figures */
 
@@ -212,6 +219,16 @@ function AddCostDialog({
   );
 }
 
+/** What was still open when a batch was closed anyway. */
+function openItems(c: BatchClosingChecklist) {
+  const parts: string[] = [];
+  if (c.students.length) parts.push(`Students ${c.students.length}`);
+  if (c.attendance_none_taken) parts.push("Attendance not taken");
+  else if (c.attendance_missing.length) parts.push(`Attendance ${c.attendance_missing.length}`);
+  if (c.teams.length) parts.push(`Teams ${c.teams.length}`);
+  return parts.join(" · ");
+}
+
 /* ------------------------------------------------------------ panel */
 
 /** A batch's money: figures, costs, and closing or reopening it. */
@@ -220,18 +237,19 @@ export function BatchMoneyPanel({
   canAddCost,
   canVoidCost,
   canClose,
+  canComplete,
 }: {
   batch: CourseBatch;
   canAddCost: boolean;
   canVoidCost: boolean;
   canClose: boolean;
+  canComplete: boolean;
 }) {
   const { data: money, isLoading } = useBatchMoney(batch.id);
   const [adding, setAdding] = useState(false);
   const [voiding, setVoiding] = useState<BatchCost | null>(null);
   const [closing, setClosing] = useState<"close" | "reopen" | null>(null);
   const voidCost = useVoidBatchCost();
-  const close = useCloseBatch();
   const reopen = useReopenBatch();
   const isClosed = money?.status === "closed";
 
@@ -286,6 +304,11 @@ export function BatchMoneyPanel({
                 <p className="text-muted-foreground text-xs">
                   {c.created_by_name} · {c.reason}
                 </p>
+                {c.checklist?.closed_anyway && (
+                  <p className="text-xs text-amber-600 dark:text-amber-400">
+                    Closed anyway · {openItems(c.checklist)}
+                  </p>
+                )}
               </li>
             ))}
           </ul>
@@ -325,19 +348,21 @@ export function BatchMoneyPanel({
           )
         }
       />
-      <ReasonDialog
-        open={closing != null}
+      <BatchCloseDialog
+        batch={batch}
+        open={closing === "close"}
         onClose={() => setClosing(null)}
-        title={closing === "reopen" ? "Reopen batch" : "Close batch"}
+        canComplete={canComplete}
+      />
+      <ReasonDialog
+        open={closing === "reopen"}
+        onClose={() => setClosing(null)}
+        title="Reopen batch"
         description={batch.name}
-        confirmLabel={closing === "reopen" ? "Reopen" : "Close batch"}
-        destructive={closing === "close"}
-        pending={close.isPending || reopen.isPending}
+        confirmLabel="Reopen"
+        pending={reopen.isPending}
         onConfirm={(reason) =>
-          (closing === "reopen" ? reopen : close).mutate(
-            { id: batch.id, reason },
-            { onSuccess: () => setClosing(null) },
-          )
+          reopen.mutate({ id: batch.id, reason }, { onSuccess: () => setClosing(null) })
         }
       />
     </div>

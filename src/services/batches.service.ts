@@ -1,10 +1,13 @@
 import { api } from "@/lib/api";
 import type {
+  AttendanceMark,
   Batch,
+  BatchCloseCheck,
   BatchCostPayload,
   BatchListParams,
   BatchMoney,
   BatchPayload,
+  BatchRegister,
   BatchStudents,
   CourseBatch,
   CourseBatchListParams,
@@ -93,8 +96,43 @@ export const courseBatchesService = {
     return data;
   },
 
-  async close(id: number, reason: string) {
-    const { data } = await api.post<BatchMoney>(`/course-batches/${id}/close/`, { reason });
+  /** Close with a reason. With open checklist items the server refuses unless closeAnyway. */
+  async close(id: number, reason: string, closeAnyway = false) {
+    const { data } = await api.post<BatchMoney>(`/course-batches/${id}/close/`, {
+      reason,
+      close_anyway: closeAnyway,
+    });
+    return data;
+  },
+
+  /** What is still open before the batch can close. */
+  async closeCheck(id: number) {
+    const { data } = await api.get<BatchCloseCheck>(`/course-batches/${id}/close-check/`);
+    return data;
+  },
+
+  /** Mark students still studying completed: these enrollments, or all of them. */
+  async completeStudents(id: number, reason: string, enrollments?: number[]) {
+    const { data } = await api.post<{ completed: number[]; checklist: BatchCloseCheck }>(
+      `/course-batches/${id}/complete-students/`,
+      { reason, ...(enrollments ? { enrollments } : {}) },
+    );
+    return data;
+  },
+
+  /** The batch's register for one day (today when left out). */
+  async attendance(id: number, date?: string) {
+    const { data } = await api.get<BatchRegister>(`/course-batches/${id}/attendance/`, {
+      params: date ? { date } : {},
+    });
+    return data;
+  },
+
+  async markAttendance(
+    id: number,
+    payload: { date: string; marks: { student: number; status: AttendanceMark }[] },
+  ) {
+    const { data } = await api.post<BatchRegister>(`/course-batches/${id}/attendance/`, payload);
     return data;
   },
 
