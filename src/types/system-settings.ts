@@ -74,3 +74,20 @@ export interface EmailTestResult {
   ms: number;
   error: string | null;
 }
+
+/** GET/PUT /api/settings/organisation/: who emails, invoices and receipts come from. */
+export interface OrganisationSettingsForm {
+  name: string;
+  address: string;
+  phone: string;
+  email: string;
+  website: string;
+  pan_number: string;
+  logo_url: string;
+  receipt_note: string;
+}
+
+export interface OrganisationSettings extends OrganisationSettingsForm {
+  updated_at: string | null;
+  updated_by_name: string;
+}

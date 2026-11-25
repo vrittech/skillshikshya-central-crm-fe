@@ -30,7 +30,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useAuth } from "@/context/auth";
 import { useDataSource } from "@/context/data-source";
-import { useCancelInvoice, useInvoices, useResendInvoice } from "@/hooks/use-invoices";
+import { openInvoicePdf, useCancelInvoice, useInvoices, useResendInvoice } from "@/hooks/use-invoices";
 import { formatDateTime, formatNPR } from "@/lib/leads-format";
 import { cn } from "@/lib/utils";
 import type { ApiInvoice, InvoiceListParams, InvoiceStatus, InvoiceType } from "@/types/invoices";
@@ -267,11 +267,8 @@ export default function InvoicesPage() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem
-                              disabled={!i.pdf_url}
-                              onSelect={() => i.pdf_url && window.open(i.pdf_url, "_blank")}
-                            >
-                              {i.pdf_url ? "Open PDF" : "No PDF archived"}
+                            <DropdownMenuItem onSelect={() => openInvoicePdf(i.id)}>
+                              <FileText className="size-4" /> Open PDF
                             </DropdownMenuItem>
                             {isStaff && !cancelled && (
                               <DropdownMenuItem

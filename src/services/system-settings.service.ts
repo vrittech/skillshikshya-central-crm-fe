@@ -3,6 +3,8 @@ import type {
   EmailSettings,
   EmailSettingsForm,
   EmailTestResult,
+  OrganisationSettings,
+  OrganisationSettingsForm,
   StorageSettings,
   StorageSettingsForm,
   StorageTestResult,
@@ -43,6 +45,16 @@ export const systemSettingsService = {
     const { data } = await api.post<EmailTestResult>("/settings/email/test/", payload, {
       timeout: 60_000,
     });
+    return data;
+  },
+
+  async getOrganisation() {
+    const { data } = await api.get<OrganisationSettings>("/settings/organisation/");
+    return data;
+  },
+
+  async saveOrganisation(payload: OrganisationSettingsForm) {
+    const { data } = await api.put<OrganisationSettings>("/settings/organisation/", payload);
     return data;
   },
 };

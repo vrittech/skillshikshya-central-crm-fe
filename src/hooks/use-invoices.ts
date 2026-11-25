@@ -87,3 +87,8 @@ export function useUpdateInvoiceEmailConfig() {
     onError: (e) => toast.error(apiErrorMessage(e, "Could not save the email settings")),
   });
 }
+
+/** Opens an invoice or receipt PDF in a new tab; shows a message when it can't. */
+export function openInvoicePdf(id: number) {
+  invoicesService.openPdf(id).catch((e) => toast.error(apiErrorMessage(e, "Couldn't open the PDF")));
+}

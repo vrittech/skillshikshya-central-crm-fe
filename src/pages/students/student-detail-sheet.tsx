@@ -24,7 +24,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/context/auth";
 import { useCourses } from "@/hooks/use-courses";
-import { useResendInvoice, useStudentInvoices } from "@/hooks/use-invoices";
+import { openInvoicePdf, useResendInvoice, useStudentInvoices } from "@/hooks/use-invoices";
 import {
   useAttendanceProfile,
   useDeleteAttendance,
@@ -111,17 +111,16 @@ function InvoicesTab({ studentId }: { studentId: number }) {
             >
               {formatNPR(Number(i.amount))}
             </span>
-            {i.pdf_url && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="text-muted-foreground size-8"
-                title="Open PDF"
-                onClick={() => window.open(i.pdf_url as string, "_blank")}
-              >
-                <ExternalLink />
-              </Button>
-            )}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="text-muted-foreground size-8"
+              title="Open PDF"
+              aria-label="Open PDF"
+              onClick={() => openInvoicePdf(i.id)}
+            >
+              <FileText />
+            </Button>
             {user?.is_staff && i.status !== "cancelled" && (
               <Button
                 variant="ghost"

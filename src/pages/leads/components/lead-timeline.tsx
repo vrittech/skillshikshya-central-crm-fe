@@ -4,6 +4,7 @@ import {
   FileText,
   GraduationCap,
   Layers,
+  Mail,
   Mic,
   MonitorSmartphone,
   PhoneCall,
@@ -33,6 +34,7 @@ const KINDS: { value: ApiTimelineKind; label: string }[] = [
   { value: "money", label: "Money" },
   { value: "teams", label: "Teams" },
   { value: "reminder", label: "Reminders" },
+  { value: "email", label: "Emails" },
   { value: "document", label: "Documents" },
   { value: "lead", label: "Lead" },
 ];
@@ -50,6 +52,7 @@ const ICONS: Record<ApiTimelineKind, React.ComponentType<{ className?: string }>
   teams: MonitorSmartphone,
   reminder: Bell,
   document: FileText,
+  email: Mail,
 };
 
 const TONES: Partial<Record<ApiTimelineKind, string>> = {
@@ -61,6 +64,7 @@ const TONES: Partial<Record<ApiTimelineKind, string>> = {
   batch: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
   money: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
   teams: "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400",
+  email: "bg-cyan-500/10 text-cyan-600 dark:text-cyan-400",
 };
 
 function hasChanges(i: ApiTimelineItem) {

@@ -2,10 +2,11 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { apiErrorMessage } from "@/lib/api";
 import { systemSettingsService } from "@/services/system-settings.service";
-import type { EmailSettingsForm, StorageSettingsForm } from "@/types/system-settings";
+import type { EmailSettingsForm, OrganisationSettingsForm, StorageSettingsForm } from "@/types/system-settings";
 
 const STORAGE_KEY = ["settings", "storage"];
 const EMAIL_KEY = ["settings", "email"];
+const ORGANISATION_KEY = ["settings", "organisation"];
 
 export function useStorageSettings(enabled = true) {
   return useQuery({
@@ -58,5 +59,24 @@ export function useSendTestEmail() {
     mutationFn: (payload: EmailSettingsForm & { to: string }) =>
       systemSettingsService.sendTestEmail(payload),
     onError: (e) => toast.error(apiErrorMessage(e, "Couldn't send the test email")),
+  });
+}
+
+export function useOrganisationSettings(enabled = true) {
+  return useQuery({
+    queryKey: ORGANISATION_KEY,
+    queryFn: () => systemSettingsService.getOrganisation(),
+    enabled,
+  });
+}
+
+export function useSaveOrganisationSettings() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: OrganisationSettingsForm) => systemSettingsService.saveOrganisation(payload),
+    onSuccess: (data) => {
+      qc.setQueryData(ORGANISATION_KEY, data);
+      toast.success("Organisation details saved");
+    },
   });
 }
