@@ -80,14 +80,6 @@ export const reportsService = {
       .then((r) => r.data);
   },
 
-  byType(params: ReportBaseParams = {}) {
-    return api
-      .get<DimensionReport<LeadsByNamedDimensionRow>>("/reports/leads-by-type/", {
-        params: clean(params),
-      })
-      .then((r) => r.data);
-  },
-
   byBranch(params: ReportBaseParams = {}) {
     return api
       .get<DimensionReport<LeadsByNamedDimensionRow>>("/reports/leads-by-branch/", {

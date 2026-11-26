@@ -41,15 +41,6 @@ export function useLeadsBySource(params: ReportBaseParams, enabled = true) {
   });
 }
 
-export function useLeadsByType(params: ReportBaseParams, enabled = true) {
-  return useQuery({
-    queryKey: ["reports", "by-type", params],
-    queryFn: () => reportsService.byType(params),
-    enabled,
-    staleTime: STALE,
-  });
-}
-
 export function useLeadTrend(params: LeadTrendParams, enabled = true) {
   return useQuery({
     queryKey: ["reports", "trend", params],

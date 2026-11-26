@@ -47,25 +47,16 @@ These count **only the leads currently visible to you** (a counsellor sees their
 
 ## 4. The vocabulary — what every value means
 
-The table uses four controlled vocabularies: **Lead Type**, **Source**, **Status**, and **Priority**. Here is what each option signifies.
+The table uses three controlled vocabularies: **Source**, **Status**, and **Priority**. Here is what each option signifies.
 
-### 4a. Lead Type — *what kind of inquiry is this?*
-
-| Type | Meaning | Example |
-|------|---------|---------|
-| **Course Inquiry** | Interested in a full diploma course. | "How much is the MERN diploma and when does the next batch start?" |
-| **Master Class Inquiry** | Interested in a short master class (a few sessions, not a full course). | "I want to join the Stock Investing master class." |
-| **General Inquiry** | A question not tied to one specific course. | "Do you provide job placement? Where is your office?" |
-| **Corporate Inquiry** | A company asking about training for its staff. | "We want to train 10 employees in Data Analytics." |
-
-### 4b. Source — *where did this lead come from?*
+### 4a. Source — *where did this lead come from?*
 
 The acquisition channel. Used to see which marketing works. Options: **Website, Facebook, Instagram, TikTok, WhatsApp, Viber, Telephone, Direct Call, Walk-in / Direct Visit, Referral, Online Counseling, Google Search, Shramsansar, Orbit (Social Media), Manual Entry.**
 
 - *Example:* Someone fills the form on the site → **Website**. Someone your existing student sent → **Referral**. You typed the lead in by hand from a paper note → **Manual Entry**.
 - A **Campaign** can sit alongside the source (e.g. source *Facebook* + campaign *"Facebook UI/UX Campaign"*), so you know the exact ad, not just the channel.
 
-### 4c. Status — *where is this lead in the journey?*
+### 4b. Status — *where is this lead in the journey?*
 
 Status is the lifecycle stage. It roughly flows top-to-bottom, though a lead can jump or reverse.
 
@@ -89,7 +80,7 @@ Status is the lifecycle stage. It roughly flows top-to-bottom, though a lead can
 
 > In **Live** mode statuses (and their colours) are defined by your admin, so you may see custom names — but the idea is the same.
 
-### 4d. Priority — *how hot is this lead?*
+### 4c. Priority — *how hot is this lead?*
 
 Priority is the classic HOT / WARM / COOL / COLD temperature system. It drives how fast you should follow up and feeds the lead **Score**.
 
@@ -100,7 +91,7 @@ Priority is the classic HOT / WARM / COOL / COLD temperature system. It drives h
 | **Cool** | Thermometer | Filled the form, interested for a *future* batch. |
 | ❄️ **Cold** | Snowflake | No response after ~3 attempts → **re-engage monthly.** |
 
-### 4e. Score — *the 0–100 engagement number*
+### 4d. Score — *the 0–100 engagement number*
 
 Each lead has a **Score** shown as a little bar. It's derived from status + priority + how recently they were contacted. Higher = more likely to convert. Colour of the bar: green ≥75, amber ≥50, orange ≥30, grey below.
 
@@ -114,11 +105,11 @@ Each row is one lead. Columns left to right:
 |--------|----------------|
 | **☑ (checkbox)** | Tick to select the row for bulk actions. The header checkbox selects all on the page. |
 | **Lead** | Initials avatar, **full name**, the **reference number** (e.g. `LD-00123`), and phone. An **Archived** tag appears here if the lead is archived. |
-| **Course / Type** | The primary course they're interested in, with the **lead type** underneath. |
+| **Course** | The primary course they're interested in. |
 | **Source** | The acquisition channel; the campaign name shows underneath if set. |
-| **Status** | The current lifecycle status as a coloured pill (see §4c). |
-| **Priority** | Hot / Warm / Cool / Cold pill with a thermometer icon (see §4d). |
-| **Score** | The 0–100 engagement bar (see §4e). |
+| **Status** | The current lifecycle status as a coloured pill (see §4b). |
+| **Priority** | Hot / Warm / Cool / Cold pill with a thermometer icon (see §4c). |
+| **Score** | The 0–100 engagement bar (see §4d). |
 | **Assigned** | The counsellor who owns the lead, or a yellow **Unassigned** tag. |
 | **Next follow-up** | Relative time ("tomorrow", "in 3 days"). Turns **red** when overdue. |
 | **Last contact** | When you last touched this lead ("yesterday", "5 days ago"). |
@@ -137,7 +128,7 @@ Each row is one lead. Columns left to right:
 
 - **Search box** — type a **name, phone, email, or lead ID**. Filters as you type.
 - **Advanced Filters** (slider icon) — opens a side panel. Filter by:
-  - Status, Source, Lead type, Course, Assigned-to counsellor, Priority.
+  - Status, Source, Course, Assigned-to counsellor, Priority.
   - **Quick toggles:** *Overdue only*, *Include archived*, and (mock mode) *Unassigned only*.
   - Set your filters in the panel, then press **Apply**. **Reset** clears them.
 - **Active filter chips** appear under the search bar. Click a chip's **✕** to remove just that filter, or **Clear all** to reset everything.
@@ -175,11 +166,10 @@ When you select rows, a bar shows **"N selected"** with **Assign** / **Archive**
    - **Primary Phone** *(required)* — e.g. `9812345678`
    - Secondary Phone, Email, Address *(all optional)*
 3. Fill **Lead Classification**:
-   - **Lead Type** *(required)* — Course / Master Class / General / Corporate (see §4a).
-   - **Lead Source** — where they came from (§4b).
+   - **Lead Source** — where they came from (§4a).
    - **Campaign** — the specific campaign, if any.
    - **Current Status** — usually leave at *New* for a fresh lead.
-   - **Priority** — Hot / Warm / Cool / Cold (§4d).
+   - **Priority** — Hot / Warm / Cool / Cold (§4c).
    - **Assigned Counselor** — who will work it (leave blank = Unassigned).
    - **Branch** *(Live mode only)* — the office/branch.
    - **Expected Revenue (NPR)** — the deal value you expect, e.g. `30000`.
@@ -245,7 +235,7 @@ Below that is a tabbed record:
 
 > **Sabin Gurung** fills the website form asking about the Full-Stack MERN course.
 >
-> 1. He appears as a lead: **Type** = Course Inquiry, **Source** = Website, **Status** = New, **Primary Course** = Full-Stack MERN Diploma, **Priority** = Cool.
+> 1. He appears as a lead: **Source** = Website, **Status** = New, **Primary Course** = Full-Stack MERN Diploma, **Priority** = Cool.
 > 2. A counsellor is assigned via **Assign**. Status becomes **Contacted** after the first call.
 > 3. On the call he asks for the fee plan and sounds keen → counsellor bumps **Priority** to **Hot** and uses **Log Call** (outcome: *Requested Details*) with a **Next follow-up** for tomorrow.
 > 4. Tomorrow he shows in **Follow-ups due today**. After the counselling session, status → **Counseling Completed**, then **Enrollment Pending**.

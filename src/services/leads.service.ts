@@ -37,8 +37,6 @@ export interface LeadListParams {
   page?: number;
   page_size?: number;
   search?: string;
-  lead_type?: number | string;
-  lead_type__in?: string;
   source?: number;
   source__in?: string;
   campaign?: number;

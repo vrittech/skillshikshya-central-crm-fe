@@ -14,7 +14,6 @@ export interface LeadFilterState {
   search: string;
   status: string;
   source: string;
-  type: string;
   course: string;
   assignedTo: string;
   priority: string;
@@ -34,7 +33,6 @@ export const DEFAULT_FILTERS: LeadFilterState = {
   search: "",
   status: "all",
   source: "all",
-  type: "all",
   course: "all",
   assignedTo: "all",
   priority: "all",
@@ -54,7 +52,6 @@ export interface FilterOption {
 export interface LeadFilterOptions {
   statuses: FilterOption[];
   sources: FilterOption[];
-  types: FilterOption[];
   courses: FilterOption[];
   counselors: FilterOption[];
   priorities: FilterOption[];
@@ -219,7 +216,6 @@ export function LeadFilters({ value, onChange, options, showScopeToggles = true 
         <FilterSelect label="Status" value={value.status} onChange={(v) => set("status", v)} allLabel="All statuses" options={options.statuses} />
         <FilterSelect label="Enrollment" value={value.enrollment} onChange={(v) => set("enrollment", v)} allLabel="All enrollments" options={ENROLLMENT_STATUSES} />
         <FilterSelect label="Source" value={value.source} onChange={(v) => set("source", v)} allLabel="All sources" options={options.sources} />
-        <FilterSelect label="Lead type" value={value.type} onChange={(v) => set("type", v)} allLabel="All lead types" options={options.types} />
         <FilterSelect label="Course" value={value.course} onChange={(v) => set("course", v)} allLabel="All courses" options={options.courses} />
         <FilterSelect
           label="Assigned to"

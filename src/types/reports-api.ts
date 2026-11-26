@@ -23,7 +23,6 @@ export interface LeadDimensionFilters {
   status?: number;
   source?: number;
   campaign?: number;
-  lead_type?: number;
   priority?: number;
   assigned_counselor?: number;
   primary_course?: number;

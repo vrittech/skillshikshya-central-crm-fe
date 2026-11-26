@@ -30,7 +30,6 @@ import {
   useEnrollmentsReport,
   useLeadsBySource,
   useLeadsByStatus,
-  useLeadsByType,
   useReportsOverview,
   useRevenueReport,
 } from "@/hooks/use-reports";
@@ -98,7 +97,6 @@ function LiveReports() {
   const enrollments = useEnrollmentsReport(params);
   const byStatus = useLeadsByStatus(params);
   const bySource = useLeadsBySource(params);
-  const byType = useLeadsByType(params);
   const counselors = useCounselorPerformance(params);
 
   const loadingAny =
@@ -123,10 +121,6 @@ function LiveReports() {
       pct: Math.round((r.count / Math.max(1, totalLeads)) * 100),
       color: DONUT_COLORS[i % DONUT_COLORS.length],
     }));
-  const typeBars = (byType.data?.results ?? []).map((r) => ({
-    label: String(r.lead_type__name ?? "—"),
-    value: r.count,
-  }));
 
   const funnel = conversion.data
     ? [
@@ -285,7 +279,7 @@ function LiveReports() {
             </Card>
           </div>
 
-          <div className="grid gap-4 lg:grid-cols-3">
+          <div className="grid gap-4 lg:grid-cols-2">
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">By status</CardTitle>
@@ -295,20 +289,6 @@ function LiveReports() {
                   <Skeleton className="h-32 w-full" />
                 ) : statusBars.length ? (
                   <HBarList data={statusBars} />
-                ) : (
-                  <p className="text-muted-foreground text-sm">No data.</p>
-                )}
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">By lead type</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {byType.isLoading ? (
-                  <Skeleton className="h-32 w-full" />
-                ) : typeBars.length ? (
-                  <HBarList data={typeBars} />
                 ) : (
                   <p className="text-muted-foreground text-sm">No data.</p>
                 )}

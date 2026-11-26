@@ -7,8 +7,6 @@
  * optional so the client is forward-compatible when they ship.
  */
 
-export type ApiLeadType = "course_inquiry" | "master_class" | "corporate" | "general_inquiry";
-
 /* ------------------------------------------------------------- config lookups */
 
 export interface ApiLeadSource {
@@ -53,15 +51,6 @@ export interface ApiLeadTag {
   name: string;
   color: string;
   is_active: boolean;
-}
-
-/** Lead type is a FK lookup on the live backend (`/api/lead-types/`). */
-export interface ApiLeadTypeConfig {
-  id: number;
-  name: string;
-  code?: string;
-  sort_order?: number;
-  is_active?: boolean;
 }
 
 /** `/api/learning-modes/` — see lead_app_overview.md §Learning Modes. */
@@ -115,9 +104,6 @@ export interface ApiLead {
   secondary_phone: string | null;
   email: string | null;
   address: string | null;
-  /** Numeric FK id on the live backend; legacy string enum on older builds. */
-  lead_type: number | ApiLeadType | null;
-  lead_type_name?: string;
   lead_score: number;
   expected_revenue: string | null;
   next_followup_at: string | null;
@@ -180,8 +166,6 @@ export interface ApiLeadPayload {
   secondary_phone?: string | null;
   email?: string | null;
   address?: string | null;
-  /** Live backend expects the numeric lead-type id; string enum kept for compat. */
-  lead_type?: number | ApiLeadType | null;
   expected_revenue?: string | null;
   notes?: string | null;
   source?: number | null;
@@ -1063,7 +1047,6 @@ export type ApiLeadFileType = "csv" | "xlsx";
 export interface ApiLeadImportOptions {
   file: File;
   duplicates?: "skip" | "import";
-  default_lead_type?: number;
   default_source?: number;
   default_status?: number;
   default_priority?: number;

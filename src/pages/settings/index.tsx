@@ -26,7 +26,7 @@ import { Switch } from "@/components/ui/switch";
 import { useDataSource } from "@/context/data-source";
 import { useRole } from "@/context/role";
 import { useAuth } from "@/context/auth";
-import { LEAD_PRIORITIES, LEAD_SOURCES, LEAD_STATUSES, LEAD_TYPES } from "@/data/lead-lookups";
+import { LEAD_PRIORITIES, LEAD_SOURCES, LEAD_STATUSES } from "@/data/lead-lookups";
 import {
   campaignHooks,
   institutionHooks,
@@ -56,7 +56,6 @@ type Section =
   | "statuses"
   | "priorities"
   | "tags"
-  | "types"
   | "learning_modes"
   | "institutions"
   | "integrations"
@@ -70,7 +69,6 @@ const SECTIONS: { key: Section; label: string }[] = [
   { key: "statuses", label: "Statuses" },
   { key: "priorities", label: "Priorities" },
   { key: "tags", label: "Tags" },
-  { key: "types", label: "Lead Types" },
   { key: "learning_modes", label: "Learning Modes" },
   { key: "institutions", label: "Institutions" },
   { key: "integrations", label: "Integrations" },
@@ -463,14 +461,11 @@ export default function SettingsPage() {
         return LEAD_STATUSES.map((s) => ({ name: s.label, meta: `${s.category}${s.isTerminal ? " · terminal" : ""}` }));
       case "priorities":
         return LEAD_PRIORITIES.map((p) => ({ name: p.label, meta: p.description }));
-      case "types":
-        return LEAD_TYPES.map((t) => ({ name: t.label, meta: t.value }));
       default:
         return [];
     }
   }
 
-  const isTypes = section === "types";
   const isIntegrations = section === "integrations";
   // Cloud storage, Email and Organisation have their own panels, not the list + editor.
   const isSystem = section === "storage" || section === "email" || section === "organisation";
@@ -557,7 +552,7 @@ export default function SettingsPage() {
               <div>
                 <CardTitle className="text-base">{heading}</CardTitle>
               </div>
-              {canManage && !isTypes && !isIntegrations && (
+              {canManage && !isIntegrations && (
                 <Button
                   variant="outline"
                   size="sm"
@@ -571,7 +566,7 @@ export default function SettingsPage() {
               )}
             </CardHeader>
             <CardContent className="space-y-2">
-              {isApi && !isTypes ? (
+              {isApi ? (
                 liveRows().length > 0 ? (
                   liveRows().map((r) => (
                     <RowItem
@@ -601,7 +596,7 @@ export default function SettingsPage() {
         )}
       </div>
 
-      {!isTypes && !isIntegrations && !isSystem && (
+      {!isIntegrations && !isSystem && (
         <EditorDialog
           open={editorOpen}
           onClose={() => {

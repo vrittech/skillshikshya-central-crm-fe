@@ -39,11 +39,10 @@ import type { FilterOption, LeadFilterOptions } from "./lead-filters";
 
 type Step = "file" | "review" | "done";
 type RowFilter = "all" | ApiLeadImportRow["status"];
-type DefaultKey = "lead_type" | "source" | "status" | "priority" | "course" | "branch" | "counselor";
+type DefaultKey = "source" | "status" | "priority" | "course" | "branch" | "counselor";
 
 const NONE = "none";
 const EMPTY: Record<DefaultKey, string> = {
-  lead_type: NONE,
   source: NONE,
   status: NONE,
   priority: NONE,
@@ -239,7 +238,6 @@ export function LeadImportDialog({
     return {
       file: file as File,
       duplicates: includeDuplicates ? "import" : "skip",
-      default_lead_type: id("lead_type"),
       default_source: id("source"),
       default_status: id("status"),
       default_priority: id("priority"),
@@ -388,7 +386,6 @@ export function LeadImportDialog({
             <div className="space-y-3 border-t pt-4">
               <p className="text-sm font-medium">Defaults</p>
               <div className="grid gap-3 sm:grid-cols-2">
-                <DefaultSelect id="imp-type" label="Lead type" value={defaults.lead_type} onChange={setDefault("lead_type")} options={options.types} />
                 <DefaultSelect id="imp-source" label="Source" value={defaults.source} onChange={setDefault("source")} options={options.sources} />
                 <DefaultSelect id="imp-status" label="Status" value={defaults.status} onChange={setDefault("status")} options={options.statuses} />
                 <DefaultSelect id="imp-priority" label="Priority" value={defaults.priority} onChange={setDefault("priority")} options={options.priorities} />

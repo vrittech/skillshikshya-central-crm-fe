@@ -19,7 +19,6 @@ import {
   adaptApiLead,
   adaptApiLeadToListItem,
   adaptApiPayment,
-  uiLeadTypeToApi,
 } from "@/data/lead-adapters";
 import { getLeadById, LEAD_LIST } from "@/data/mock-leads";
 import { isOverdue } from "@/lib/leads-format";
@@ -45,7 +44,7 @@ import type {
   EnrollmentListParams,
   PaymentListParams,
 } from "@/types/leads-api";
-import type { Lead, LeadListItem, LeadTypeCode } from "@/types/leads";
+import type { Lead, LeadListItem } from "@/types/leads";
 import type { LeadFilterState } from "@/pages/leads/components/lead-filters";
 
 const EMPTY_PAGE = { count: 0, next: null, previous: null, results: [] };
@@ -64,10 +63,6 @@ export function buildApiParams(
   if (f.source !== "all") p.source = Number(f.source);
   if (f.priority !== "all") p.priority = Number(f.priority);
   if (f.course !== "all") p.primary_course = Number(f.course);
-  if (f.type !== "all") {
-    // Live backend: numeric lead-type FK id. Mock: legacy string enum.
-    p.lead_type = /^\d+$/.test(f.type) ? Number(f.type) : uiLeadTypeToApi(f.type as LeadTypeCode);
-  }
   if (f.assignedTo !== "all" && f.assignedTo !== "unassigned") {
     p.assigned_counselor = Number(f.assignedTo);
   }
@@ -88,7 +83,6 @@ export function mockMatch(l: LeadListItem, f: LeadFilterState): boolean {
   if (f.enrollment !== "all") return false;
   if (f.status !== "all" && l.status !== f.status) return false;
   if (f.source !== "all" && l.source !== f.source) return false;
-  if (f.type !== "all" && l.leadType !== f.type) return false;
   if (f.priority !== "all" && l.priority !== f.priority) return false;
   if (f.assignedTo === "unassigned" && l.assignedTo !== null) return false;
   if (f.assignedTo !== "all" && f.assignedTo !== "unassigned" && l.assignedTo !== f.assignedTo)

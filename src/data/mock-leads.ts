@@ -236,7 +236,6 @@ function expandSeed(seed: LeadSeed, seq: number): Lead {
     email: seed.email,
     address: seed.address,
     city: seed.address ? undefined : pick(rng, CITIES),
-    leadType: seed.type,
     source: seed.source,
     campaign: seed.campaign,
     status,
@@ -244,7 +243,7 @@ function expandSeed(seed: LeadSeed, seq: number): Lead {
     score: computeScore(status, priority, lastContactedAt),
     assignedTo,
     courseInterests,
-    customData: buildCustomData(seed, rng),
+    customData: buildCustomData(rng),
     generalNotes: notes.length > 1 ? notes.join(" · ") : notes[0],
     createdAt,
     updatedAt: lastContactedAt ?? createdAt,
@@ -310,21 +309,7 @@ function mapOutcome(callStatus: string): Activity["outcome"] {
   }
 }
 
-function buildCustomData(seed: LeadSeed, rng: () => number): Lead["customData"] {
-  if (seed.type === "general_inquiry") {
-    return {
-      inquirySubject: seed.subject || "General question",
-      inquiryCategory: seed.category || "General Question",
-      inquiryMessage: seed.message,
-    };
-  }
-  if (seed.type === "master_class_inquiry") {
-    return {
-      masterClassTopic: seed.courseRaw || courseById(seed.course ?? "")?.name,
-      masterClassPreferredMode: pick(rng, ["online", "office", "hybrid"] as const),
-    };
-  }
-  // Course inquiry — the richest dynamic set.
+function buildCustomData(rng: () => number): Lead["customData"] {
   return {
     preferredLearningMode: pick(rng, ["online", "office", "hybrid", "undecided"] as const),
     preferredShift: pick(rng, ["morning", "day", "evening", "weekend", "flexible"] as const),
@@ -345,8 +330,6 @@ const INSTITUTIONS = [
 ];
 
 function sheetOf(seed: LeadSeed): string {
-  if (seed.type === "master_class_inquiry") return "Master Class Lead";
-  if (seed.type === "general_inquiry") return "Contact Us";
   if (seed.source === "orbit") return "Orbit Leads from sm";
   if (seed.source === "telephone") return "Telephonic enquiry";
   if (seed.campaign) return "SEE Lead";
@@ -390,7 +373,6 @@ const SHOWCASE_LEADS: Lead[] = [
     address: "Sankhamul, Kathmandu",
     city: "Kathmandu",
     district: "Kathmandu",
-    leadType: "course_inquiry",
     source: "website",
     campaign: "SEE 2083 Campaign",
     status: "follow_up_scheduled",
@@ -514,7 +496,6 @@ const SHOWCASE_LEADS: Lead[] = [
     address: "Patan, Lalitpur",
     city: "Lalitpur",
     district: "Lalitpur",
-    leadType: "course_inquiry",
     source: "facebook",
     campaign: "Dashain Admission Campaign",
     status: "enrolled",
@@ -620,7 +601,6 @@ const SHOWCASE_LEADS: Lead[] = [
     email: "gautammanish975@gmail.com",
     address: "Imadol, Lalitpur",
     city: "Lalitpur",
-    leadType: "master_class_inquiry",
     source: "instagram",
     campaign: "Master Class October 2025",
     status: "contact_attempted",
@@ -697,7 +677,6 @@ const SHOWCASE_LEADS: Lead[] = [
     fullName: "Raju Karki",
     primaryPhone: "+9779766388023",
     email: "rajubposolution@gmail.com",
-    leadType: "corporate_inquiry",
     source: "website",
     status: "new",
     priority: "warm",
@@ -739,7 +718,6 @@ const SHOWCASE_LEADS: Lead[] = [
     referenceNumber: "LD-2026-00045",
     fullName: "Nikhil Shrestha",
     primaryPhone: "+9779865036801",
-    leadType: "course_inquiry",
     source: "orbit",
     campaign: "Facebook UI/UX Campaign",
     status: "lost",
@@ -827,7 +805,6 @@ export function toListItem(lead: Lead): LeadListItem {
     fullName: lead.fullName,
     primaryPhone: lead.primaryPhone,
     email: lead.email,
-    leadType: lead.leadType,
     source: lead.source,
     campaign: lead.campaign,
     primaryCourse: primary?.courseName,

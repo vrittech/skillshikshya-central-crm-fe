@@ -44,7 +44,6 @@ import {
   LEAD_PRIORITIES,
   LEAD_SOURCES,
   LEAD_STATUSES,
-  LEAD_TYPES,
 } from "@/data/lead-lookups";
 import { LEAD_LIST } from "@/data/mock-leads";
 import { useCourses } from "@/hooks/use-courses";
@@ -52,7 +51,6 @@ import {
   useLeadPriorities,
   useLeadSources,
   useLeadStatuses,
-  useLeadTypes,
 } from "@/hooks/use-lead-config";
 import {
   buildApiParams,
@@ -110,7 +108,6 @@ export default function LeadsPage() {
   const statusesQ = useLeadStatuses(apiEnabled);
   const sourcesQ = useLeadSources(apiEnabled);
   const prioritiesQ = useLeadPriorities(apiEnabled);
-  const typesQ = useLeadTypes(apiEnabled);
   const coursesQ = useCourses(1, 100, "");
   const usersQ = useUsers(1, 100);
 
@@ -122,7 +119,6 @@ export default function LeadsPage() {
         priorities: (prioritiesQ.data?.results ?? []).map((p) => ({ value: String(p.id), label: p.name })),
         courses: (coursesQ.data?.results ?? []).map((c) => ({ value: String(c.id), label: c.name })),
         counselors: (usersQ.data?.results ?? []).map((u) => ({ value: String(u.id), label: u.name })),
-        types: (typesQ.data?.results ?? []).map((t) => ({ value: String(t.id), label: t.name })),
       };
     }
     return {
@@ -131,9 +127,8 @@ export default function LeadsPage() {
       priorities: LEAD_PRIORITIES.map((p) => ({ value: p.value, label: p.label })),
       courses: COURSE_CATALOG.map((c) => ({ value: c.id, label: c.name })),
       counselors: COUNSELORS.map((c) => ({ value: c.id, label: c.name })),
-      types: LEAD_TYPES.map((t) => ({ value: t.value, label: t.label })),
     };
-  }, [apiEnabled, statusesQ.data, sourcesQ.data, prioritiesQ.data, typesQ.data, coursesQ.data, usersQ.data]);
+  }, [apiEnabled, statusesQ.data, sourcesQ.data, prioritiesQ.data, coursesQ.data, usersQ.data]);
 
   // Counselors (mock role preview) see only their own book; API is governed by the backend.
   const effectiveFilters =

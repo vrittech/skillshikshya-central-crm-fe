@@ -31,7 +31,6 @@ import {
   EDUCATION_LEVELS,
   labelOf,
   LEARNING_MODES,
-  leadTypeLabel,
   SHIFTS,
   sourceLabel,
 } from "@/data/lead-lookups";
@@ -444,7 +443,6 @@ export default function LeadDetailPage() {
                   <div className="grid gap-3 sm:grid-cols-2">
                     <Fact label="Source" value={lead.sourceName ?? sourceLabel(lead.source)} />
                     <Fact label="Campaign" value={lead.campaign ?? "—"} />
-                    <Fact label="Lead type" value={lead.leadTypeName ?? leadTypeLabel(lead.leadType)} />
                     <Fact
                       label="Priority"
                       value={

@@ -17,7 +17,6 @@ import type {
   Lead,
   LeadCustomData,
   LeadListItem,
-  LeadTypeCode,
   Payment,
 } from "@/types/leads";
 import type {
@@ -27,32 +26,10 @@ import type {
   ApiLead,
   ApiLeadActivity,
   ApiLeadCall,
-  ApiLeadType,
   ApiPayment,
 } from "@/types/leads-api";
 
 /* ------------------------------------------------------------ enum mapping */
-
-const API_TO_UI_TYPE: Record<ApiLeadType, LeadTypeCode> = {
-  course_inquiry: "course_inquiry",
-  master_class: "master_class_inquiry",
-  corporate: "corporate_inquiry",
-  general_inquiry: "general_inquiry",
-};
-
-const UI_TO_API_TYPE: Record<LeadTypeCode, ApiLeadType> = {
-  course_inquiry: "course_inquiry",
-  master_class_inquiry: "master_class",
-  corporate_inquiry: "corporate",
-  general_inquiry: "general_inquiry",
-};
-
-export const uiLeadTypeToApi = (t: LeadTypeCode): ApiLeadType => UI_TO_API_TYPE[t];
-
-/** BE `lead_type` may be a numeric FK id (live) or a string enum (legacy). */
-function uiLeadTypeFromApi(v: ApiLead["lead_type"]): LeadTypeCode {
-  return typeof v === "string" ? (API_TO_UI_TYPE[v] ?? "general_inquiry") : "general_inquiry";
-}
 
 const ACTIVITY_TYPE_MAP: Record<string, ActivityType> = {
   call: "call",
@@ -183,8 +160,6 @@ export function adaptApiLeadToListItem(api: ApiLead): LeadListItem {
     fullName: api.full_name,
     primaryPhone: api.phone,
     email: api.email ?? undefined,
-    leadType: uiLeadTypeFromApi(api.lead_type),
-    leadTypeName: api.lead_type_name,
     source: "manual_entry",
     sourceName: api.source_name,
     campaign: api.campaign_name ?? undefined,
@@ -223,8 +198,6 @@ export function adaptApiLead(api: ApiLead): Lead {
     provinceName: api.province_name,
     cityId: api.city ?? null,
     cityName: api.city_name,
-    leadType: uiLeadTypeFromApi(api.lead_type),
-    leadTypeName: api.lead_type_name,
     source: "manual_entry",
     sourceName: api.source_name,
     campaign: api.campaign_name ?? undefined,
@@ -264,7 +237,6 @@ export function adaptApiLead(api: ApiLead): Lead {
     campaignId: api.campaign,
     branchId: api.branch,
     primaryCourseId: api.primary_course?.id ?? null,
-    leadTypeId: typeof api.lead_type === "number" ? api.lead_type : null,
     tagIds: api.tags ?? [],
     sourceSheet: "API",
     activities: [],

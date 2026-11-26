@@ -7,7 +7,6 @@ import type {
   ApiLeadSource,
   ApiLeadStatus,
   ApiLeadTag,
-  ApiLeadTypeConfig,
   ApiLearningMode,
 } from "@/types/leads-api";
 
@@ -49,7 +48,6 @@ export const campaignsService = crud<ApiCampaign, Omit<ApiCampaign, "id" | "sour
 export const leadStatusesService = crud<ApiLeadStatus, Omit<ApiLeadStatus, "id">>("/lead-statuses/");
 export const leadPrioritiesService = crud<ApiLeadPriority, Omit<ApiLeadPriority, "id">>("/lead-priorities/");
 export const leadTagsService = crud<ApiLeadTag, Omit<ApiLeadTag, "id">>("/lead-tags/");
-export const leadTypesService = crud<ApiLeadTypeConfig, Omit<ApiLeadTypeConfig, "id">>("/lead-types/");
 export const learningModesService = crud<ApiLearningMode, Omit<ApiLearningMode, "id">>(
   "/learning-modes/",
 );

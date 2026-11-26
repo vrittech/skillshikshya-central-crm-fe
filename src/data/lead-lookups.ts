@@ -4,7 +4,7 @@
  * Every list here is derived from the real SkillShikshya X Vrit workbook
  * ("Options", "colorcode" and lead sheets) so the static UI reflects the
  * vocabulary staff already use. When the backend ships, these become API-fed
- * lookup tables (lead_types, lead_sources, lead_statuses, ...).
+ * lookup tables (lead_sources, lead_statuses, ...).
  */
 
 import type {
@@ -14,7 +14,6 @@ import type {
   LeadPriorityCode,
   LeadSourceCode,
   LeadStatusCode,
-  LeadTypeCode,
   LearningMode,
   Shift,
 } from "@/types/leads";
@@ -129,15 +128,6 @@ export function matchCourse(raw: string): CourseCatalogItem | undefined {
   }
   return undefined;
 }
-
-/* -------------------------------------------------------------- lead types */
-
-export const LEAD_TYPES: Option<LeadTypeCode>[] = [
-  { value: "course_inquiry", label: "Course Inquiry" },
-  { value: "master_class_inquiry", label: "Master Class Inquiry" },
-  { value: "general_inquiry", label: "General Inquiry" },
-  { value: "corporate_inquiry", label: "Corporate Inquiry" },
-];
 
 /* ------------------------------------------------------------ lead sources */
 
@@ -300,7 +290,6 @@ export const CALL_OUTCOME_TONE: Record<string, string> = {
 export const labelOf = <T extends string>(opts: Option<T>[], value: T | undefined): string =>
   opts.find((o) => o.value === value)?.label ?? (value ?? "—");
 
-export const leadTypeLabel = (v: LeadTypeCode) => labelOf(LEAD_TYPES, v);
 export const sourceLabel = (v: LeadSourceCode) => labelOf(LEAD_SOURCES, v);
 export const statusLabel = (v: LeadStatusCode) => STATUS_BY_CODE.get(v)?.label ?? v;
 export const priorityLabel = (v: LeadPriorityCode) => PRIORITY_BY_CODE.get(v)?.label ?? v;

@@ -10,7 +10,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { counselorName, leadTypeLabel, sourceLabel } from "@/data/lead-lookups";
+import { counselorName, sourceLabel } from "@/data/lead-lookups";
 import { formatDate, formatPhone, initialsOf, isOverdue, relativeToToday } from "@/lib/leads-format";
 import { cn } from "@/lib/utils";
 import type { LeadListItem } from "@/types/leads";
@@ -44,7 +44,7 @@ export function LeadTable({ leads, selected, onToggle, onToggleAll, onAction, ca
             </TableHead>
             <TableHead>Lead ID</TableHead>
             <TableHead>Lead</TableHead>
-            <TableHead>Course / Type</TableHead>
+            <TableHead>Course</TableHead>
             <TableHead>Source</TableHead>
             <TableHead>Status</TableHead>
             <TableHead>Priority</TableHead>
@@ -107,7 +107,6 @@ export function LeadTable({ leads, selected, onToggle, onToggleAll, onAction, ca
 
                 <TableCell>
                   <p className="line-clamp-1 max-w-[15rem] text-sm">{lead.primaryCourse ?? "—"}</p>
-                  <p className="text-muted-foreground text-xs">{lead.leadTypeName ?? leadTypeLabel(lead.leadType)}</p>
                 </TableCell>
 
                 <TableCell>

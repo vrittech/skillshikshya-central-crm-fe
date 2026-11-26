@@ -16,7 +16,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useDataSource } from "@/context/data-source";
 import { useRole } from "@/context/role";
-import { leadTypeLabel, sourceLabel } from "@/data/lead-lookups";
+import { sourceLabel } from "@/data/lead-lookups";
 import { usePurgeLead, useRecycleBin, useRestoreLead } from "@/hooks/use-leads";
 import { formatDate, formatPhone, initialsOf } from "@/lib/leads-format";
 
@@ -67,7 +67,7 @@ export default function RecycleBinPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Lead</TableHead>
-                  <TableHead>Course / Type</TableHead>
+                  <TableHead>Course</TableHead>
                   <TableHead>Source</TableHead>
                   <TableHead>Deleted</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
@@ -100,9 +100,6 @@ export default function RecycleBinPage() {
                     </TableCell>
                     <TableCell>
                       <p className="line-clamp-1 max-w-[15rem] text-sm">{lead.primaryCourse ?? "—"}</p>
-                      <p className="text-muted-foreground text-xs">
-                        {lead.leadTypeName ?? leadTypeLabel(lead.leadType)}
-                      </p>
                     </TableCell>
                     <TableCell className="text-sm">{lead.sourceName ?? sourceLabel(lead.source)}</TableCell>
                     <TableCell className="text-muted-foreground text-sm">{formatDate(lead.deletedAt ?? undefined)}</TableCell>

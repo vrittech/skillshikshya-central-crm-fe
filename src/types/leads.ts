@@ -8,12 +8,6 @@
  * data today and swap in the real API later with minimal churn.
  */
 
-export type LeadTypeCode =
-  | "course_inquiry"
-  | "master_class_inquiry"
-  | "general_inquiry"
-  | "corporate_inquiry";
-
 /** Lead lifecycle status (the plan's controlled `lead_statuses`). */
 export type LeadStatusCode =
   | "new"
@@ -226,7 +220,6 @@ export interface Lead {
   cityId?: number | null;
   cityName?: string;
 
-  leadType: LeadTypeCode;
   source: LeadSourceCode;
   campaign?: string;
   status: LeadStatusCode;
@@ -260,7 +253,6 @@ export interface Lead {
   campaignId?: number | null;
   branchId?: number | null;
   primaryCourseId?: number | null;
-  leadTypeId?: number | null;
   tagIds?: number[];
 
   /** Display overrides for the live API path (admin-defined names + hex colors). */
@@ -269,7 +261,6 @@ export interface Lead {
   priorityName?: string;
   priorityColor?: string;
   sourceName?: string;
-  leadTypeName?: string;
   assignedToName?: string;
   branchName?: string;
 
@@ -287,7 +278,6 @@ export interface LeadListItem {
   fullName: string;
   primaryPhone: string;
   email?: string;
-  leadType: LeadTypeCode;
   source: LeadSourceCode;
   campaign?: string;
   primaryCourse?: string;
@@ -310,6 +300,5 @@ export interface LeadListItem {
   priorityName?: string;
   priorityColor?: string;
   sourceName?: string;
-  leadTypeName?: string;
   assignedToName?: string;
 }
