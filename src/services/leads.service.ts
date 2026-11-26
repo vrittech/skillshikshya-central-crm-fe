@@ -81,9 +81,18 @@ export interface LeadListParams {
   ordering?: string;
 }
 
+/** The most rows the server sends in one page (CustomPagination.max_page_size). */
+const MAX_PAGE = 100;
+
 /** Counts for the cards on the lead list (GET /api/leads/summary/). */
 export interface LeadSummary {
   pending_enrollment: number;
+  new_this_week: number;
+  new_last_week: number;
+  followups_today: number;
+  followups_overdue: number;
+  enrolled_this_month: number;
+  enrolled_last_month: number;
 }
 
 /** Query params accepted by GET /api/leads/{id}/calls/ (see lead_app_calls_api_guide.md). */
@@ -144,8 +153,11 @@ export const leadsService = {
   },
 
   // ---- nested collections ----
+  // The lead page shows each list whole, up to the server's 100 a page.
   async courseInterests(leadId: number) {
-    const { data } = await api.get<Paginated<ApiCourseInterest>>(`/leads/${leadId}/course-interests/`);
+    const { data } = await api.get<Paginated<ApiCourseInterest>>(`/leads/${leadId}/course-interests/`, {
+      params: { page_size: MAX_PAGE },
+    });
     return data;
   },
   async addCourseInterest(leadId: number, payload: Partial<ApiCourseInterest>) {
@@ -157,7 +169,7 @@ export const leadsService = {
   },
   async enrollments(leadId: number, params: EnrollmentListParams = {}) {
     const { data } = await api.get<Paginated<ApiEnrollment>>(`/leads/${leadId}/enrollments/`, {
-      params,
+      params: { page_size: MAX_PAGE, ...params },
     });
     return data;
   },
@@ -304,7 +316,9 @@ export const leadsService = {
     return data;
   },
   async calls(leadId: number, params: CallListParams = {}) {
-    const { data } = await api.get<Paginated<ApiLeadCall>>(`/leads/${leadId}/calls/`, { params });
+    const { data } = await api.get<Paginated<ApiLeadCall>>(`/leads/${leadId}/calls/`, {
+      params: { page_size: MAX_PAGE, ...params },
+    });
     return data;
   },
   async addCall(leadId: number, payload: Partial<ApiLeadCall>) {
@@ -317,7 +331,9 @@ export const leadsService = {
     return data;
   },
   async activities(leadId: number) {
-    const { data } = await api.get<Paginated<ApiLeadActivity>>(`/leads/${leadId}/activities/`);
+    const { data } = await api.get<Paginated<ApiLeadActivity>>(`/leads/${leadId}/activities/`, {
+      params: { page_size: MAX_PAGE },
+    });
     return data;
   },
   async addActivity(leadId: number, payload: Partial<ApiLeadActivity>) {
@@ -325,7 +341,9 @@ export const leadsService = {
     return data;
   },
   async followups(leadId: number) {
-    const { data } = await api.get<Paginated<ApiFollowup>>(`/leads/${leadId}/followups/`);
+    const { data } = await api.get<Paginated<ApiFollowup>>(`/leads/${leadId}/followups/`, {
+      params: { page_size: MAX_PAGE },
+    });
     return data;
   },
   async addFollowup(leadId: number, payload: Partial<ApiFollowup>) {
@@ -337,7 +355,9 @@ export const leadsService = {
     return data;
   },
   async documents(leadId: number) {
-    const { data } = await api.get<Paginated<ApiLeadDocument>>(`/leads/${leadId}/documents/`);
+    const { data } = await api.get<Paginated<ApiLeadDocument>>(`/leads/${leadId}/documents/`, {
+      params: { page_size: MAX_PAGE },
+    });
     return data;
   },
   async addDocument(leadId: number, payload: { document_type: string; file: string }) {

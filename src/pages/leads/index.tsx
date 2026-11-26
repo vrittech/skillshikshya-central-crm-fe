@@ -284,8 +284,9 @@ export default function LeadsPage() {
       </div>
 
       <LeadSummaryCards
+        live={!isMock}
         leads={summaryLeads}
-        pendingEnrollment={isMock ? 0 : summaryQ.data?.pending_enrollment}
+        summary={summaryQ.data}
         pendingActive={pendingActive}
         onPendingClick={() => updateFilters({ ...filters, enrollment: pendingActive ? "all" : "pending" })}
       />

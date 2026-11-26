@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/context/auth";
 import { useDataSource } from "@/context/data-source";
+import { MOCK_ENABLED } from "@/lib/mock-mode";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/lib/use-theme";
 
@@ -59,24 +60,26 @@ export function AppHeader({ onMenuClick }: { onMenuClick: () => void }) {
       </div>
 
       <div className="flex items-center gap-2 md:gap-3">
-        {/* Data-source toggle (dev) — live API vs mock preview */}
-        <div className="hidden items-center rounded-full border p-0.5 lg:inline-flex" title="Data source">
-          {(["api", "mock"] as const).map((s) => (
-            <button
-              key={s}
-              type="button"
-              onClick={() => setSource(s)}
-              className={cn(
-                "cursor-pointer rounded-full px-2.5 py-1 text-xs font-semibold transition-colors",
-                source === s
-                  ? "bg-brand-fixed-dim/30 text-brand-container"
-                  : "text-muted-foreground hover:bg-surface-container-low",
-              )}
-            >
-              {s === "api" ? "Live" : "Mock"}
-            </button>
-          ))}
-        </div>
+        {/* Data-source toggle (dev only) — live API vs mock preview */}
+        {MOCK_ENABLED && (
+          <div className="hidden items-center rounded-full border p-0.5 lg:inline-flex" title="Data source">
+            {(["api", "mock"] as const).map((s) => (
+              <button
+                key={s}
+                type="button"
+                onClick={() => setSource(s)}
+                className={cn(
+                  "cursor-pointer rounded-full px-2.5 py-1 text-xs font-semibold transition-colors",
+                  source === s
+                    ? "bg-brand-fixed-dim/30 text-brand-container"
+                    : "text-muted-foreground hover:bg-surface-container-low",
+                )}
+              >
+                {s === "api" ? "Live" : "Mock"}
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* Quick Create */}
         <Button variant="brand" size="sm" className="hidden sm:inline-flex" onClick={() => navigate("/leads/new")}>

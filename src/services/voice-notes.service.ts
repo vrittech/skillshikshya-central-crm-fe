@@ -18,7 +18,8 @@ const EXTENSION: Record<string, string> = {
 export const voiceNotesService = {
   async list(leadId: number) {
     const { data } = await api.get<Paginated<ApiVoiceNote>>(`/leads/${leadId}/voice-notes/`, {
-      params: { page_size: 200 },
+      // The server sends at most 100 a page.
+      params: { page_size: 100 },
     });
     return data;
   },

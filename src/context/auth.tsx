@@ -1,3 +1,4 @@
+import { useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { authService } from "@/services/auth.service";
@@ -40,6 +41,8 @@ async function fetchCurrentUser(): Promise<User | null> {
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [status, setStatus] = useState<AuthState["status"]>("loading");
   const [user, setUser] = useState<User | null>(null);
+  // Cached lists belong to the person who loaded them: drop them when the user changes.
+  const queryClient = useQueryClient();
 
   const refreshUser = useCallback(async () => {
     try {
@@ -60,30 +63,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const onLogout = () => {
       localStorage.removeItem(SESSION_KEY);
+      queryClient.clear();
       setUser(null);
       setStatus("unauthenticated");
     };
     window.addEventListener("auth:logout", onLogout);
     return () => window.removeEventListener("auth:logout", onLogout);
-  }, []);
+  }, [queryClient]);
 
   const login = useCallback(async (email: string, password: string) => {
     // Login returns the signed-in user with groups and permissions.
     const { user: me } = await authService.login({ email, password });
     localStorage.setItem(SESSION_KEY, email);
+    queryClient.clear();
     setUser(me);
     setStatus("authenticated");
-  }, []);
+  }, [queryClient]);
 
   const logout = useCallback(async () => {
     try {
       await authService.logout();
     } finally {
       localStorage.removeItem(SESSION_KEY);
+      queryClient.clear();
       setUser(null);
       setStatus("unauthenticated");
     }
-  }, []);
+  }, [queryClient]);
 
   const hasPerm = useCallback(
     (codename: string) =>

@@ -1,6 +1,7 @@
 import { CalendarClock, GraduationCap, Hourglass, Sparkles, TriangleAlert } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import type { LeadSummary } from "@/services/leads.service";
 import type { LeadListItem } from "@/types/leads";
 import { isDueToday, isOverdue, TODAY } from "@/lib/leads-format";
 
@@ -19,61 +20,85 @@ function leadsCreatedInWindow(leads: LeadListItem[], startMs: number, endMs: num
   }).length;
 }
 
+interface Counts {
+  newLeads: number;
+  newThisWeek: number;
+  newLastWeek: number;
+  dueToday: number;
+  hotDue: number;
+  overdue: number;
+  enrolled: number;
+  enrolledLastMonth: number;
+}
+
+/** Mock preview: counted from the in-memory leads. */
+function mockCounts(leads: LeadListItem[]): Counts {
+  const now = TODAY.getTime();
+  const week = 7 * 24 * 60 * 60 * 1000;
+  const lastMonth = TODAY.getMonth() === 0 ? 11 : TODAY.getMonth() - 1;
+  const lastMonthYear = TODAY.getMonth() === 0 ? TODAY.getFullYear() - 1 : TODAY.getFullYear();
+  return {
+    newLeads: leads.filter((l) => l.status === "new").length,
+    newThisWeek: leadsCreatedInWindow(leads, now - week, now),
+    newLastWeek: leadsCreatedInWindow(leads, now - 2 * week, now - week),
+    dueToday: leads.filter((l) => isDueToday(l.nextFollowUpAt)).length,
+    hotDue: leads.filter((l) => isDueToday(l.nextFollowUpAt) && l.priority === "hot").length,
+    overdue: leads.filter(
+      (l) => l.nextFollowUpAt && isOverdue(l.nextFollowUpAt) && l.status !== "enrolled",
+    ).length,
+    enrolled: countEnrolledInMonth(leads, TODAY.getFullYear(), TODAY.getMonth()),
+    enrolledLastMonth: countEnrolledInMonth(leads, lastMonthYear, lastMonth),
+  };
+}
+
+/** Live data: the server counts every lead the user can see, not just this page. */
+function liveCounts(s: LeadSummary): Counts {
+  return {
+    newLeads: s.new_this_week,
+    newThisWeek: s.new_this_week,
+    newLastWeek: s.new_last_week,
+    dueToday: s.followups_today,
+    hotDue: 0,
+    overdue: s.followups_overdue,
+    enrolled: s.enrolled_this_month,
+    enrolledLastMonth: s.enrolled_last_month,
+  };
+}
+
+function change(now: number, before: number, period: string) {
+  if (before === 0) return now > 0 ? `new this ${period}` : "no change";
+  return `${now >= before ? "+" : ""}${Math.round(((now - before) / before) * 100)}% vs last ${period}`;
+}
+
 export function LeadSummaryCards({
+  live,
   leads,
-  pendingEnrollment,
+  summary,
   pendingActive,
   onPendingClick,
 }: {
+  live: boolean;
+  /** Mock preview only: the cards are counted from these. */
   leads: LeadListItem[];
-  /** Leads whose enrollment is pending, not yet confirmed; undefined while unknown. */
-  pendingEnrollment?: number;
+  /** Live data: the counts from GET /api/leads/summary/; undefined while loading. */
+  summary?: LeadSummary;
   /** The list below shows only those leads. */
   pendingActive: boolean;
   onPendingClick: () => void;
 }) {
-  const newLeads = leads.filter((l) => l.status === "new").length;
-  const dueToday = leads.filter((l) => isDueToday(l.nextFollowUpAt)).length;
-  const overdue = leads.filter(
-    (l) => l.nextFollowUpAt && isOverdue(l.nextFollowUpAt) && l.status !== "enrolled",
-  ).length;
-  const enrolled = countEnrolledInMonth(leads, TODAY.getFullYear(), TODAY.getMonth());
-
-  const hotDue = leads.filter((l) => isDueToday(l.nextFollowUpAt) && l.priority === "hot").length;
-
-  // "New leads" delta: week-over-week change.
-  const now = TODAY.getTime();
-  const week = 7 * 24 * 60 * 60 * 1000;
-  const thisWeekNew = leadsCreatedInWindow(leads, now - week, now);
-  const prevWeekNew = leadsCreatedInWindow(leads, now - 2 * week, now - week);
-  const newLeadsDelta =
-    prevWeekNew === 0
-      ? thisWeekNew > 0
-        ? "new this week"
-        : "no change"
-      : `${thisWeekNew >= prevWeekNew ? "+" : ""}${Math.round(
-          ((thisWeekNew - prevWeekNew) / prevWeekNew) * 100,
-        )}% vs last week`;
-
-  // "Enrolled this month" delta: change vs last month.
-  const lastMonthEnrolled = countEnrolledInMonth(
-    leads,
-    TODAY.getMonth() === 0 ? TODAY.getFullYear() - 1 : TODAY.getFullYear(),
-    TODAY.getMonth() === 0 ? 11 : TODAY.getMonth() - 1,
-  );
-  const enrolledDelta =
-    lastMonthEnrolled === 0
-      ? enrolled > 0
-        ? "new this month"
-        : "no change"
-      : `${enrolled >= lastMonthEnrolled ? "+" : ""}${Math.round(
-          ((enrolled - lastMonthEnrolled) / lastMonthEnrolled) * 100,
-        )}% vs last month`;
+  // Live counts are unknown until the summary loads: the cards show "—".
+  const counts = live ? (summary ? liveCounts(summary) : null) : mockCounts(leads);
+  const pendingEnrollment = live ? summary?.pending_enrollment : 0;
+  const shown = (pick: (c: Counts) => number) => (counts ? pick(counts) : "—");
+  const newLeadsDelta = counts ? change(counts.newThisWeek, counts.newLastWeek, "week") : "";
+  const enrolledDelta = counts ? change(counts.enrolled, counts.enrolledLastMonth, "month") : "";
+  const hotDue = counts?.hotDue ?? 0;
+  const overdue = counts?.overdue ?? 0;
 
   const cards = [
     {
       label: "New leads",
-      value: newLeads,
+      value: shown((c) => c.newLeads),
       icon: Sparkles,
       tone: "text-sky-600 dark:text-sky-400",
       delta: newLeadsDelta,
@@ -81,23 +106,23 @@ export function LeadSummaryCards({
     },
     {
       label: "Follow-ups due today",
-      value: dueToday,
+      value: shown((c) => c.dueToday),
       icon: CalendarClock,
       tone: "text-brand",
-      delta: hotDue > 0 ? `${hotDue} high priority` : "on track",
+      delta: !counts ? "" : hotDue > 0 ? `${hotDue} high priority` : "on track",
       deltaTone: hotDue > 0 ? ("warn" as const) : ("up" as const),
     },
     {
       label: "Overdue follow-ups",
-      value: overdue,
+      value: shown((c) => c.overdue),
       icon: TriangleAlert,
       tone: "text-destructive",
-      delta: overdue > 0 ? "needs attention" : "all clear",
+      delta: !counts ? "" : overdue > 0 ? "needs attention" : "all clear",
       deltaTone: overdue > 0 ? ("warn" as const) : ("up" as const),
     },
     {
       label: "Enrolled this month",
-      value: enrolled,
+      value: shown((c) => c.enrolled),
       icon: GraduationCap,
       tone: "text-emerald-600 dark:text-emerald-400",
       delta: enrolledDelta,
@@ -153,14 +178,16 @@ export function LeadSummaryCards({
           </CardHeader>
           <CardContent className="space-y-2">
             <p className="font-headline text-2xl font-semibold">{c.value}</p>
-            <span
-              className={cn(
-                "inline-flex w-fit rounded-full px-2 py-0.5 text-xs font-semibold",
-                deltaClass[c.deltaTone],
-              )}
-            >
-              {c.delta}
-            </span>
+            {c.delta && (
+              <span
+                className={cn(
+                  "inline-flex w-fit rounded-full px-2 py-0.5 text-xs font-semibold",
+                  deltaClass[c.deltaTone],
+                )}
+              >
+                {c.delta}
+              </span>
+            )}
           </CardContent>
         </Card>
       ))}

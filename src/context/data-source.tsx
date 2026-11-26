@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useMemo, useState } from "react";
+import { MOCK_ENABLED } from "@/lib/mock-mode";
 
 /**
  * Chooses where the Leads module reads/writes:
@@ -22,17 +23,25 @@ interface DataSourceState {
 const Ctx = createContext<DataSourceState | null>(null);
 
 function readInitial(): DataSource {
-  if (typeof window === "undefined") return "api";
-  const v = window.localStorage.getItem(STORAGE_KEY);
-  return v === "mock" ? "mock" : "api";
+  if (typeof window === "undefined" || !MOCK_ENABLED) return "api";
+  try {
+    return window.localStorage.getItem(STORAGE_KEY) === "mock" ? "mock" : "api";
+  } catch {
+    return "api";
+  }
 }
 
 export function DataSourceProvider({ children }: { children: React.ReactNode }) {
   const [source, setSourceState] = useState<DataSource>(readInitial);
 
   const setSource = useCallback((s: DataSource) => {
-    setSourceState(s);
-    window.localStorage.setItem(STORAGE_KEY, s);
+    const next = MOCK_ENABLED ? s : "api";
+    setSourceState(next);
+    try {
+      window.localStorage.setItem(STORAGE_KEY, next);
+    } catch {
+      // Storage blocked: the choice lasts until reload.
+    }
   }, []);
 
   const value = useMemo<DataSourceState>(
