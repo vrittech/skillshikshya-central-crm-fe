@@ -208,7 +208,7 @@ export function useLead(routeId?: string): LeadDetailResult {
       if (latestEnr) {
         ui.enrollment = adaptApiEnrollment(latestEnr);
         const pays = await leadsService
-          .payments(numId, latestEnr.id, { ordering: "-payment_date" })
+          .payments(numId, latestEnr.id, { ordering: "-payment_date", page_size: 100 })
           .catch(() => EMPTY_PAGE);
         ui.payments = pays.results.map(adaptApiPayment);
       }
