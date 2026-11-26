@@ -114,14 +114,13 @@ function RoleFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl">
+      {/* Only the permission list scrolls; the name and buttons stay put. */}
+      <DialogContent className="flex max-h-[90dvh] flex-col overflow-hidden sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>{isEdit ? `Edit role: ${group.name}` : "Create role"}</DialogTitle>
-          <DialogDescription>
-            Roles are Django groups — users assigned this role inherit its permissions.
-          </DialogDescription>
+          <DialogDescription className="sr-only">Role name and permissions</DialogDescription>
         </DialogHeader>
-        <form onSubmit={submit} className="space-y-4">
+        <form onSubmit={submit} className="flex min-h-0 flex-1 flex-col gap-4">
           <div className="space-y-2">
             <Label htmlFor="role-name" required>Role name</Label>
             <Input
@@ -132,8 +131,8 @@ function RoleFormDialog({
               onChange={(e) => setName(e.target.value)}
             />
           </div>
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
+          <div className="flex min-h-0 flex-1 flex-col gap-2">
+            <div className="flex items-center justify-between gap-3">
               <Label>Permissions ({selected.size} selected)</Label>
               <div className="relative">
                 <Search className="text-muted-foreground absolute top-2 left-2 size-3.5" />
@@ -145,7 +144,7 @@ function RoleFormDialog({
                 />
               </div>
             </div>
-            <div className="max-h-72 space-y-3 overflow-y-auto rounded-md border p-3">
+            <div className="relative min-h-0 flex-1 space-y-3 overflow-y-auto rounded-md border p-3">
               {permissions.length === 0 && (
                 <p className="text-muted-foreground text-sm">No permissions loaded.</p>
               )}
@@ -199,7 +198,7 @@ export default function RolesPage() {
             Roles &amp; Permissions
           </h1>
           <p className="text-muted-foreground mt-1 text-sm">
-            Admin-only — create role groups and assign Django permissions.
+            Admin only.
           </p>
         </div>
         <Button
