@@ -1032,8 +1032,7 @@ export type ApiTimelineKind =
   | "money"
   | "teams"
   | "reminder"
-  | "document"
-  | "email";
+  | "document";
 
 /** One row of a lead's full history (GET /leads/{id}/timeline/). */
 export interface ApiTimelineItem {
