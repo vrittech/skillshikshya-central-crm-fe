@@ -1,7 +1,7 @@
 /** Formatting helpers for the lead CRM. Locale: Nepal (NPR, en-IN grouping). */
 
 /** Nepal timezone offset */
-const NEPAL_OFFSET = "+05:45";
+export const NEPAL_OFFSET = "+05:45";
 
 export function formatDateToNepalIso(d: Date): string {
   const y = d.getFullYear();

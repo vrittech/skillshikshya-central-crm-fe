@@ -31,7 +31,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useAuth } from "@/context/auth";
 import { useDataSource } from "@/context/data-source";
 import { openInvoicePdf, useCancelInvoice, useInvoices, useResendInvoice } from "@/hooks/use-invoices";
-import { formatDateTime, formatNPR } from "@/lib/leads-format";
+import { formatDateTime, formatNPR, NEPAL_OFFSET } from "@/lib/leads-format";
 import { cn } from "@/lib/utils";
 import type { ApiInvoice, InvoiceListParams, InvoiceStatus, InvoiceType } from "@/types/invoices";
 import { InvoiceEmailConfigDialog } from "./email-config-dialog";
@@ -71,8 +71,9 @@ export default function InvoicesPage() {
       page_size: PAGE_SIZE,
       type: type === "all" ? undefined : type,
       status: statusFilter === "all" ? undefined : statusFilter,
-      created_at__gte: from ? `${from}T00:00:00Z` : undefined,
-      created_at__lte: to ? `${to}T23:59:59Z` : undefined,
+      // Whole Nepal days, not UTC days.
+      created_at__gte: from ? `${from}T00:00:00${NEPAL_OFFSET}` : undefined,
+      created_at__lte: to ? `${to}T23:59:59${NEPAL_OFFSET}` : undefined,
     }),
     [page, type, statusFilter, from, to],
   );

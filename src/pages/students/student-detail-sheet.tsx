@@ -35,6 +35,7 @@ import {
   useStudentDocuments,
 } from "@/hooks/use-students";
 import { formatDate, formatDateTime, formatNPR } from "@/lib/leads-format";
+import { localToday } from "@/lib/seats";
 import { cn } from "@/lib/utils";
 import type { ApiAttendanceStatus, ApiStudentStatus } from "@/types/leads-api";
 import { TeamsStateBadge } from "../leads/components/teams-licence";
@@ -181,7 +182,7 @@ function AttendanceTab({ studentId }: { studentId: number }) {
   const mark = useMarkAttendance(studentId);
   const removeRecord = useDeleteAttendance(studentId);
 
-  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [date, setDate] = useState(localToday);
   const [status, setStatus] = useState<ApiAttendanceStatus>("present");
   const [remarks, setRemarks] = useState("");
 

@@ -139,7 +139,7 @@ export function EnrollmentDialog({
         course: enrollment.course,
         batch: enrollment.batch,
         student: enrollment.student,
-        enrollment_date: enrollment.enrollment_date ?? new Date().toISOString().slice(0, 10),
+        enrollment_date: enrollment.enrollment_date ?? localToday(),
         listed_fee: enrollment.listed_fee,
         standard_discount: enrollment.standard_discount,
         additional_discount: enrollment.additional_discount,
@@ -151,7 +151,7 @@ export function EnrollmentDialog({
     setF({
       course: primaryCourseId ?? undefined,
       batch: undefined,
-      enrollment_date: new Date().toISOString().slice(0, 10),
+      enrollment_date: localToday(),
       // A new enrollment is pending until it is confirmed (that makes the lead a student).
       status: "pending",
       listed_fee: "0",
