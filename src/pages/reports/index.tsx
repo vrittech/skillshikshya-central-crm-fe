@@ -1,7 +1,7 @@
 import { Download } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import { DonutChart, FunnelChart, HBarList, MiniBars } from "@/components/charts";
+import { MeterList, type MeterRow } from "@/components/charts";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -35,7 +35,26 @@ import {
 import { formatNPR } from "@/lib/leads-format";
 import type { ReportBaseParams } from "@/types/reports-api";
 
-const DONUT_COLORS = ["#00694c", "#008561", "#67dbae", "#f59e0b", "#64748b", "#0ea5e9", "#a855f7"];
+function pct(part: number, whole: number) {
+  return whole ? Math.round((part / whole) * 100) : 0;
+}
+
+/** Rows with each value's share of the total, largest first unless `keepOrder`. */
+function meterRows(items: { label: string; value: number }[], keepOrder = false): MeterRow[] {
+  const total = items.reduce((sum, r) => sum + r.value, 0);
+  const rows = keepOrder ? items : [...items].sort((a, b) => b.value - a.value);
+  return rows.map((r) => ({ ...r, share: pct(r.value, total) }));
+}
+
+/** Top `n` rows, the rest folded into "Other". */
+function topRows(items: { label: string; value: number }[], n: number) {
+  const sorted = [...items].filter((r) => r.value > 0).sort((a, b) => b.value - a.value);
+  const rest = sorted.slice(n).reduce((sum, r) => sum + r.value, 0);
+  return rest > 0 ? [...sorted.slice(0, n), { label: "Other", value: rest }] : sorted;
+}
+
+const npr = (v: number) => `NPR ${v.toLocaleString("en-IN")}`;
+const label = (v: string) => v.replace(/_/g, " ").replace(/^\w/, (c) => c.toUpperCase());
 
 function Kpi({
   label,
@@ -97,45 +116,26 @@ export default function ReportsPage() {
     enrollments.isLoading ||
     byStatus.isLoading;
 
-  const totalLeads = byStatus.data?.total ?? 0;
-  const statusBars = (byStatus.data?.results ?? []).map((r) => ({
-    label: r.status__name,
-    value: r.count,
-  }));
-  const sourceSlices = (bySource.data?.results ?? [])
-    .filter((r) => r.count > 0)
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 6)
-    .map((r, i) => ({
-      label: String(r.source__name ?? "—"),
-      count: r.count,
-      pct: Math.round((r.count / Math.max(1, totalLeads)) * 100),
-      color: DONUT_COLORS[i % DONUT_COLORS.length],
-    }));
+  const statusRows = meterRows(
+    (byStatus.data?.results ?? []).map((r) => ({ label: r.status__name, value: r.count })),
+  );
+  const sourceRows = meterRows(
+    topRows(
+      (bySource.data?.results ?? []).map((r) => ({ label: String(r.source__name ?? "No source"), value: r.count })),
+      5,
+    ),
+    true,
+  );
 
-  const funnel = conversion.data
+  const f = conversion.data?.funnel;
+  const funnelRows: MeterRow[] = f
     ? [
-        { label: "Total", count: conversion.data.funnel.total_leads, pct: 100 },
-        {
-          label: "Contacted",
-          count: conversion.data.funnel.contacted,
-          pct: Math.round(conversion.data.rates.contacted_rate),
-        },
-        {
-          label: "Interested",
-          count: conversion.data.funnel.interested,
-          pct: Math.round(conversion.data.rates.interested_rate),
-        },
-        {
-          label: "Enrolled",
-          count: conversion.data.funnel.enrolled,
-          pct: Math.round(conversion.data.rates.enrolled_rate),
-        },
-        {
-          label: "Converted",
-          count: conversion.data.funnel.converted,
-          pct: Math.round(conversion.data.rates.converted_rate),
-        },
+        { label: "Leads", value: f.total_leads, share: 100 },
+        { label: "Contacted", value: f.contacted, share: pct(f.contacted, f.total_leads) },
+        { label: "Interested", value: f.interested, share: pct(f.interested, f.total_leads) },
+        { label: "Enrolled", value: f.enrolled, share: pct(f.enrolled, f.total_leads) },
+        { label: "Converted", value: f.converted, share: pct(f.converted, f.total_leads) },
+        { label: "Lost", value: f.lost, share: pct(f.lost, f.total_leads), muted: true },
       ]
     : [];
 
@@ -247,22 +247,24 @@ export default function ReportsPage() {
               </CardHeader>
               <CardContent>
                 {conversion.isLoading ? (
-                  <Skeleton className="h-28 w-full" />
-                ) : funnel.length ? (
-                  <FunnelChart stages={funnel} />
-                ) : null}
+                  <Skeleton className="h-48 w-full" />
+                ) : f && f.total_leads > 0 ? (
+                  <MeterList rows={funnelRows} />
+                ) : (
+                  <p className="text-muted-foreground text-sm">No leads in range.</p>
+                )}
               </CardContent>
             </Card>
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">Lead sources</CardTitle>
-                <CardDescription>Share of all leads</CardDescription>
+                <CardDescription>Share of leads</CardDescription>
               </CardHeader>
               <CardContent>
                 {bySource.isLoading ? (
                   <Skeleton className="h-40 w-full" />
-                ) : sourceSlices.length ? (
-                  <DonutChart slices={sourceSlices} />
+                ) : sourceRows.length ? (
+                  <MeterList rows={sourceRows} />
                 ) : (
                   <p className="text-muted-foreground text-sm">No data.</p>
                 )}
@@ -278,8 +280,8 @@ export default function ReportsPage() {
               <CardContent>
                 {byStatus.isLoading ? (
                   <Skeleton className="h-32 w-full" />
-                ) : statusBars.length ? (
-                  <HBarList data={statusBars} />
+                ) : statusRows.length ? (
+                  <MeterList rows={statusRows} />
                 ) : (
                   <p className="text-muted-foreground text-sm">No data.</p>
                 )}
@@ -294,12 +296,14 @@ export default function ReportsPage() {
                 {revenue.isLoading ? (
                   <Skeleton className="h-32 w-full" />
                 ) : revenue.data?.by_payment_method.length ? (
-                  <HBarList
-                    data={revenue.data.by_payment_method.map((m) => ({
-                      label: m.payment_method.replace("_", " "),
-                      value: Number(m.amount),
-                    }))}
-                    max={Math.max(...revenue.data.by_payment_method.map((m) => Number(m.amount)))}
+                  <MeterList
+                    format={npr}
+                    rows={meterRows(
+                      revenue.data.by_payment_method.map((m) => ({
+                        label: label(m.payment_method),
+                        value: Number(m.amount),
+                      })),
+                    )}
                   />
                 ) : (
                   <p className="text-muted-foreground text-sm">No payments in range.</p>
@@ -319,11 +323,14 @@ export default function ReportsPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <HBarList
-                  data={revenue.data.by_branch.map((b) => ({
-                    label: b.branch__name ?? "—",
-                    value: Number(b.amount),
-                  }))}
+                <MeterList
+                  format={npr}
+                  rows={meterRows(
+                    revenue.data.by_branch.map((b) => ({
+                      label: b.branch__name ?? "No branch",
+                      value: Number(b.amount),
+                    })),
+                  )}
                 />
               </CardContent>
             </Card>
@@ -344,11 +351,10 @@ export default function ReportsPage() {
                 {enrollments.isLoading ? (
                   <Skeleton className="h-32 w-full" />
                 ) : enrollments.data?.by_course.length ? (
-                  <HBarList
-                    data={enrollments.data.by_course.map((c) => ({
-                      label: c.course__name ?? "—",
-                      value: c.count,
-                    }))}
+                  <MeterList
+                    rows={meterRows(
+                      enrollments.data.by_course.map((c) => ({ label: c.course__name ?? "No course", value: c.count })),
+                    )}
                   />
                 ) : (
                   <p className="text-muted-foreground text-sm">No enrollments in range.</p>
@@ -361,19 +367,16 @@ export default function ReportsPage() {
               </CardHeader>
               <CardContent>
                 {enrollments.isLoading ? (
-                  <Skeleton className="h-24 w-full" />
+                  <Skeleton className="h-32 w-full" />
                 ) : enrollments.data?.by_status.length ? (
-                  <MiniBars values={enrollments.data.by_status.map((s) => s.count)} />
+                  <MeterList
+                    rows={meterRows(
+                      enrollments.data.by_status.map((st) => ({ label: label(st.status), value: st.count })),
+                    )}
+                  />
                 ) : (
                   <p className="text-muted-foreground text-sm">No data.</p>
                 )}
-                <div className="text-muted-foreground mt-2 flex flex-wrap gap-x-3 text-xs capitalize">
-                  {enrollments.data?.by_status.map((s) => (
-                    <span key={s.status}>
-                      {s.status.replace("_", " ")} ({s.count})
-                    </span>
-                  ))}
-                </div>
               </CardContent>
             </Card>
             <Card>
