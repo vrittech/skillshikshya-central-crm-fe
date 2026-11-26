@@ -1,0 +1,21 @@
+# Production stack, started on the server by .github/workflows/deploy.yml.
+# The image comes from GitHub Container Registry; .env next to this file is
+# written by the deploy job.
+name: skillshikshya-frontend
+
+services:
+  web:
+    image: ${FRONTEND_IMAGE:-ghcr.io/vrittech/skillshikshya-crm-frontend:latest}
+    restart: unless-stopped
+    environment:
+      # The backend stack's API on the shared network (alias "backend").
+      VITE_API_URL: ${VITE_API_URL:-http://backend:8188}
+    ports:
+      - "${FRONTEND_PORT:-8080}:80"
+    networks:
+      - skillshikshya
+
+networks:
+  skillshikshya:
+    name: skillshikshya
+    external: true
