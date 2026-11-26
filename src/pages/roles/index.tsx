@@ -1,5 +1,6 @@
 import { MoreHorizontal, Plus, Search } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { Navigate } from "react-router-dom";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -38,6 +39,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { useAuth } from "@/context/auth";
 import {
   useCreateGroup,
   useDeleteGroup,
@@ -52,11 +54,13 @@ function RoleFormDialog({
   onOpenChange,
   group,
   permissions,
+  loading,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   group: Group | null;
   permissions: Permission[];
+  loading: boolean;
 }) {
   const isEdit = group != null;
   const [name, setName] = useState("");
@@ -104,7 +108,7 @@ function RoleFormDialog({
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
-    const payload = { name, permissions: [...selected] };
+    const payload = { name: name.trim(), permissions: [...selected] };
     if (isEdit) {
       update.mutate({ id: group.id, payload }, { onSuccess: () => onOpenChange(false) });
     } else {
@@ -117,7 +121,9 @@ function RoleFormDialog({
       {/* Only the permission list scrolls; the name and buttons stay put. */}
       <DialogContent className="flex max-h-[90dvh] flex-col overflow-hidden sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>{isEdit ? `Edit role: ${group.name}` : "Create role"}</DialogTitle>
+          <DialogTitle className="line-clamp-2 [overflow-wrap:anywhere]">
+            {isEdit ? `Edit role: ${group.name}` : "Create role"}
+          </DialogTitle>
           <DialogDescription className="sr-only">Role name and permissions</DialogDescription>
         </DialogHeader>
         <form onSubmit={submit} className="flex min-h-0 flex-1 flex-col gap-4">
@@ -126,6 +132,7 @@ function RoleFormDialog({
             <Input
               id="role-name"
               required
+              maxLength={150}
               placeholder="Call Agent"
               value={name}
               onChange={(e) => setName(e.target.value)}
@@ -141,12 +148,24 @@ function RoleFormDialog({
                   placeholder="Filter permissions…"
                   value={filter}
                   onChange={(e) => setFilter(e.target.value)}
+                  // Enter here filters; it must not save the role.
+                  onKeyDown={(e) => e.key === "Enter" && e.preventDefault()}
                 />
               </div>
             </div>
             <div className="relative min-h-0 flex-1 space-y-3 overflow-y-auto rounded-md border p-3">
-              {permissions.length === 0 && (
-                <p className="text-muted-foreground text-sm">No permissions loaded.</p>
+              {loading ? (
+                <div className="space-y-2">
+                  {Array.from({ length: 6 }).map((_, i) => (
+                    <Skeleton key={i} className="h-5 w-full" />
+                  ))}
+                </div>
+              ) : permissions.length === 0 ? (
+                <p className="text-muted-foreground text-sm">Could not load permissions.</p>
+              ) : (
+                grouped.length === 0 && (
+                  <p className="text-muted-foreground text-sm">No permissions match.</p>
+                )
               )}
               {grouped.map(([contentType, perms]) => (
                 <div key={contentType}>
@@ -172,7 +191,7 @@ function RoleFormDialog({
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit" variant="brand" disabled={busy}>
+            <Button type="submit" variant="brand" disabled={busy || !name.trim()}>
               {busy ? "Saving…" : isEdit ? "Save role" : "Create role"}
             </Button>
           </DialogFooter>
@@ -183,6 +202,13 @@ function RoleFormDialog({
 }
 
 export default function RolesPage() {
+  const { user } = useAuth();
+  // Roles are changed by admins only; others go back to the dashboard.
+  if (!user?.is_staff) return <Navigate to="/" replace />;
+  return <RolesScreen />;
+}
+
+function RolesScreen() {
   const groups = useGroups();
   const permissions = usePermissions();
   const deleteGroup = useDeleteGroup();
@@ -233,22 +259,28 @@ export default function RolesPage() {
             {groups.isError && (
               <TableRow>
                 <TableCell colSpan={3} className="text-muted-foreground py-10 text-center">
-                  Could not load roles — admin access is required.
+                  Could not load roles.
                 </TableCell>
               </TableRow>
             )}
             {groups.data?.results.length === 0 && (
               <TableRow>
                 <TableCell colSpan={3} className="text-muted-foreground py-10 text-center">
-                  No roles yet. Create the first one.
+                  No roles yet.
                 </TableCell>
               </TableRow>
             )}
             {groups.data?.results.map((g) => (
               <TableRow key={g.id}>
-                <TableCell className="font-medium">{g.name}</TableCell>
+                <TableCell className="max-w-xs font-medium whitespace-normal">
+                  <span className="line-clamp-2 [overflow-wrap:anywhere]" title={g.name}>
+                    {g.name}
+                  </span>
+                </TableCell>
                 <TableCell>
-                  <Badge variant="secondary">{g.permissions.length} permissions</Badge>
+                  <Badge variant="secondary">
+                    {g.permissions.length} {g.permissions.length === 1 ? "permission" : "permissions"}
+                  </Badge>
                 </TableCell>
                 <TableCell>
                   <DropdownMenu>
@@ -283,12 +315,13 @@ export default function RolesPage() {
         onOpenChange={setFormOpen}
         group={editing}
         permissions={permissions.data ?? []}
+        loading={permissions.isLoading}
       />
 
       <AlertDialog open={deleting != null} onOpenChange={(o) => !o && setDeleting(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete role "{deleting?.name}"?</AlertDialogTitle>
+            <AlertDialogTitle className="line-clamp-3 [overflow-wrap:anywhere]">Delete role "{deleting?.name}"?</AlertDialogTitle>
             <AlertDialogDescription>
               Users assigned this role will lose its permissions. This cannot be undone.
             </AlertDialogDescription>

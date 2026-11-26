@@ -120,11 +120,9 @@ export interface UserListParams {
   is_active?: boolean;
   is_staff?: boolean;
   group?: number;
-  /**
-   * Filter users by their assigned branch. Pending backend support
-   * (see docs/user-branch-counselor-handoff.md) — ignored server-side until
-   * `/api/users/?branch_id=` ships, at which point this narrows the list.
-   */
+  /** Comma-separated role ids: users in any of them. */
+  group__in?: string;
+  /** Users in this branch. */
   branch_id?: number;
   ordering?: string;
 }

@@ -4,7 +4,7 @@ import { apiErrorMessage } from "@/lib/api";
 import { groupsService } from "@/services/groups.service";
 import { permissionsService } from "@/services/permissions.service";
 
-/** Groups list — used for the role <Select>. Non-admins get a 403; treat as empty. */
+/** Roles list (role picker, counselor list). Anyone signed in may read it; only admins change it. */
 export function useGroups(enabled = true) {
   return useQuery({
     queryKey: ["groups"],
