@@ -546,25 +546,27 @@ export default function LeadDetailPage() {
                       <p className="mt-1 text-sm">{nextFollowUp.purpose}</p>
                       {can("leads.log_activity") && (
                         <div className="mt-3 flex gap-1.5">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            disabled={completeFollowup.isPending}
-                            onClick={() => {
-                              if (source === "api" && lead.apiId != null) {
-                                completeFollowup.mutate({
-                                  leadApiId: lead.apiId,
-                                  followupId: Number(nextFollowUp.id.replace(/\D/g, "")),
-                                });
-                              } else {
-                                toast.success("Follow-up completed", {
-                                  description: "Mock preview — not saved.",
-                                });
-                              }
-                            }}
-                          >
-                            Complete
-                          </Button>
+                          {can("followups.complete") && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={completeFollowup.isPending}
+                              onClick={() => {
+                                if (source === "api" && lead.apiId != null) {
+                                  completeFollowup.mutate({
+                                    leadApiId: lead.apiId,
+                                    followupId: Number(nextFollowUp.id.replace(/\D/g, "")),
+                                  });
+                                } else {
+                                  toast.success("Follow-up completed", {
+                                    description: "Mock preview — not saved.",
+                                  });
+                                }
+                              }}
+                            >
+                              Complete
+                            </Button>
+                          )}
                           <Button size="sm" variant="ghost" onClick={() => setAction("follow_up")}>
                             Reschedule
                           </Button>
@@ -691,7 +693,7 @@ export default function LeadDetailPage() {
                   {lead.enrollment.remarks && (
                     <p className="text-muted-foreground text-sm">{lead.enrollment.remarks}</p>
                   )}
-                  {can("enrollment.manage") && (
+                  {can("payment.record") && (
                     <div className="flex gap-2 pt-2">
                       <Button
                         size="sm"
@@ -706,7 +708,7 @@ export default function LeadDetailPage() {
               ) : (
                 <div className="py-8 text-center">
                   <p className="text-muted-foreground text-sm">This lead is not enrolled yet.</p>
-                  {can("enrollment.manage") && (
+                  {can("enrollment.create") && (
                     <Button
                       size="sm"
                       variant="outline"
@@ -723,7 +725,7 @@ export default function LeadDetailPage() {
             {/* Payments */}
             <TabsContent value="payments">
               {source === "api" ? (
-                <LeadPaymentsPanel leadId={lead.apiId} canManage={can("enrollment.manage")} />
+                <LeadPaymentsPanel leadId={lead.apiId} />
               ) : lead.payments.length > 0 ? (
                 <ul className="divide-border divide-y">
                   {lead.payments.map((p) => (

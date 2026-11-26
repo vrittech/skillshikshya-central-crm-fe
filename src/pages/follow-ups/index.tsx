@@ -78,7 +78,7 @@ function FollowUpItem({ row, canComplete }: { row: FollowUpRow; canComplete: boo
 export default function FollowUpsPage() {
   const { isMock } = useDataSource();
   const { can } = useRole();
-  const canComplete = can("leads.log_activity");
+  const canComplete = can("followups.complete");
   const [search, setSearch] = useState("");
   const [view, setView] = useState<"all" | "overdue" | "today" | "upcoming">("all");
   const [kind, setKind] = useState<"all" | "payment" | "other">("all");

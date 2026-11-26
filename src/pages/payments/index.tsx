@@ -130,7 +130,7 @@ export default function PaymentsPage() {
               {formatNPR(successfulTotal)}
             </p>
           </div>
-          {source === "api" && can("enrollment.manage") && (
+          {source === "api" && can("payment.record") && (
             <Button variant="brand" onClick={() => setPayOpen(true)}>
               <CreditCard /> Record Payment
             </Button>

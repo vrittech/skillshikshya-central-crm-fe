@@ -121,7 +121,7 @@ export default function EnrollmentsPage() {
             </SelectContent>
           </Select>
         )}
-        {source === "api" && can("enrollment.manage") && (
+        {source === "api" && can("enrollment.create") && (
           <Button variant="brand" onClick={() => setCreateOpen(true)}>
             <Plus /> New Enrollment
           </Button>

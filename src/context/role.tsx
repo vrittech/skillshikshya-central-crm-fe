@@ -23,9 +23,13 @@ export type Capability =
   | "leads.delete" // move to recycle bin
   | "leads.purge" // delete forever
   | "leads.log_activity"
+  | "followups.complete"
   | "leads.import"
+  | "enrollment.create"
   | "enrollment.manage"
+  | "payment.record"
   | "payment.manage"
+  | "money.adjust"
   | "reports.view"
   | "users.manage"
   | "minutes.top_up"
@@ -49,9 +53,13 @@ const ALL: Capability[] = [
   "leads.delete",
   "leads.purge",
   "leads.log_activity",
+  "followups.complete",
   "leads.import",
+  "enrollment.create",
   "enrollment.manage",
+  "payment.record",
   "payment.manage",
+  "money.adjust",
   "reports.view",
   "users.manage",
   "minutes.top_up",
@@ -73,9 +81,13 @@ const LIVE_PERMS: Record<Capability, string | string[]> = {
   "leads.delete": "lead.delete_lead",
   "leads.purge": "staff",
   "leads.log_activity": ["lead.add_leadcall", "lead.add_followup"],
+  "followups.complete": "lead.change_followup",
   "leads.import": "lead.add_lead",
+  "enrollment.create": "lead.add_enrollment",
   "enrollment.manage": "lead.change_enrollment",
-  "payment.manage": "lead.add_payment",
+  "payment.record": "lead.add_payment",
+  "payment.manage": "lead.change_payment",
+  "money.adjust": "lead.add_adjustment",
   "reports.view": "lead.view_payment",
   "users.manage": "account.change_user",
   "minutes.top_up": "staff",
@@ -102,6 +114,7 @@ export const ROLE_DEFS: Record<MockRole, RoleDef> = {
       "leads.merge",
       "leads.archive",
       "leads.log_activity",
+      "followups.complete",
       "leads.import",
       "reports.view",
     ]),
@@ -110,7 +123,12 @@ export const ROLE_DEFS: Record<MockRole, RoleDef> = {
     role: "counselor",
     label: "Counselor",
     description: "Assigned leads only. Can log calls and add follow-ups.",
-    capabilities: new Set<Capability>(["leads.create", "leads.edit", "leads.log_activity"]),
+    capabilities: new Set<Capability>([
+      "leads.create",
+      "leads.edit",
+      "leads.log_activity",
+      "followups.complete",
+    ]),
   },
   finance: {
     role: "finance",
@@ -118,8 +136,11 @@ export const ROLE_DEFS: Record<MockRole, RoleDef> = {
     description: "Enrollment and payment access. Limited lead-note access.",
     capabilities: new Set<Capability>([
       "leads.view.all",
+      "enrollment.create",
       "enrollment.manage",
+      "payment.record",
       "payment.manage",
+      "money.adjust",
       "reports.view",
     ]),
   },

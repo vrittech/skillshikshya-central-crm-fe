@@ -42,6 +42,7 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useRole } from "@/context/role";
 import {
   useChangeEnrollmentStatus,
   useEnrollmentHistory,
@@ -203,15 +204,8 @@ function Fee({ label: l, value, strong }: { label: string; value: string; strong
 
 /* ------------------------------------------- payments nested in enrollment */
 
-function EnrollmentPayments({
-  leadId,
-  enrollment,
-  canManage,
-}: {
-  leadId?: number;
-  enrollment: ApiEnrollment;
-  canManage: boolean;
-}) {
+function EnrollmentPayments({ leadId, enrollment }: { leadId?: number; enrollment: ApiEnrollment }) {
+  const { can } = useRole();
   const { payments, isLoading } = useEnrollmentPayments(leadId, enrollment.id);
 
   if (isLoading) return <Skeleton className="h-16 w-full rounded-xl" />;
@@ -236,7 +230,7 @@ function EnrollmentPayments({
           </div>
           <div className="flex shrink-0 items-center gap-1.5">
             <PaymentPill status={p.status} />
-            {canManage && leadId != null && (
+            {can("payment.manage") && leadId != null && (
               <PaymentActions
                 leadId={leadId}
                 enrollmentId={enrollment.id}
@@ -373,6 +367,9 @@ export function EnrollmentCard({
   onEdit: () => void;
   page?: boolean;
 }) {
+  const { can } = useRole();
+  const canPay = can("payment.record");
+  const canAdjust = can("money.adjust");
   const [payOpen, setPayOpen] = useState(false);
   const sections: Section[] = [
     "fee",
@@ -451,70 +448,78 @@ export function EnrollmentCard({
               {enrollment.branch_name ? ` · ${enrollment.branch_name}` : ""}
             </p>
           </div>
-          {canManage && (
+          {(canManage || canPay || canAdjust) && (
             <div className="flex items-center gap-2">
-              {isPending && leadId != null && (
+              {canManage && isPending && leadId != null && (
                 <Button size="sm" variant="brand" onClick={() => setConfirmOpen(true)}>
                   <BadgeCheck /> Confirm
                 </Button>
               )}
-              {!isCancelled && (
+              {canPay && !isCancelled && (
                 <Button size="sm" variant="outline" onClick={() => setPayOpen(true)}>
                   <Receipt /> Add Payment
                 </Button>
               )}
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button size="icon" variant="outline" className="size-8" aria-label="More actions">
-                    <MoreHorizontal />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-48">
-                  {leadId != null && canSit(enrollment) && (
-                    <>
-                      <SeatMenuItems enrollment={enrollment} onAction={setSeatAction} />
-                      <DropdownMenuSeparator />
-                    </>
-                  )}
-                  {isCancelled && (
-                    <DropdownMenuItem onSelect={() => setPayOpen(true)}>
-                      <Receipt /> Add Payment
-                    </DropdownMenuItem>
-                  )}
-                  <DropdownMenuItem onSelect={() => setAdjustOpen(true)}>
-                    <Coins /> Money entry
-                  </DropdownMenuItem>
-                  {canInvoice && (
-                    <DropdownMenuItem
-                      disabled={feeInvoice.isPending}
-                      onSelect={() => feeInvoice.mutate(enrollment.id)}
-                    >
-                      <FileText /> Create fee invoice
-                    </DropdownMenuItem>
-                  )}
-                  <DropdownMenuItem onSelect={onEdit}>
-                    <PencilLine /> Edit
-                  </DropdownMenuItem>
-                  {leadId != null && !isCancelled && !isPending && (
-                    <DropdownMenuItem onSelect={() => setChangeStatusOpen(true)}>
-                      <RefreshCw /> Change status
-                    </DropdownMenuItem>
-                  )}
-                  <DropdownMenuSeparator />
-                  {isCancelled ? (
-                    <DropdownMenuItem onSelect={() => setStatusAction("reinstate")}>
-                      <RotateCcw /> Reinstate
-                    </DropdownMenuItem>
-                  ) : (
-                    <DropdownMenuItem
-                      variant="destructive"
-                      onSelect={() => setStatusAction("cancel")}
-                    >
-                      <Ban /> Cancel enrollment
-                    </DropdownMenuItem>
-                  )}
-                </DropdownMenuContent>
-              </DropdownMenu>
+              {(canManage || canAdjust || (canPay && isCancelled)) && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button size="icon" variant="outline" className="size-8" aria-label="More actions">
+                      <MoreHorizontal />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-48">
+                    {canManage && leadId != null && canSit(enrollment) && (
+                      <>
+                        <SeatMenuItems enrollment={enrollment} onAction={setSeatAction} />
+                        <DropdownMenuSeparator />
+                      </>
+                    )}
+                    {canPay && isCancelled && (
+                      <DropdownMenuItem onSelect={() => setPayOpen(true)}>
+                        <Receipt /> Add Payment
+                      </DropdownMenuItem>
+                    )}
+                    {canAdjust && (
+                      <DropdownMenuItem onSelect={() => setAdjustOpen(true)}>
+                        <Coins /> Money entry
+                      </DropdownMenuItem>
+                    )}
+                    {canManage && canInvoice && (
+                      <DropdownMenuItem
+                        disabled={feeInvoice.isPending}
+                        onSelect={() => feeInvoice.mutate(enrollment.id)}
+                      >
+                        <FileText /> Create fee invoice
+                      </DropdownMenuItem>
+                    )}
+                    {canManage && (
+                      <>
+                        <DropdownMenuItem onSelect={onEdit}>
+                          <PencilLine /> Edit
+                        </DropdownMenuItem>
+                        {leadId != null && !isCancelled && !isPending && (
+                          <DropdownMenuItem onSelect={() => setChangeStatusOpen(true)}>
+                            <RefreshCw /> Change status
+                          </DropdownMenuItem>
+                        )}
+                        <DropdownMenuSeparator />
+                        {isCancelled ? (
+                          <DropdownMenuItem onSelect={() => setStatusAction("reinstate")}>
+                            <RotateCcw /> Reinstate
+                          </DropdownMenuItem>
+                        ) : (
+                          <DropdownMenuItem
+                            variant="destructive"
+                            onSelect={() => setStatusAction("cancel")}
+                          >
+                            <Ban /> Cancel enrollment
+                          </DropdownMenuItem>
+                        )}
+                      </>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
             </div>
           )}
         </div>
@@ -602,7 +607,7 @@ export function EnrollmentCard({
             </>
           )}
           {s === "payments" && (
-            <EnrollmentPayments leadId={leadId} enrollment={enrollment} canManage={canManage} />
+            <EnrollmentPayments leadId={leadId} enrollment={enrollment} />
           )}
           {s === "due" && (
             <>
@@ -766,6 +771,7 @@ export function EnrollmentsPanel({
   canManage: boolean;
 }) {
   const { enrollments, isLoading } = useLeadEnrollments(leadId);
+  const canCreate = useRole().can("enrollment.create");
   const [searchParams, setSearchParams] = useSearchParams();
   const [createOpen, setCreateOpen] = useState(false);
   const [editing, setEditing] = useState<ApiEnrollment | null>(null);
@@ -835,7 +841,7 @@ export function EnrollmentsPanel({
                 Enrollments{" "}
                 <span className="text-muted-foreground font-normal">{enrollments.length}</span>
               </p>
-              {canManage && (
+              {canCreate && (
                 <Button size="sm" variant="outline" onClick={startCreate}>
                   <Plus /> New Enrollment
                 </Button>
@@ -872,7 +878,7 @@ export function EnrollmentsPanel({
       ) : (
         <div className="py-8 text-center">
           <p className="text-muted-foreground text-sm">This lead is not enrolled yet.</p>
-          {canManage && (
+          {canCreate && (
             <Button size="sm" variant="outline" className="mt-3" onClick={startCreate}>
               <Plus /> Create Enrollment
             </Button>
@@ -897,13 +903,8 @@ export function EnrollmentsPanel({
 }
 
 /** Payments tab (live path) — every payment of the lead across its enrollments. */
-export function LeadPaymentsPanel({
-  leadId,
-  canManage,
-}: {
-  leadId?: number;
-  canManage?: boolean;
-}) {
+export function LeadPaymentsPanel({ leadId }: { leadId?: number }) {
+  const { can } = useRole();
   const { rows, isLoading } = useLeadPayments(leadId);
   const { enrollments } = useLeadEnrollments(leadId);
   const [payOpen, setPayOpen] = useState(false);
@@ -941,7 +942,7 @@ export function LeadPaymentsPanel({
         </p>
         <div className="flex items-center gap-3">
           <p className="text-sm font-semibold">{formatNPR(collected)} collected</p>
-          {canManage && (
+          {can("payment.record") && (
             <Button size="sm" variant="outline" onClick={startRecord}>
               <Receipt /> Record Payment
             </Button>
@@ -967,7 +968,7 @@ export function LeadPaymentsPanel({
             </div>
             <div className="flex shrink-0 items-center gap-1.5">
               <PaymentPill status={p.status} />
-              {canManage && e && leadId != null && (
+              {can("payment.manage") && e && leadId != null && (
                 <PaymentActions
                   leadId={leadId}
                   enrollmentId={e.id}
