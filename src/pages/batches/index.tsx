@@ -236,7 +236,15 @@ function CourseBatchesTab({ canAdd, canChange, canDelete }: TabPerms) {
               </TableRow>
             )}
             {rows.map((cb) => (
-              <TableRow key={cb.id}>
+              <TableRow
+                key={cb.id}
+                className="cursor-pointer"
+                onClick={(e) => {
+                  // The name link opens it on its own.
+                  if ((e.target as HTMLElement).closest("a")) return;
+                  navigate(`/batches/${cb.id}`);
+                }}
+              >
                 <TableCell>
                   <Link to={`/batches/${cb.id}`} className="font-semibold hover:underline">
                     {cb.name}
@@ -271,9 +279,9 @@ function CourseBatchesTab({ canAdd, canChange, canDelete }: TabPerms) {
                     {!cb.is_active && <Badge variant="secondary">Inactive</Badge>}
                   </div>
                 </TableCell>
-                <TableCell>
+                {/* Menu clicks stay in the menu (they reach the row through the portal otherwise). */}
+                <TableCell onClick={(e) => e.stopPropagation()}>
                   <RowMenu
-                    onOpen={() => navigate(`/batches/${cb.id}`)}
                     onEdit={
                       canChange
                         ? () => {
@@ -474,14 +482,13 @@ function SeatsCell({ batch }: { batch: CourseBatch }) {
 /* ------------------------------------------------------------------- shared */
 
 function RowMenu({
-  onOpen,
   onEdit,
   onDelete,
 }: {
-  onOpen?: () => void;
   onEdit?: () => void;
   onDelete?: () => void;
 }) {
+  if (!onEdit && !onDelete) return null;
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -490,7 +497,6 @@ function RowMenu({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        {onOpen && <DropdownMenuItem onSelect={onOpen}>Open</DropdownMenuItem>}
         {onEdit && <DropdownMenuItem onSelect={onEdit}>Edit</DropdownMenuItem>}
         {onDelete && (
           <DropdownMenuItem variant="destructive" onSelect={onDelete}>
