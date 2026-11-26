@@ -3,7 +3,6 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ChangePasswordDialog } from "@/components/layout/change-password-dialog";
 import { NotificationBell } from "@/components/layout/notification-bell";
-import { RoleSwitcher } from "@/components/layout/role-switcher";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -14,16 +13,12 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/context/auth";
-import { useDataSource } from "@/context/data-source";
-import { MOCK_ENABLED } from "@/lib/mock-mode";
-import { cn } from "@/lib/utils";
 import { useTheme } from "@/lib/use-theme";
 
 export function AppHeader({ onMenuClick }: { onMenuClick: () => void }) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const { theme, toggle } = useTheme();
-  const { source, isMock, setSource } = useDataSource();
   const [changePwOpen, setChangePwOpen] = useState(false);
 
   const initials =
@@ -60,34 +55,10 @@ export function AppHeader({ onMenuClick }: { onMenuClick: () => void }) {
       </div>
 
       <div className="flex items-center gap-2 md:gap-3">
-        {/* Data-source toggle (dev only) — live API vs mock preview */}
-        {MOCK_ENABLED && (
-          <div className="hidden items-center rounded-full border p-0.5 lg:inline-flex" title="Data source">
-            {(["api", "mock"] as const).map((s) => (
-              <button
-                key={s}
-                type="button"
-                onClick={() => setSource(s)}
-                className={cn(
-                  "cursor-pointer rounded-full px-2.5 py-1 text-xs font-semibold transition-colors",
-                  source === s
-                    ? "bg-brand-fixed-dim/30 text-brand-container"
-                    : "text-muted-foreground hover:bg-surface-container-low",
-                )}
-              >
-                {s === "api" ? "Live" : "Mock"}
-              </button>
-            ))}
-          </div>
-        )}
-
         {/* Quick Create */}
         <Button variant="brand" size="sm" className="hidden sm:inline-flex" onClick={() => navigate("/leads/new")}>
           <Plus /> Quick Create
         </Button>
-
-        {/* Previews a role with mock data; live data follows the user's real permissions */}
-        {isMock && <RoleSwitcher />}
 
         {/* Notifications */}
         <NotificationBell />
@@ -120,7 +91,7 @@ export function AppHeader({ onMenuClick }: { onMenuClick: () => void }) {
                   {roleLabel}
                 </span>
               </span>
-              <span className="border-brand-container text-brand-container bg-brand-fixed-dim/30 flex size-9 items-center justify-center rounded-full border-2 text-xs font-bold">
+              <span className="border-brand-container text-brand-container dark:text-brand-fixed bg-brand-fixed-dim/30 flex size-9 items-center justify-center rounded-full border-2 text-xs font-bold">
                 {initials}
               </span>
             </button>

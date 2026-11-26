@@ -25,19 +25,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { useDataSource } from "@/context/data-source";
 import { buildCustomDataPayload } from "@/data/lead-adapters";
-import {
-  CAMPAIGNS,
-  COURSE_CATALOG,
-  COUNSELORS,
-  EDUCATION_LEVELS,
-  LEAD_PRIORITIES,
-  LEAD_SOURCES,
-  LEAD_STATUSES,
-  LEARNING_MODES,
-  SHIFTS,
-} from "@/data/lead-lookups";
+import { EDUCATION_LEVELS, LEARNING_MODES, SHIFTS } from "@/data/lead-lookups";
 import { useBranches } from "@/hooks/use-branches";
 import { useCourses } from "@/hooks/use-courses";
 import { useCities, useProvinces } from "@/hooks/use-locations";
@@ -213,8 +202,6 @@ function QuickCreateDialog({
 export default function LeadFormPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { source, isMock } = useDataSource();
-  const apiEnabled = source === "api";
   const editing = !!id;
 
   const { lead: existing } = useLead(id);
@@ -249,46 +236,32 @@ export default function LeadFormPage() {
   const [provinceSearch, setProvinceSearch] = useState("");
   const [citySearch, setCitySearch] = useState("");
 
-  const branchId = apiEnabled && form.branch ? Number(form.branch) : undefined;
-  const provinceId = apiEnabled && form.province ? Number(form.province) : undefined;
+  const branchId = form.branch ? Number(form.branch) : undefined;
+  const provinceId = form.province ? Number(form.province) : undefined;
 
-  // Live config for dropdowns (API path); mock lookups otherwise.
-  const statusesQ = useLeadStatuses(apiEnabled);
-  const sourcesQ = useLeadSources(apiEnabled);
-  const prioritiesQ = useLeadPriorities(apiEnabled);
-  const campaignsQ = useCampaigns(apiEnabled);
-  const coursesQ = useCourses(1, 100, apiEnabled ? courseSearch : "");
-  const usersQ = useCounselors(apiEnabled ? counselorSearch : "", branchId, apiEnabled);
-  const branchesQ = useBranches(1, 100, branchSearch, apiEnabled);
-  const provincesQ = useProvinces(provinceSearch, apiEnabled);
-  const citiesQ = useCities(provinceId, citySearch, apiEnabled);
+  const statusesQ = useLeadStatuses();
+  const sourcesQ = useLeadSources();
+  const prioritiesQ = useLeadPriorities();
+  const campaignsQ = useCampaigns();
+  const coursesQ = useCourses(1, 100, courseSearch);
+  const usersQ = useCounselors(counselorSearch, branchId);
+  const branchesQ = useBranches(1, 100, branchSearch);
+  const provincesQ = useProvinces(provinceSearch);
+  const citiesQ = useCities(provinceId, citySearch);
 
   const opts = useMemo(() => {
-    if (apiEnabled) {
-      return {
-        sources: (sourcesQ.data?.results ?? []).map((s) => ({ value: String(s.id), label: s.name })),
-        statuses: (statusesQ.data?.results ?? []).map((s) => ({ value: String(s.id), label: s.name })),
-        priorities: (prioritiesQ.data?.results ?? []).map((p) => ({ value: String(p.id), label: p.name })),
-        campaigns: (campaignsQ.data?.results ?? []).map((c) => ({ value: String(c.id), label: c.name })),
-        courses: (coursesQ.data?.results ?? []).map((c) => ({ value: String(c.id), label: c.name })),
-        counselors: (usersQ.data?.results ?? []).map((u) => ({ value: String(u.id), label: u.name })),
-        branches: (branchesQ.data?.results ?? []).map((b) => ({ value: String(b.id), label: b.name })),
-        provinces: (provincesQ.data?.results ?? []).map((p) => ({ value: String(p.id), label: p.name })),
-        cities: (citiesQ.data?.results ?? []).map((c) => ({ value: String(c.id), label: c.name })),
-      };
-    }
     return {
-      sources: LEAD_SOURCES.map((s) => ({ value: s.value, label: s.label })),
-      statuses: LEAD_STATUSES.map((s) => ({ value: s.value, label: s.label })),
-      priorities: LEAD_PRIORITIES.map((p) => ({ value: p.value, label: p.label })),
-      campaigns: CAMPAIGNS.map((c) => ({ value: c.value, label: c.label })),
-      courses: COURSE_CATALOG.map((c) => ({ value: c.id, label: c.name })),
-      counselors: COUNSELORS.map((c) => ({ value: c.id, label: c.name })),
-      branches: [] as Option[],
-      provinces: [] as Option[],
-      cities: [] as Option[],
+      sources: (sourcesQ.data?.results ?? []).map((s) => ({ value: String(s.id), label: s.name })),
+      statuses: (statusesQ.data?.results ?? []).map((s) => ({ value: String(s.id), label: s.name })),
+      priorities: (prioritiesQ.data?.results ?? []).map((p) => ({ value: String(p.id), label: p.name })),
+      campaigns: (campaignsQ.data?.results ?? []).map((c) => ({ value: String(c.id), label: c.name })),
+      courses: (coursesQ.data?.results ?? []).map((c) => ({ value: String(c.id), label: c.name })),
+      counselors: (usersQ.data?.results ?? []).map((u) => ({ value: String(u.id), label: u.name })),
+      branches: (branchesQ.data?.results ?? []).map((b) => ({ value: String(b.id), label: b.name })),
+      provinces: (provincesQ.data?.results ?? []).map((p) => ({ value: String(p.id), label: p.name })),
+      cities: (citiesQ.data?.results ?? []).map((c) => ({ value: String(c.id), label: c.name })),
     };
-  }, [apiEnabled, sourcesQ.data, statusesQ.data, prioritiesQ.data, campaignsQ.data, coursesQ.data, usersQ.data, branchesQ.data, provincesQ.data, citiesQ.data]);
+  }, [sourcesQ.data, statusesQ.data, prioritiesQ.data, campaignsQ.data, coursesQ.data, usersQ.data, branchesQ.data, provincesQ.data, citiesQ.data]);
 
   // The existing lead loads async on the API path — populate the form once it arrives.
   useEffect(() => {
@@ -457,16 +430,15 @@ export default function LeadFormPage() {
     }
   };
 
-  const createFooter = (kind: "source" | "campaign", label: string) =>
-    apiEnabled ? (
-      <button
-        type="button"
-        onClick={() => setCreateLookup(kind)}
-        className="text-brand hover:bg-accent flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm font-medium"
-      >
-        <Plus className="size-4" /> Create {label}
-      </button>
-    ) : undefined;
+  const createFooter = (kind: "source" | "campaign", label: string) => (
+    <button
+      type="button"
+      onClick={() => setCreateLookup(kind)}
+      className="text-brand hover:bg-accent flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm font-medium"
+    >
+      <Plus className="size-4" /> Create {label}
+    </button>
+  );
   const onPickProvince = (v: string) => {
     const changed = v !== form.province;
     setForm((f) => ({ ...f, province: v, city: changed ? "" : f.city }));
@@ -550,18 +522,16 @@ export default function LeadFormPage() {
     const done = (targetId?: number | string) => navigate(targetId ? `/leads/${targetId}` : "/leads");
     // Additional courses live in the nested collection — sync them, then navigate.
     const syncThenDone = (leadApiId?: number, target?: number | string) => {
-      if (apiEnabled && leadApiId != null) void syncAdditionalCourses(leadApiId).finally(() => done(target));
+      if (leadApiId != null) void syncAdditionalCourses(leadApiId).finally(() => done(target));
       else done(target);
     };
 
-    if (editing && existing?.apiId != null) {
+    if (editing) {
+      if (existing?.apiId == null) return;
       updateLead.mutate(
         { id: existing.apiId, payload },
         { onSuccess: () => syncThenDone(existing.apiId, existing.apiId) },
       );
-    } else if (editing) {
-      // mock edit — no persistence
-      updateLead.mutate({ id: 0, payload }, { onSuccess: () => done(id) });
     } else {
       createLead.mutate(
         allowDuplicatePhone ? { ...payload, allow_duplicate_phone: true } : payload,
@@ -591,12 +561,11 @@ export default function LeadFormPage() {
 
       <div>
         <p className="text-brand font-mono text-[11px] font-bold tracking-wider uppercase">
-          {isMock ? "Lead intake · mock preview" : "Lead intake"}
+          Lead intake
         </p>
         <h1 className="font-headline mt-1 text-3xl font-semibold tracking-tight">{title}</h1>
         <p className="text-muted-foreground mt-1 text-sm">
           Fields marked <span className="text-destructive">*</span> are required.
-          {isMock && " Saving is disabled in mock preview."}
         </p>
       </div>
 
@@ -610,7 +579,7 @@ export default function LeadFormPage() {
         <Field label="Secondary Phone">
           <Input value={form.secondary_phone} onChange={(e) => set("secondary_phone", e.target.value)} placeholder="Optional" />
         </Field>
-        {apiEnabled && phoneMatches.length > 0 && (
+        {phoneMatches.length > 0 && (
           <div className="sm:col-span-2">
             <PhoneMatchBox
               matches={phoneMatches}
@@ -629,36 +598,32 @@ export default function LeadFormPage() {
             <Input value={form.address} onChange={(e) => set("address", e.target.value)} placeholder="Street, area, city" />
           </Field>
         </div>
-        {apiEnabled && (
-          <>
-            <Field label="Province">
-              <Combobox
-                value={form.province}
-                onChange={onPickProvince}
-                options={opts.provinces}
-                placeholder="Select province"
-                searchPlaceholder="Search provinces…"
-                emptyText="No provinces found."
-                onSearchChange={setProvinceSearch}
-                loading={provincesQ.isFetching}
-                selectedLabel={labels.province}
-              />
-            </Field>
-            <Field label="City">
-              <Combobox
-                value={form.city}
-                onChange={onPickCity}
-                options={opts.cities}
-                placeholder="Select city"
-                searchPlaceholder="Search cities…"
-                emptyText={form.province ? "No cities in this province." : "No cities found."}
-                onSearchChange={setCitySearch}
-                loading={citiesQ.isFetching}
-                selectedLabel={labels.city}
-              />
-            </Field>
-          </>
-        )}
+        <Field label="Province">
+          <Combobox
+            value={form.province}
+            onChange={onPickProvince}
+            options={opts.provinces}
+            placeholder="Select province"
+            searchPlaceholder="Search provinces…"
+            emptyText="No provinces found."
+            onSearchChange={setProvinceSearch}
+            loading={provincesQ.isFetching}
+            selectedLabel={labels.province}
+          />
+        </Field>
+        <Field label="City">
+          <Combobox
+            value={form.city}
+            onChange={onPickCity}
+            options={opts.cities}
+            placeholder="Select city"
+            searchPlaceholder="Search cities…"
+            emptyText={form.province ? "No cities in this province." : "No cities found."}
+            onSearchChange={setCitySearch}
+            loading={citiesQ.isFetching}
+            selectedLabel={labels.city}
+          />
+        </Field>
         <div className="sm:col-span-2">
           <Field label="Landmark">
             <Input value={form.landmark} onChange={(e) => set("landmark", e.target.value)} placeholder="Nearby landmark" />
@@ -731,61 +696,47 @@ export default function LeadFormPage() {
         </Field>
 
         {/* Branch + Assigned counselor — one row; counselor is scoped to the branch. */}
-        {apiEnabled ? (
-          <div className="grid gap-4 sm:col-span-2 sm:grid-cols-2">
-            <Field label="Branch">
-              <Combobox
-                value={form.branch}
-                onChange={onPickBranch}
-                options={opts.branches}
-                placeholder="Select branch"
-                searchPlaceholder="Search branches…"
-                emptyText="No branches found."
-                onSearchChange={setBranchSearch}
-                loading={branchesQ.isFetching}
-                selectedLabel={labels.branch}
-                footer={
-                  <button
-                    type="button"
-                    onClick={() => setBranchDialogOpen(true)}
-                    className="text-brand hover:bg-accent flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm font-medium"
-                  >
-                    <Plus className="size-4" /> Create branch
-                  </button>
-                }
-              />
-            </Field>
-            <Field
-              label="Assigned Counselor"
-              helper={form.branch ? undefined : "Select a branch to choose a counselor"}
-            >
-              <Combobox
-                value={form.assigned_counselor}
-                onChange={onPickCounselor}
-                options={opts.counselors}
-                placeholder={form.branch ? "Select counselor" : "Select a branch first"}
-                searchPlaceholder="Search counselors…"
-                emptyText="No counselors in this branch."
-                onSearchChange={setCounselorSearch}
-                loading={usersQ.isFetching}
-                disabled={!form.branch}
-                selectedLabel={labels.counselor}
-              />
-            </Field>
-          </div>
-        ) : (
-          <Field label="Assigned Counselor">
+        <div className="grid gap-4 sm:col-span-2 sm:grid-cols-2">
+          <Field label="Branch">
+            <Combobox
+              value={form.branch}
+              onChange={onPickBranch}
+              options={opts.branches}
+              placeholder="Select branch"
+              searchPlaceholder="Search branches…"
+              emptyText="No branches found."
+              onSearchChange={setBranchSearch}
+              loading={branchesQ.isFetching}
+              selectedLabel={labels.branch}
+              footer={
+                <button
+                  type="button"
+                  onClick={() => setBranchDialogOpen(true)}
+                  className="text-brand hover:bg-accent flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm font-medium"
+                >
+                  <Plus className="size-4" /> Create branch
+                </button>
+              }
+            />
+          </Field>
+          <Field
+            label="Assigned Counselor"
+            helper={form.branch ? undefined : "Select a branch to choose a counselor"}
+          >
             <Combobox
               value={form.assigned_counselor}
               onChange={onPickCounselor}
               options={opts.counselors}
-              placeholder="Unassigned"
+              placeholder={form.branch ? "Select counselor" : "Select a branch first"}
               searchPlaceholder="Search counselors…"
-              emptyText="No counselors."
+              emptyText="No counselors in this branch."
+              onSearchChange={setCounselorSearch}
+              loading={usersQ.isFetching}
+              disabled={!form.branch}
               selectedLabel={labels.counselor}
             />
           </Field>
-        )}
+        </div>
       </Section>
 
       <Section title="Course Interest" description="Primary course the lead is considering.">
@@ -798,8 +749,8 @@ export default function LeadFormPage() {
               placeholder="Select course"
               searchPlaceholder="Search courses…"
               emptyText="No courses found."
-              onSearchChange={apiEnabled ? setCourseSearch : undefined}
-              loading={apiEnabled && coursesQ.isFetching}
+              onSearchChange={setCourseSearch}
+              loading={coursesQ.isFetching}
               selectedLabel={labels.course}
             />
           </Field>
@@ -816,17 +767,12 @@ export default function LeadFormPage() {
               placeholder="Add courses"
               searchPlaceholder="Search courses…"
               emptyText="No courses found."
-              onSearchChange={apiEnabled ? setCourseSearch : undefined}
-              loading={apiEnabled && coursesQ.isFetching}
+              onSearchChange={setCourseSearch}
+              loading={coursesQ.isFetching}
               selectedLabels={courseLabels}
             />
           </Field>
         </div>
-        {isMock && (
-          <p className="text-muted-foreground sm:col-span-2 text-xs">
-            Additional courses aren’t persisted in mock preview — switch to Live to save them.
-          </p>
-        )}
       </Section>
 
       <Section title="Type-specific Information" description="Stored in the lead's custom fields.">

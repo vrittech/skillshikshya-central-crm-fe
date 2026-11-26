@@ -1,218 +1,497 @@
-import { CalendarClock, Layers, Sparkles, TrendingUp, TriangleAlert, Wallet } from "lucide-react";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { ArrowDownRight, ArrowUpRight, ChevronRight, Minus } from "lucide-react";
+import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { DonutChart, FunnelChart } from "@/components/charts";
+import { DailyBarChart, MeterList, type DailyDatum, type MeterRow } from "@/components/charts";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/context/auth";
-import { useDataSource } from "@/context/data-source";
-import { LiveDashboard } from "@/pages/dashboard-live";
+import { useRole } from "@/context/role";
+import { useBranches } from "@/hooks/use-branches";
+import { useLeadSummary } from "@/hooks/use-leads";
 import {
-  counselorLeaderboard,
-  KPIS,
-  leadFunnel,
-  recentActivities,
-  sourceBreakdown,
-  upcomingFollowUps,
-} from "@/data/lead-analytics";
-import { formatNPR, formatDateTime, relativeToToday } from "@/lib/leads-format";
+  useConversionReport,
+  useCounselorPerformance,
+  useLeadTrend,
+  useLeadsBySource,
+  useRevenueReport,
+} from "@/hooks/use-reports";
+import { formatTime, initialsOf, relativeToToday } from "@/lib/leads-format";
 import { cn } from "@/lib/utils";
-import { PriorityBadge } from "@/pages/leads/components/lead-badges";
+import { StatusBadge } from "@/pages/leads/components/lead-badges";
+import { globalListsService } from "@/services/global-lists.service";
+import { leadsService } from "@/services/leads.service";
+import type { ReportBaseParams } from "@/types/reports-api";
 
-const ACTIVITY_BADGE: Record<string, { label: string; cls: string }> = {
-  call: { label: "Call", cls: "bg-sky-500/10 text-sky-600 dark:text-sky-400" },
-  status_change: { label: "Status", cls: "bg-amber-500/10 text-amber-600 dark:text-amber-400" },
-  assignment_change: { label: "Assign", cls: "bg-violet-500/10 text-violet-600 dark:text-violet-400" },
-  follow_up: { label: "Follow-up", cls: "bg-brand-fixed-dim/25 text-brand-container" },
-  enrollment: { label: "Enrolled", cls: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" },
-  payment: { label: "Payment", cls: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" },
-};
+const CARD_SHADOW = "shadow-[0_1px_3px_0_rgba(0,0,0,0.05),0_1px_2px_-1px_rgba(0,0,0,0.05)]";
+const LONG_DATE = new Intl.DateTimeFormat("en-GB", {
+  weekday: "long",
+  day: "numeric",
+  month: "long",
+  year: "numeric",
+});
 
-function Kpi({
+/** Local calendar day as YYYY-MM-DD. */
+function isoDay(d: Date) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+function greeting() {
+  const h = new Date().getHours();
+  if (h < 12) return "Good morning";
+  if (h < 17) return "Good afternoon";
+  return "Good evening";
+}
+
+function pct(part: number, whole: number) {
+  return whole ? Math.round((part / whole) * 100) : 0;
+}
+
+function money(v: string | number | undefined) {
+  return Number(v ?? 0).toLocaleString("en-IN");
+}
+
+/* ------------------------------------------------------------------ pieces */
+
+function Stat({
+  to,
   label,
-  value,
-  icon: Icon,
-  delta,
-  deltaTone = "up",
-  tone,
+  loading,
+  children,
+  foot,
 }: {
+  to: string;
   label: string;
-  value: string | number;
-  icon: React.ComponentType<{ className?: string }>;
-  delta: string;
-  deltaTone?: "up" | "warn";
-  tone: string;
+  loading: boolean;
+  children: React.ReactNode;
+  foot?: React.ReactNode;
 }) {
   return (
-    <Card className="gap-2 py-5">
-      <CardHeader className="flex-row items-center justify-between">
-        <CardDescription className="font-mono text-[11px] font-medium tracking-wider uppercase">
-          {label}
-        </CardDescription>
-        <Icon className={cn("size-4", tone)} />
+    <Link
+      to={to}
+      className={cn(
+        "bg-card hover:border-brand/40 focus-visible:ring-ring flex flex-col gap-3 rounded-2xl border p-5 transition-colors outline-none focus-visible:ring-2",
+        CARD_SHADOW,
+      )}
+    >
+      <p className="text-muted-foreground font-mono text-[11px] font-medium tracking-wider uppercase">{label}</p>
+      {loading ? (
+        <Skeleton className="h-9 w-24" />
+      ) : (
+        <p className="font-headline truncate text-3xl font-semibold tracking-tight">{children}</p>
+      )}
+      <div className="min-h-4 text-xs">{loading ? null : foot}</div>
+    </Link>
+  );
+}
+
+function Delta({ now, before, period }: { now: number; before: number; period: string }) {
+  const diff = now - before;
+  if (diff === 0) {
+    return (
+      <span className="text-muted-foreground inline-flex items-center gap-1">
+        <Minus className="size-3.5" /> Same as {period}
+      </span>
+    );
+  }
+  const up = diff > 0;
+  const Icon = up ? ArrowUpRight : ArrowDownRight;
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center gap-1 font-medium",
+        up ? "text-emerald-700 dark:text-emerald-400" : "text-destructive",
+      )}
+    >
+      <Icon className="size-3.5" />
+      {up ? "+" : "−"}
+      {Math.abs(diff)} vs {period}
+    </span>
+  );
+}
+
+function Panel({
+  title,
+  sub,
+  action,
+  className,
+  children,
+}: {
+  title: string;
+  sub?: string;
+  action?: React.ReactNode;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <Card className={cn("gap-5", className)}>
+      <CardHeader className="flex-row items-start justify-between gap-3">
+        <div className="space-y-1">
+          <CardTitle className="text-base">{title}</CardTitle>
+          {sub && <CardDescription>{sub}</CardDescription>}
+        </div>
+        {action}
       </CardHeader>
-      <CardContent className="space-y-2">
-        <p className="font-headline text-2xl font-semibold">{value}</p>
-        <span
-          className={cn(
-            "inline-flex w-fit rounded-full px-2 py-0.5 text-xs font-semibold",
-            deltaTone === "up"
-              ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
-              : "bg-amber-500/10 text-amber-700 dark:text-amber-400",
-          )}
-        >
-          {delta}
-        </span>
-      </CardContent>
+      <CardContent className="flex-1">{children}</CardContent>
     </Card>
   );
 }
 
-export default function DashboardPage() {
-  const { user } = useAuth();
-  const { source } = useDataSource();
-  const firstName = user?.name?.split(" ")[0] ?? "there";
-
-  if (source === "api") return <LiveDashboard firstName={firstName} />;
-
-  return <MockDashboard />;
+function ViewAll({ to }: { to: string }) {
+  return (
+    <Link to={to} className="text-brand inline-flex shrink-0 items-center text-sm font-medium hover:underline">
+      View all <ChevronRight className="size-4" />
+    </Link>
+  );
 }
 
-function MockDashboard() {
+function Empty({ children }: { children: React.ReactNode }) {
+  return <p className="text-muted-foreground grid h-full min-h-32 place-items-center text-sm">{children}</p>;
+}
+
+function RowsSkeleton({ rows = 4 }: { rows?: number }) {
+  return (
+    <div className="space-y-3">
+      {Array.from({ length: rows }).map((_, i) => (
+        <Skeleton key={i} className="h-10 w-full" />
+      ))}
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------- page */
+
+export default function DashboardPage() {
   const { user } = useAuth();
-  const funnel = leadFunnel();
-  const sources = sourceBreakdown();
-  const leaders = counselorLeaderboard();
-  const upcoming = upcomingFollowUps();
-  const activities = recentActivities();
+  const { can } = useRole();
+  const isStaff = !!user?.is_staff;
+  const seesReports = can("reports.view");
+  const firstName = user?.name?.split(" ")[0] ?? "there";
+
+  const [branch, setBranch] = useState("all");
+  const branchId = branch === "all" ? undefined : Number(branch);
+  const branches = useBranches(1, 100, "", isStaff);
+
+  const { days, range } = useMemo(() => {
+    const now = new Date();
+    const list: string[] = [];
+    for (let d = 1; d <= now.getDate(); d++) list.push(isoDay(new Date(now.getFullYear(), now.getMonth(), d)));
+    const r: ReportBaseParams = { start_date: list[0], end_date: list[list.length - 1], branch_id: branchId };
+    return { days: list, range: r };
+  }, [branchId]);
+
+  // Everyone: lead counts, today's follow-ups, newest leads.
+  const summary = useLeadSummary({ branch_id: branchId });
+  const fuParams = { open: true, branch_id: branchId };
+  const fuCounts = useQuery({
+    queryKey: ["followups", "summary", fuParams],
+    queryFn: () => globalListsService.followupsSummary(fuParams),
+    placeholderData: keepPreviousData,
+  });
+  const fuToday = useQuery({
+    queryKey: ["followups", "dashboard-today", fuParams],
+    queryFn: () =>
+      globalListsService.followups({ ...fuParams, due: "today", ordering: "scheduled_at", page_size: 6 }),
+    placeholderData: keepPreviousData,
+  });
+  const recent = useQuery({
+    queryKey: ["leads", "recent", branchId ?? null],
+    queryFn: () => leadsService.list({ page: 1, page_size: 6, ordering: "-created_at", branch_id: branchId }),
+    placeholderData: keepPreviousData,
+  });
+
+  // Reports: charts, money and counselors, this month.
+  const trend = useLeadTrend({ ...range, group_by: "day" }, seesReports);
+  const conversion = useConversionReport(range, seesReports);
+  const sources = useLeadsBySource(range, seesReports);
+  const revenue = useRevenueReport(range, seesReports);
+  const counselors = useCounselorPerformance({ ...range, sort_by: "converted" }, seesReports);
+
+  const s = summary.data;
+
+  const daily: DailyDatum[] = useMemo(() => {
+    const byDay = new Map((trend.data?.results ?? []).map((r) => [r.period, r.leads]));
+    return days.map((d) => ({ date: d, value: byDay.get(d) ?? 0 }));
+  }, [days, trend.data]);
+  const monthTotal = daily.reduce((sum, d) => sum + d.value, 0);
+
+  const funnel = conversion.data?.funnel;
+  const funnelRows: MeterRow[] = funnel
+    ? [
+        { label: "Leads", value: funnel.total_leads, share: 100 },
+        { label: "Contacted", value: funnel.contacted, share: pct(funnel.contacted, funnel.total_leads) },
+        { label: "Interested", value: funnel.interested, share: pct(funnel.interested, funnel.total_leads) },
+        { label: "Enrolled", value: funnel.enrolled, share: pct(funnel.enrolled, funnel.total_leads) },
+        { label: "Converted", value: funnel.converted, share: pct(funnel.converted, funnel.total_leads) },
+        { label: "Lost", value: funnel.lost, share: pct(funnel.lost, funnel.total_leads), muted: true },
+      ]
+    : [];
+
+  const sourceRows: MeterRow[] = useMemo(() => {
+    const rows = (sources.data?.results ?? [])
+      .filter((r) => r.count > 0)
+      .map((r) => ({ label: String(r.source__name ?? "No source"), value: r.count }))
+      .sort((a, b) => b.value - a.value);
+    const total = rows.reduce((sum, r) => sum + r.value, 0);
+    const top = rows.slice(0, 5);
+    const rest = rows.slice(5).reduce((sum, r) => sum + r.value, 0);
+    if (rest > 0) top.push({ label: "Other", value: rest });
+    return top.map((r) => ({ ...r, share: pct(r.value, total) }));
+  }, [sources.data]);
+
+  const counselorRows = (counselors.data?.results ?? [])
+    .filter((r) => r.leads_assigned > 0 || r.converted > 0 || Number(r.revenue_collected) > 0)
+    .slice(0, 6);
+
+  const fuRows = fuToday.data?.results ?? [];
+  const leadRows = recent.data?.results ?? [];
+  const overdue = fuCounts.data?.overdue ?? 0;
 
   return (
     <div className="space-y-6">
-      <div>
-        <p className="text-brand font-mono text-[11px] font-bold tracking-wider uppercase">
-          CRM command center
-        </p>
-        <h1 className="font-headline mt-1 text-3xl font-semibold tracking-tight">
-          Welcome back, {user?.name?.split(" ")[0] ?? "there"} 👋
-        </h1>
-        <p className="text-muted-foreground mt-1 text-sm">
-          Track demand, counselor execution, and admissions movement across the institute.
-        </p>
+      {/* Header */}
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <p className="text-brand font-mono text-[11px] font-bold tracking-wider uppercase">Dashboard</p>
+          <h1 className="font-headline mt-1 text-3xl font-semibold tracking-tight">
+            {greeting()}, {firstName}
+          </h1>
+          <p className="text-muted-foreground mt-1 text-sm">{LONG_DATE.format(new Date())}</p>
+        </div>
+        {isStaff && (
+          <Select value={branch} onValueChange={setBranch}>
+            <SelectTrigger className="w-48">
+              <SelectValue placeholder="All branches" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All branches</SelectItem>
+              {branches.data?.results.map((b) => (
+                <SelectItem key={b.id} value={String(b.id)}>
+                  {b.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
       </div>
 
       {/* KPI row */}
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-        <Kpi label="New leads" value={KPIS.newLeads} icon={Sparkles} delta="+12.8% vs last week" tone="text-sky-600 dark:text-sky-400" />
-        <Kpi label="Follow-ups today" value={KPIS.dueToday} icon={CalendarClock} delta="action needed" deltaTone="warn" tone="text-brand" />
-        <Kpi label="Overdue" value={KPIS.overdue} icon={TriangleAlert} delta="needs attention" deltaTone="warn" tone="text-destructive" />
-        <Kpi label="Admissions" value={KPIS.admissions} icon={Layers} delta="+7 this month" tone="text-violet-600 dark:text-violet-400" />
-        <Kpi label="Enrolled revenue" value={formatNPR(KPIS.revenue)} icon={Wallet} delta="82% collected" tone="text-emerald-600 dark:text-emerald-400" />
-      </div>
-
-      {/* Funnel + sources */}
-      <div className="grid gap-4 lg:grid-cols-[1.5fr_1fr]">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Lead funnel</CardTitle>
-            <CardDescription>Inquiry to enrollment by current stage</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <FunnelChart stages={funnel} />
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Lead sources</CardTitle>
-            <CardDescription>Top acquisition channels</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <DonutChart slices={sources} />
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Activities + upcoming + leaderboard */}
-      <div className="grid gap-4 lg:grid-cols-3">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Recent activities</CardTitle>
-            <CardDescription>Latest CRM touchpoints</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {activities.map((a) => {
-              const badge = ACTIVITY_BADGE[a.type] ?? { label: "Event", cls: "bg-muted text-muted-foreground" };
-              return (
-                <Link
-                  key={a.id}
-                  to={`/leads/${a.leadId}`}
-                  className="bg-surface-container-low hover:bg-accent flex items-center justify-between gap-3 rounded-lg border p-3 transition-colors"
-                >
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold">{a.title}</p>
-                    <p className="text-muted-foreground truncate text-xs">
-                      {a.leadName} · {relativeToToday(a.at)}
-                    </p>
-                  </div>
-                  <span className={cn("rounded-full px-2 py-0.5 text-xs font-semibold", badge.cls)}>
-                    {badge.label}
-                  </span>
-                </Link>
-              );
-            })}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Upcoming follow-ups</CardTitle>
-            <CardDescription>Next counselor actions</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {upcoming.map((u) => (
-              <Link
-                key={u.id}
-                to={`/leads/${u.id}`}
-                className="bg-surface-container-low hover:bg-accent flex items-center justify-between gap-3 rounded-lg border p-3 transition-colors"
-              >
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold">{u.name}</p>
-                  <p className="text-muted-foreground truncate text-xs">
-                    {formatDateTime(u.dueAt)} — {u.purpose}
-                  </p>
-                </div>
-                <PriorityBadge priority={u.priority as never} showLabel={false} />
-              </Link>
-            ))}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Counselor leaderboard</CardTitle>
-            <CardDescription>Conversions this cycle</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {leaders.map((l, i) => (
-              <div
-                key={l.id}
-                className="bg-surface-container-low flex items-center justify-between gap-3 rounded-lg border p-3"
-              >
-                <div className="flex items-center gap-3">
-                  <span className="text-muted-foreground font-mono text-xs font-bold">#{i + 1}</span>
-                  <div>
-                    <p className="text-sm font-semibold">{l.name}</p>
-                    <p className="text-muted-foreground text-xs">
-                      {l.admissions} admissions · {l.followUps} follow-ups
-                    </p>
-                  </div>
-                </div>
-                <span className="text-brand flex items-center gap-1 text-sm font-bold">
-                  <TrendingUp className="size-3.5" />
-                  {l.conversionPct}%
+      <div className={cn("grid gap-4 sm:grid-cols-2 lg:grid-cols-3", seesReports ? "xl:grid-cols-5" : "xl:grid-cols-4")}>
+        <Stat
+          to="/leads"
+          label="New leads · 7 days"
+          loading={summary.isLoading}
+          foot={s && <Delta now={s.new_this_week} before={s.new_last_week} period="last week" />}
+        >
+          {s?.new_this_week ?? 0}
+        </Stat>
+        <Stat
+          to="/follow-ups"
+          label="Follow-ups today"
+          loading={fuCounts.isLoading}
+          foot={
+            overdue > 0 ? (
+              <span className="text-destructive font-medium">{overdue} overdue</span>
+            ) : (
+              <span className="text-muted-foreground">None overdue</span>
+            )
+          }
+        >
+          {fuCounts.data?.today ?? 0}
+        </Stat>
+        <Stat to="/enrollments" label="Pending enrollment" loading={summary.isLoading}>
+          {s?.pending_enrollment ?? 0}
+        </Stat>
+        <Stat
+          to="/students"
+          label="Enrolled this month"
+          loading={summary.isLoading}
+          foot={s && <Delta now={s.enrolled_this_month} before={s.enrolled_last_month} period="last month" />}
+        >
+          {s?.enrolled_this_month ?? 0}
+        </Stat>
+        {seesReports && (
+          <Stat
+            to="/payments"
+            label="Collected this month"
+            loading={revenue.isLoading}
+            foot={
+              Number(revenue.data?.summary.outstanding_to_collect ?? 0) > 0 ? (
+                <span className="font-medium text-amber-700 dark:text-amber-400">
+                  NPR {money(revenue.data?.summary.outstanding_to_collect)} to collect
                 </span>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
+              ) : (
+                <span className="text-muted-foreground">Nothing to collect</span>
+              )
+            }
+          >
+            <span className="text-muted-foreground mr-1.5 text-base font-medium">NPR</span>
+            {money(revenue.data?.summary.total_collected)}
+          </Stat>
+        )}
       </div>
+
+      {/* Lead flow + conversion */}
+      {seesReports && (
+        <div className="grid gap-4 lg:grid-cols-[1.6fr_1fr]">
+          <Panel
+            title="New leads"
+            sub="This month"
+            action={
+              !trend.isLoading && (
+                <p className="font-headline text-2xl font-semibold tracking-tight">{monthTotal.toLocaleString("en-IN")}</p>
+              )
+            }
+          >
+            {trend.isLoading ? (
+              <Skeleton className="h-52 w-full" />
+            ) : (
+              <DailyBarChart data={daily} unit={["lead", "leads"]} emptyText="No leads this month" />
+            )}
+          </Panel>
+          <Panel title="Conversion" sub="This month">
+            {conversion.isLoading ? (
+              <RowsSkeleton rows={5} />
+            ) : funnel && funnel.total_leads > 0 ? (
+              <MeterList rows={funnelRows} />
+            ) : (
+              <Empty>No leads this month</Empty>
+            )}
+          </Panel>
+        </div>
+      )}
+
+      {/* Today's work */}
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Panel
+          title="Today's follow-ups"
+          sub={fuCounts.data ? `${fuCounts.data.today} due` : undefined}
+          action={<ViewAll to="/follow-ups" />}
+        >
+          {fuToday.isLoading ? (
+            <RowsSkeleton />
+          ) : fuRows.length === 0 ? (
+            <Empty>No follow-ups due today</Empty>
+          ) : (
+            <ul className="-my-1 divide-y">
+              {fuRows.map((f) => (
+                <li key={f.id}>
+                  <Link
+                    to={`/leads/${f.lead}`}
+                    className="hover:bg-accent/60 -mx-2 flex items-center gap-3 rounded-lg px-2 py-2.5 transition-colors"
+                  >
+                    <span className="text-muted-foreground w-16 shrink-0 font-mono text-xs tabular-nums">
+                      {formatTime(f.scheduled_at)}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-medium">{f.lead_name}</span>
+                      <span className="text-muted-foreground block truncate text-xs">
+                        {f.enrollment_course_name ? `Payment · ${f.enrollment_course_name}` : f.purpose || "Follow-up"}
+                      </span>
+                    </span>
+                    {f.assigned_to_name && (
+                      <span className="text-muted-foreground hidden max-w-[9rem] truncate text-xs sm:block">
+                        {f.assigned_to_name}
+                      </span>
+                    )}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Panel>
+
+        <Panel title="Recent leads" action={<ViewAll to="/leads" />}>
+          {recent.isLoading ? (
+            <RowsSkeleton />
+          ) : leadRows.length === 0 ? (
+            <Empty>No leads yet</Empty>
+          ) : (
+            <ul className="-my-1 divide-y">
+              {leadRows.map((l) => (
+                <li key={l.id}>
+                  <Link
+                    to={`/leads/${l.id}`}
+                    className="hover:bg-accent/60 -mx-2 flex items-center gap-3 rounded-lg px-2 py-2.5 transition-colors"
+                  >
+                    <span className="bg-brand-fixed-dim/30 text-brand-container dark:text-brand-fixed flex size-8 shrink-0 items-center justify-center rounded-full text-xs font-bold">
+                      {initialsOf(l.full_name)}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-medium">{l.full_name}</span>
+                      <span className="text-muted-foreground block truncate text-xs">
+                        {[l.primary_course?.name ?? l.source_name, relativeToToday(l.created_at)]
+                          .filter(Boolean)
+                          .join(" · ")}
+                      </span>
+                    </span>
+                    {l.status_name && <StatusBadge name={l.status_name} color={l.status_color} />}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Panel>
+      </div>
+
+      {/* Sources + counselors */}
+      {seesReports && (
+        <div className="grid gap-4 lg:grid-cols-[1fr_1.6fr]">
+          <Panel title="Lead sources" sub="This month">
+            {sources.isLoading ? (
+              <RowsSkeleton rows={5} />
+            ) : sourceRows.length ? (
+              <MeterList rows={sourceRows} />
+            ) : (
+              <Empty>No leads this month</Empty>
+            )}
+          </Panel>
+          <Panel title="Counselors" sub="This month">
+            {counselors.isLoading ? (
+              <RowsSkeleton rows={5} />
+            ) : counselorRows.length === 0 ? (
+              <Empty>No assigned leads this month</Empty>
+            ) : (
+              <div className="-mx-2 overflow-x-auto">
+                <table className="w-full min-w-[30rem] text-sm">
+                  <thead>
+                    <tr className="text-muted-foreground border-b text-left text-xs">
+                      <th className="px-2 pb-2 font-medium">Counselor</th>
+                      <th className="px-2 pb-2 text-right font-medium">Leads</th>
+                      <th className="px-2 pb-2 text-right font-medium">Converted</th>
+                      <th className="px-2 pb-2 text-right font-medium">Rate</th>
+                      <th className="px-2 pb-2 text-right font-medium">Collected</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {counselorRows.map((r) => (
+                      <tr key={r.counselor.id}>
+                        <td className="px-2 py-2.5">
+                          <span className="flex items-center gap-2.5">
+                            <span className="bg-muted text-muted-foreground flex size-7 shrink-0 items-center justify-center rounded-full text-[11px] font-bold">
+                              {initialsOf(r.counselor.name)}
+                            </span>
+                            <span className="truncate font-medium">{r.counselor.name}</span>
+                          </span>
+                        </td>
+                        <td className="px-2 py-2.5 text-right tabular-nums">{r.leads_assigned}</td>
+                        <td className="px-2 py-2.5 text-right font-semibold tabular-nums">{r.converted}</td>
+                        <td className="text-muted-foreground px-2 py-2.5 text-right tabular-nums">
+                          {r.conversion_rate}%
+                        </td>
+                        <td className="px-2 py-2.5 text-right whitespace-nowrap tabular-nums">
+                          NPR {money(r.revenue_collected)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Panel>
+        </div>
+      )}
     </div>
   );
 }

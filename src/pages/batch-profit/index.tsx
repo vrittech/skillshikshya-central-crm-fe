@@ -19,7 +19,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useAuth } from "@/context/auth";
-import { useDataSource } from "@/context/data-source";
 import { useBranches } from "@/hooks/use-branches";
 import { useBatchProfit } from "@/hooks/use-reports";
 import { DateRange } from "@/components/date-range";
@@ -103,11 +102,9 @@ function MoneyCell({
 }
 
 export default function BatchProfitPage() {
-  const { source } = useDataSource();
-  const isApi = source === "api";
   const { user } = useAuth();
   const isStaff = !!user?.is_staff;
-  const branches = useBranches(1, 100, "", isApi && isStaff);
+  const branches = useBranches(1, 100, "", isStaff);
   const [branch, setBranch] = useState("all");
   const [status, setStatus] = useState<Status | "all">("all");
   const [from, setFrom] = useState("");
@@ -121,7 +118,7 @@ export default function BatchProfitPage() {
     }),
     [branch, status, from, to],
   );
-  const { data, isLoading } = useBatchProfit(params, isApi);
+  const { data, isLoading } = useBatchProfit(params);
   const s = data?.summary;
   const rows = data?.results ?? [];
 
@@ -136,126 +133,116 @@ export default function BatchProfitPage() {
             Batch profit
           </h1>
         </div>
-        {isApi && (
-          <div className="flex flex-wrap gap-2">
-            <DateRange
-              from={from}
-              to={to}
-              onFromChange={setFrom}
-              onToChange={setTo}
-              fromLabel="Starts on or after"
-              toLabel="Starts on or before"
-            />
-            <Select value={status} onValueChange={(v) => setStatus(v as Status | "all")}>
-              <SelectTrigger className="w-40">
+        <div className="flex flex-wrap gap-2">
+          <DateRange
+            from={from}
+            to={to}
+            onFromChange={setFrom}
+            onToChange={setTo}
+            fromLabel="Starts on or after"
+            toLabel="Starts on or before"
+          />
+          <Select value={status} onValueChange={(v) => setStatus(v as Status | "all")}>
+            <SelectTrigger className="w-40">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All statuses</SelectItem>
+              <SelectItem value="upcoming">Upcoming</SelectItem>
+              <SelectItem value="running">Running</SelectItem>
+              <SelectItem value="closed">Closed</SelectItem>
+            </SelectContent>
+          </Select>
+          {isStaff && (
+            <Select value={branch} onValueChange={setBranch}>
+              <SelectTrigger className="w-44">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All statuses</SelectItem>
-                <SelectItem value="upcoming">Upcoming</SelectItem>
-                <SelectItem value="running">Running</SelectItem>
-                <SelectItem value="closed">Closed</SelectItem>
+                <SelectItem value="all">All branches</SelectItem>
+                {branches.data?.results.map((b) => (
+                  <SelectItem key={b.id} value={String(b.id)}>
+                    {b.name}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
-            {isStaff && (
-              <Select value={branch} onValueChange={setBranch}>
-                <SelectTrigger className="w-44">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All branches</SelectItem>
-                  {branches.data?.results.map((b) => (
-                    <SelectItem key={b.id} value={String(b.id)}>
-                      {b.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
-      {!isApi ? (
-        <div className="text-muted-foreground rounded-2xl border border-dashed py-16 text-center text-sm">
-          Switch to Live data to see batch profit.
-        </div>
-      ) : (
-        <>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <Kpi label="Collected" value={s && money(s.collected)} loading={isLoading} />
-            <Kpi label="Costs" value={s && money(s.costs)} loading={isLoading} />
-            <Kpi
-              label="Profit"
-              value={s && money(s.profit)}
-              loading={isLoading}
-              loss={!!s && Number(s.profit) < 0}
-            />
-            <Kpi label="Owed" value={s && money(s.owed)} loading={isLoading} />
-          </div>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <Kpi label="Collected" value={s && money(s.collected)} loading={isLoading} />
+        <Kpi label="Costs" value={s && money(s.costs)} loading={isLoading} />
+        <Kpi
+          label="Profit"
+          value={s && money(s.profit)}
+          loading={isLoading}
+          loss={!!s && Number(s.profit) < 0}
+        />
+        <Kpi label="Owed" value={s && money(s.owed)} loading={isLoading} />
+      </div>
 
-          <div className="bg-card overflow-hidden rounded-2xl border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="pl-6">Batch</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Students</TableHead>
-                  <TableHead className="text-right">Fees</TableHead>
-                  <TableHead className="text-right">Collected</TableHead>
-                  <TableHead className="text-right">Owed</TableHead>
-                  <TableHead className="text-right">Costs</TableHead>
-                  <TableHead className="pr-6 text-right">Profit</TableHead>
+      <div className="bg-card overflow-hidden rounded-2xl border">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="pl-6">Batch</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead className="text-right">Students</TableHead>
+              <TableHead className="text-right">Fees</TableHead>
+              <TableHead className="text-right">Collected</TableHead>
+              <TableHead className="text-right">Owed</TableHead>
+              <TableHead className="text-right">Costs</TableHead>
+              <TableHead className="pr-6 text-right">Profit</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {isLoading &&
+              Array.from({ length: 3 }).map((_, i) => (
+                <TableRow key={i}>
+                  <TableCell colSpan={8} className="pl-6">
+                    <Skeleton className="h-5 w-full" />
+                  </TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isLoading &&
-                  Array.from({ length: 3 }).map((_, i) => (
-                    <TableRow key={i}>
-                      <TableCell colSpan={8} className="pl-6">
-                        <Skeleton className="h-5 w-full" />
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                {!isLoading && (data?.error || rows.length === 0) && (
-                  <TableRow>
-                    <TableCell colSpan={8} className="text-muted-foreground py-10 text-center">
-                      {data?.error ?? "No batches."}
-                    </TableCell>
-                  </TableRow>
-                )}
-                {!isLoading &&
-                  rows.map((r) => (
-                    <TableRow key={r.batch}>
-                      <TableCell className="pl-6">
-                        <Link to={`/batches/${r.batch}`} className="font-semibold hover:underline">
-                          {r.name}
-                        </Link>
-                        <p className="text-muted-foreground text-xs">
-                          <span className="font-mono">{r.coursebatch_id}</span> · {r.course_name}
-                        </p>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={STATUS_BADGE[r.status]}>{r.status_display}</Badge>
-                        {r.closed_at && (
-                          <p className="text-muted-foreground mt-1 text-xs">
-                            {formatDate(r.closed_at)}
-                          </p>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums">{r.students}</TableCell>
-                      <MoneyCell row={r} field="fees" />
-                      <MoneyCell row={r} field="collected" />
-                      <MoneyCell row={r} field="owed" />
-                      <MoneyCell row={r} field="costs" />
-                      <MoneyCell row={r} field="profit" strong />
-                    </TableRow>
-                  ))}
-              </TableBody>
-            </Table>
-          </div>
-        </>
-      )}
+              ))}
+            {!isLoading && (data?.error || rows.length === 0) && (
+              <TableRow>
+                <TableCell colSpan={8} className="text-muted-foreground py-10 text-center">
+                  {data?.error ?? "No batches."}
+                </TableCell>
+              </TableRow>
+            )}
+            {!isLoading &&
+              rows.map((r) => (
+                <TableRow key={r.batch}>
+                  <TableCell className="pl-6">
+                    <Link to={`/batches/${r.batch}`} className="font-semibold hover:underline">
+                      {r.name}
+                    </Link>
+                    <p className="text-muted-foreground text-xs">
+                      <span className="font-mono">{r.coursebatch_id}</span> · {r.course_name}
+                    </p>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant={STATUS_BADGE[r.status]}>{r.status_display}</Badge>
+                    {r.closed_at && (
+                      <p className="text-muted-foreground mt-1 text-xs">
+                        {formatDate(r.closed_at)}
+                      </p>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">{r.students}</TableCell>
+                  <MoneyCell row={r} field="fees" />
+                  <MoneyCell row={r} field="collected" />
+                  <MoneyCell row={r} field="owed" />
+                  <MoneyCell row={r} field="costs" />
+                  <MoneyCell row={r} field="profit" strong />
+                </TableRow>
+              ))}
+          </TableBody>
+        </Table>
+      </div>
     </div>
   );
 }

@@ -29,7 +29,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useAuth } from "@/context/auth";
-import { useDataSource } from "@/context/data-source";
 import { CALL_OUTCOMES, CALL_OUTCOME_TONE } from "@/data/lead-lookups";
 import { useBranches } from "@/hooks/use-branches";
 import { useCalls, useCallsSummary } from "@/hooks/use-calls";
@@ -213,11 +212,9 @@ function Pager({
 }
 
 export default function CallsPage() {
-  const { source } = useDataSource();
-  const isApi = source === "api";
   const { user } = useAuth();
   const isStaff = !!user?.is_staff;
-  const branches = useBranches(1, 100, "", isApi && isStaff);
+  const branches = useBranches(1, 100, "", isStaff);
   const users = useUsers(1, 100);
 
   const [search, setSearch] = useState("");
@@ -251,8 +248,8 @@ export default function CallsPage() {
   // Any filter change goes back to the first page.
   useEffect(() => setPage(1), [filters]);
 
-  const list = useCalls({ ...filters, page, page_size: PAGE_SIZE }, isApi);
-  const summary = useCallsSummary(filters, isApi);
+  const list = useCalls({ ...filters, page, page_size: PAGE_SIZE });
+  const summary = useCallsSummary(filters);
   const s = summary.data;
   const rows = list.data?.results ?? [];
   const count = list.data?.count ?? 0;
@@ -266,7 +263,7 @@ export default function CallsPage() {
           </p>
           <h1 className="font-headline mt-1 text-3xl font-semibold tracking-tight">Calls</h1>
         </div>
-        {isApi && isStaff && (
+        {isStaff && (
           <Select value={branch} onValueChange={setBranch}>
             <SelectTrigger className="w-44">
               <SelectValue />
@@ -283,120 +280,112 @@ export default function CallsPage() {
         )}
       </div>
 
-      {!isApi ? (
-        <div className="text-muted-foreground rounded-2xl border border-dashed py-16 text-center text-sm">
-          Switch to Live data to see calls.
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <Kpi
+          label="Calls"
+          value={s?.calls}
+          sub={s && `${s.outbound} outbound · ${s.inbound} inbound`}
+          loading={summary.isLoading}
+        />
+        <Kpi label="Leads called" value={s?.leads} loading={summary.isLoading} />
+        <Kpi label="Talk time" value={talkTime(s?.talk_seconds)} loading={summary.isLoading} />
+        <Kpi
+          label="Average call"
+          value={s?.average_seconds ? formatDuration(s.average_seconds) : "—"}
+          loading={summary.isLoading}
+        />
+      </div>
+
+      <div className="bg-card overflow-hidden rounded-2xl border">
+        <div className="flex flex-wrap items-center gap-2 border-b p-4">
+          <div className="relative min-w-[14rem] flex-1">
+            <Search className="text-muted-foreground absolute top-2.5 left-3 size-4" />
+            <Input
+              placeholder="Search calls…"
+              className="rounded-full pl-9"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+          <DateRange from={from} to={to} onFromChange={setFrom} onToChange={setTo} />
+          <Select value={direction} onValueChange={setDirection}>
+            <SelectTrigger className="w-36">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All directions</SelectItem>
+              <SelectItem value="outbound">Outbound</SelectItem>
+              <SelectItem value="inbound">Inbound</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={outcome} onValueChange={setOutcome}>
+            <SelectTrigger className="w-44">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All outcomes</SelectItem>
+              {CALL_OUTCOMES.map((o) => (
+                <SelectItem key={o.value} value={o.value}>
+                  {o.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {(users.data?.results.length ?? 0) > 0 && (
+            <Select value={by} onValueChange={setBy}>
+              <SelectTrigger className="w-44">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Everyone</SelectItem>
+                {users.data?.results.map((u) => (
+                  <SelectItem key={u.id} value={String(u.id)}>
+                    {u.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
         </div>
-      ) : (
-        <>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <Kpi
-              label="Calls"
-              value={s?.calls}
-              sub={s && `${s.outbound} outbound · ${s.inbound} inbound`}
-              loading={summary.isLoading}
-            />
-            <Kpi label="Leads called" value={s?.leads} loading={summary.isLoading} />
-            <Kpi label="Talk time" value={talkTime(s?.talk_seconds)} loading={summary.isLoading} />
-            <Kpi
-              label="Average call"
-              value={s?.average_seconds ? formatDuration(s.average_seconds) : "—"}
-              loading={summary.isLoading}
-            />
-          </div>
 
-          <div className="bg-card overflow-hidden rounded-2xl border">
-            <div className="flex flex-wrap items-center gap-2 border-b p-4">
-              <div className="relative min-w-[14rem] flex-1">
-                <Search className="text-muted-foreground absolute top-2.5 left-3 size-4" />
-                <Input
-                  placeholder="Search calls…"
-                  className="rounded-full pl-9"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                />
-              </div>
-              <DateRange from={from} to={to} onFromChange={setFrom} onToChange={setTo} />
-              <Select value={direction} onValueChange={setDirection}>
-                <SelectTrigger className="w-36">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All directions</SelectItem>
-                  <SelectItem value="outbound">Outbound</SelectItem>
-                  <SelectItem value="inbound">Inbound</SelectItem>
-                </SelectContent>
-              </Select>
-              <Select value={outcome} onValueChange={setOutcome}>
-                <SelectTrigger className="w-44">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All outcomes</SelectItem>
-                  {CALL_OUTCOMES.map((o) => (
-                    <SelectItem key={o.value} value={o.value}>
-                      {o.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {(users.data?.results.length ?? 0) > 0 && (
-                <Select value={by} onValueChange={setBy}>
-                  <SelectTrigger className="w-44">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Everyone</SelectItem>
-                    {users.data?.results.map((u) => (
-                      <SelectItem key={u.id} value={String(u.id)}>
-                        {u.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-            </div>
-
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="pl-6">When</TableHead>
-                    <TableHead>Lead</TableHead>
-                    <TableHead>Direction</TableHead>
-                    <TableHead>Duration</TableHead>
-                    <TableHead>Outcome</TableHead>
-                    <TableHead>By</TableHead>
-                    <TableHead>Notes</TableHead>
-                    <TableHead className="pr-6">Next follow-up</TableHead>
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="pl-6">When</TableHead>
+                <TableHead>Lead</TableHead>
+                <TableHead>Direction</TableHead>
+                <TableHead>Duration</TableHead>
+                <TableHead>Outcome</TableHead>
+                <TableHead>By</TableHead>
+                <TableHead>Notes</TableHead>
+                <TableHead className="pr-6">Next follow-up</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {list.isLoading &&
+                Array.from({ length: 3 }).map((_, i) => (
+                  <TableRow key={i}>
+                    <TableCell colSpan={COLS} className="pl-6">
+                      <Skeleton className="h-5 w-full" />
+                    </TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {list.isLoading &&
-                    Array.from({ length: 3 }).map((_, i) => (
-                      <TableRow key={i}>
-                        <TableCell colSpan={COLS} className="pl-6">
-                          <Skeleton className="h-5 w-full" />
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  {!list.isLoading && rows.length === 0 && (
-                    <TableRow>
-                      <TableCell colSpan={COLS} className="text-muted-foreground py-10 text-center">
-                        No calls.
-                      </TableCell>
-                    </TableRow>
-                  )}
-                  {rows.map((c) => (
-                    <CallRow key={c.id} call={c} />
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-            <Pager page={page} count={count} shown={rows.length} onPage={setPage} />
-          </div>
-        </>
-      )}
+                ))}
+              {!list.isLoading && rows.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={COLS} className="text-muted-foreground py-10 text-center">
+                    No calls.
+                  </TableCell>
+                </TableRow>
+              )}
+              {rows.map((c) => (
+                <CallRow key={c.id} call={c} />
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+        <Pager page={page} count={count} shown={rows.length} onPage={setPage} />
+      </div>
     </div>
   );
 }

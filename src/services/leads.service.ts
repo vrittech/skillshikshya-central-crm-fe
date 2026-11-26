@@ -109,8 +109,8 @@ export const leadsService = {
     const { data } = await api.get<Paginated<ApiLead>>("/leads/", { params });
     return data;
   },
-  async summary() {
-    const { data } = await api.get<LeadSummary>("/leads/summary/");
+  async summary(params: { branch_id?: number } = {}) {
+    const { data } = await api.get<LeadSummary>("/leads/summary/", { params });
     return data;
   },
   async get(id: number) {

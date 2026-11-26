@@ -38,6 +38,7 @@ export function useLeadsBySource(params: ReportBaseParams, enabled = true) {
     queryFn: () => reportsService.bySource(params),
     enabled,
     staleTime: STALE,
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -47,6 +48,7 @@ export function useLeadTrend(params: LeadTrendParams, enabled = true) {
     queryFn: () => reportsService.leadTrend(params),
     enabled,
     staleTime: STALE,
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -56,6 +58,7 @@ export function useConversionReport(params: ReportBaseParams, enabled = true) {
     queryFn: () => reportsService.conversion(params),
     enabled,
     staleTime: STALE,
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -65,6 +68,7 @@ export function useRevenueReport(params: ReportBaseParams, enabled = true) {
     queryFn: () => reportsService.revenue(params),
     enabled,
     staleTime: STALE,
+    placeholderData: keepPreviousData,
   });
 }
 

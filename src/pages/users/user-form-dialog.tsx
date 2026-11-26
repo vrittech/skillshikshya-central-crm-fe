@@ -24,7 +24,6 @@ import { useBranches } from "@/hooks/use-branches";
 import { useGroups } from "@/hooks/use-groups";
 import { useRegisterUser, useUpdateUser } from "@/hooks/use-users";
 import { useAuth } from "@/context/auth";
-import { useDataSource } from "@/context/data-source";
 import type { RegisterPayload, User } from "@/types";
 
 const WEEKDAYS = [
@@ -128,13 +127,12 @@ export function UserFormDialog({
 }) {
   const isEdit = user != null;
   const { user: currentUser } = useAuth();
-  const { source } = useDataSource();
   const isStaff = !!currentUser?.is_staff;
   const [form, setForm] = useState<FormState>(emptyForm);
   const [branchSearch, setBranchSearch] = useState("");
   const [branchLabel, setBranchLabel] = useState("");
   const groups = useGroups(open && isStaff);
-  const branchesQ = useBranches(1, 100, branchSearch, open && isStaff && source === "api");
+  const branchesQ = useBranches(1, 100, branchSearch, open && isStaff);
   const register = useRegisterUser();
   const update = useUpdateUser();
   const busy = register.isPending || update.isPending;
@@ -311,7 +309,7 @@ export function UserFormDialog({
                 </Select>
               </div>
             )}
-            {isStaff && source === "api" && (
+            {isStaff && (
               <div className="space-y-2">
                 <Label>Branch</Label>
                 <Combobox

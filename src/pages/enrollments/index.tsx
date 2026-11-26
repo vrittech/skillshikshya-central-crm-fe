@@ -14,7 +14,6 @@ import {
 import { ListPager } from "@/components/list-pager";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { useDataSource } from "@/context/data-source";
 import { useRole } from "@/context/role";
 import { useEnrollments } from "@/hooks/use-billing";
 import { formatDate, formatNPR } from "@/lib/leads-format";
@@ -44,7 +43,6 @@ const STATUSES: ApiEnrollmentStatus[] = [
 
 export default function EnrollmentsPage() {
   const navigate = useNavigate();
-  const { isMock, source } = useDataSource();
   const { can } = useRole();
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<ApiEnrollmentStatus | "all">("all");
@@ -66,7 +64,7 @@ export default function EnrollmentsPage() {
         <p className="text-brand font-mono text-[11px] font-bold tracking-wider uppercase">CRM Workspace</p>
         <h1 className="font-headline mt-1 text-3xl font-semibold tracking-tight">Enrollments</h1>
         <p className="text-muted-foreground mt-1 text-sm">
-          Enrollments across all leads.{isMock && " Previewing mock data."}
+          Enrollments across all leads.
         </p>
       </div>
 
@@ -102,8 +100,7 @@ export default function EnrollmentsPage() {
             ))}
           </SelectContent>
         </Select>
-        {!isMock && (
-          <Select
+        <Select
             value={seat}
             onValueChange={(v) => {
               setSeat(v as ApiSeatState | "all");
@@ -120,8 +117,7 @@ export default function EnrollmentsPage() {
               <SelectItem value="none">No batch</SelectItem>
             </SelectContent>
           </Select>
-        )}
-        {source === "api" && can("enrollment.create") && (
+        {can("enrollment.create") && (
           <Button variant="brand" onClick={() => setCreateOpen(true)}>
             <Plus /> New Enrollment
           </Button>
@@ -163,12 +159,8 @@ export default function EnrollmentsPage() {
               {rows.map((e) => (
                 <TableRow
                   key={e.id}
-                  className={cn(source === "api" && "cursor-pointer")}
-                  onClick={() =>
-                    source === "api"
-                      ? navigate(`/enrollments/${e.id}`)
-                      : e.leadId && navigate(`/leads/${e.leadId}`)
-                  }
+                  className={cn("cursor-pointer")}
+                  onClick={() => navigate(`/enrollments/${e.id}`)}
                 >
                   <TableCell className="font-semibold">
                     {e.leadId ? (

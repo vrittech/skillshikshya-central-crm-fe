@@ -29,7 +29,6 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useAuth } from "@/context/auth";
-import { useDataSource } from "@/context/data-source";
 import { openInvoicePdf, useCancelInvoice, useInvoices, useResendInvoice } from "@/hooks/use-invoices";
 import { formatDateTime, formatNPR, NEPAL_OFFSET } from "@/lib/leads-format";
 import { cn } from "@/lib/utils";
@@ -49,8 +48,6 @@ const TYPE_TONE: Record<InvoiceType, string> = {
  * They are never edited: staff can re-send one, or cancel a wrong one with a reason.
  */
 export default function InvoicesPage() {
-  const { source } = useDataSource();
-  const isApi = source === "api";
   const { user } = useAuth();
   const isStaff = !!user?.is_staff;
 
@@ -106,224 +103,218 @@ export default function InvoicesPage() {
             student — never created by hand.
           </p>
         </div>
-        {isApi && isStaff && (
+        {isStaff && (
           <Button variant="outline" onClick={() => setConfigOpen(true)}>
             <MailCheck /> Email settings
           </Button>
         )}
       </div>
 
-      {!isApi ? (
-        <div className="text-muted-foreground rounded-2xl border border-dashed py-16 text-center text-sm">
-          Switch to Live data to see invoices.
-        </div>
-      ) : (
-        <div className="bg-card overflow-hidden rounded-2xl border shadow-[0_1px_3px_0_rgba(0,0,0,0.05),0_1px_2px_-1px_rgba(0,0,0,0.05)]">
-          <div className="flex flex-wrap items-center gap-2 border-b p-4">
-            <div className="relative min-w-[15rem] flex-1">
-              <Search className="text-muted-foreground absolute top-2.5 left-3 size-4" />
-              <Input
-                placeholder="Search invoice no., student, course, or email"
-                className="rounded-full pl-9"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-            </div>
-            <Select value={type} onValueChange={(v) => setType(v as "all" | InvoiceType)}>
-              <SelectTrigger className="h-9 w-44">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All types</SelectItem>
-                <SelectItem value="enrollment">Course fee</SelectItem>
-                <SelectItem value="payment">Payment receipt</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select
-              value={statusFilter}
-              onValueChange={(v) => setStatusFilter(v as "all" | InvoiceStatus)}
-            >
-              <SelectTrigger className="h-9 w-36">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All statuses</SelectItem>
-                <SelectItem value="active">Active</SelectItem>
-                <SelectItem value="cancelled">Cancelled</SelectItem>
-              </SelectContent>
-            </Select>
+      <div className="bg-card overflow-hidden rounded-2xl border shadow-[0_1px_3px_0_rgba(0,0,0,0.05),0_1px_2px_-1px_rgba(0,0,0,0.05)]">
+        <div className="flex flex-wrap items-center gap-2 border-b p-4">
+          <div className="relative min-w-[15rem] flex-1">
+            <Search className="text-muted-foreground absolute top-2.5 left-3 size-4" />
             <Input
-              type="date"
-              className="h-9 w-40"
-              value={from}
-              onChange={(e) => setFrom(e.target.value)}
-              title="Created on or after"
-            />
-            <Input
-              type="date"
-              className="h-9 w-40"
-              value={to}
-              onChange={(e) => setTo(e.target.value)}
-              title="Created on or before"
+              placeholder="Search invoice no., student, course, or email"
+              className="rounded-full pl-9"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
             />
           </div>
+          <Select value={type} onValueChange={(v) => setType(v as "all" | InvoiceType)}>
+            <SelectTrigger className="h-9 w-44">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All types</SelectItem>
+              <SelectItem value="enrollment">Course fee</SelectItem>
+              <SelectItem value="payment">Payment receipt</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select
+            value={statusFilter}
+            onValueChange={(v) => setStatusFilter(v as "all" | InvoiceStatus)}
+          >
+            <SelectTrigger className="h-9 w-36">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All statuses</SelectItem>
+              <SelectItem value="active">Active</SelectItem>
+              <SelectItem value="cancelled">Cancelled</SelectItem>
+            </SelectContent>
+          </Select>
+          <Input
+            type="date"
+            className="h-9 w-40"
+            value={from}
+            onChange={(e) => setFrom(e.target.value)}
+            title="Created on or after"
+          />
+          <Input
+            type="date"
+            className="h-9 w-40"
+            value={to}
+            onChange={(e) => setTo(e.target.value)}
+            title="Created on or before"
+          />
+        </div>
 
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Invoice</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Student</TableHead>
-                  <TableHead>Course</TableHead>
-                  <TableHead className="text-right">Amount</TableHead>
-                  <TableHead className="text-right">Remaining</TableHead>
-                  <TableHead>Emailed</TableHead>
-                  <TableHead>Created</TableHead>
-                  <TableHead className="w-12" />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isLoading &&
-                  Array.from({ length: 5 }).map((_, i) => (
-                    <TableRow key={i}>
-                      <TableCell colSpan={9}>
-                        <Skeleton className="h-6 w-full" />
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                {!isLoading && rows.length === 0 && (
-                  <TableRow>
-                    <TableCell colSpan={9} className="py-14 text-center">
-                      <FileText className="text-muted-foreground mx-auto size-8 opacity-40" />
-                      <p className="mt-2 text-sm font-semibold">No invoices found</p>
-                      <p className="text-muted-foreground text-xs">
-                        They appear once a student is created or a successful payment is recorded.
-                      </p>
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Invoice</TableHead>
+                <TableHead>Type</TableHead>
+                <TableHead>Student</TableHead>
+                <TableHead>Course</TableHead>
+                <TableHead className="text-right">Amount</TableHead>
+                <TableHead className="text-right">Remaining</TableHead>
+                <TableHead>Emailed</TableHead>
+                <TableHead>Created</TableHead>
+                <TableHead className="w-12" />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {isLoading &&
+                Array.from({ length: 5 }).map((_, i) => (
+                  <TableRow key={i}>
+                    <TableCell colSpan={9}>
+                      <Skeleton className="h-6 w-full" />
                     </TableCell>
                   </TableRow>
-                )}
-                {rows.map((i) => {
-                  const cancelled = i.status === "cancelled";
-                  return (
-                    <TableRow key={i.id} className={cn(cancelled && "opacity-70")}>
-                      <TableCell>
-                        <p className="font-mono text-xs font-semibold">{i.invoice_number}</p>
-                        {cancelled && (
-                          <div className="mt-1 max-w-56">
-                            <Badge variant="secondary" className="bg-destructive/10 text-destructive">
-                              Cancelled
-                            </Badge>
-                            <p
-                              className="text-muted-foreground mt-1 truncate text-xs"
-                              title={i.cancel_reason ?? undefined}
-                            >
-                              {i.cancel_reason}
-                              {i.cancelled_by_name && ` · ${i.cancelled_by_name}`}
+                ))}
+              {!isLoading && rows.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={9} className="py-14 text-center">
+                    <FileText className="text-muted-foreground mx-auto size-8 opacity-40" />
+                    <p className="mt-2 text-sm font-semibold">No invoices found</p>
+                    <p className="text-muted-foreground text-xs">
+                      They appear once a student is created or a successful payment is recorded.
+                    </p>
+                  </TableCell>
+                </TableRow>
+              )}
+              {rows.map((i) => {
+                const cancelled = i.status === "cancelled";
+                return (
+                  <TableRow key={i.id} className={cn(cancelled && "opacity-70")}>
+                    <TableCell>
+                      <p className="font-mono text-xs font-semibold">{i.invoice_number}</p>
+                      {cancelled && (
+                        <div className="mt-1 max-w-56">
+                          <Badge variant="secondary" className="bg-destructive/10 text-destructive">
+                            Cancelled
+                          </Badge>
+                          <p
+                            className="text-muted-foreground mt-1 truncate text-xs"
+                            title={i.cancel_reason ?? undefined}
+                          >
+                            {i.cancel_reason}
+                            {i.cancelled_by_name && ` · ${i.cancelled_by_name}`}
+                          </p>
+                        </div>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="secondary" className={TYPE_TONE[i.type]}>
+                        {i.type_display ?? (i.type === "payment" ? "Payment Receipt" : "Course Fee")}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="font-medium">{i.student_name || "—"}</TableCell>
+                    <TableCell className="text-muted-foreground">{i.course_name || "—"}</TableCell>
+                    <TableCell
+                      className={cn(
+                        "text-right font-medium tabular-nums",
+                        cancelled && "text-muted-foreground line-through",
+                      )}
+                    >
+                      {formatNPR(Number(i.amount))}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {formatNPR(Number(i.remaining_balance))}
+                    </TableCell>
+                    <TableCell className="text-sm">
+                      {i.sent_at ? (
+                        <div className="min-w-0">
+                          <p className="truncate">{i.emailed_to}</p>
+                          <p className="text-muted-foreground text-xs">{formatDateTime(i.sent_at)}</p>
+                          {i.cc_emails?.length > 0 && (
+                            <p className="text-muted-foreground text-xs">
+                              cc {i.cc_emails.length}
                             </p>
-                          </div>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="secondary" className={TYPE_TONE[i.type]}>
-                          {i.type_display ?? (i.type === "payment" ? "Payment Receipt" : "Course Fee")}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="font-medium">{i.student_name || "—"}</TableCell>
-                      <TableCell className="text-muted-foreground">{i.course_name || "—"}</TableCell>
-                      <TableCell
-                        className={cn(
-                          "text-right font-medium tabular-nums",
-                          cancelled && "text-muted-foreground line-through",
-                        )}
-                      >
-                        {formatNPR(Number(i.amount))}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums">
-                        {formatNPR(Number(i.remaining_balance))}
-                      </TableCell>
-                      <TableCell className="text-sm">
-                        {i.sent_at ? (
-                          <div className="min-w-0">
-                            <p className="truncate">{i.emailed_to}</p>
-                            <p className="text-muted-foreground text-xs">{formatDateTime(i.sent_at)}</p>
-                            {i.cc_emails?.length > 0 && (
-                              <p className="text-muted-foreground text-xs">
-                                cc {i.cc_emails.length}
-                              </p>
-                            )}
-                          </div>
-                        ) : (
-                          <span className="text-muted-foreground text-xs">Not sent</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground whitespace-nowrap">
-                        {formatDateTime(i.created_at)}
-                      </TableCell>
-                      <TableCell>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="rounded-full">
-                              <MoreHorizontal />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onSelect={() => openInvoicePdf(i.id)}>
-                              <FileText className="size-4" /> Open PDF
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground text-xs">Not sent</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground whitespace-nowrap">
+                      {formatDateTime(i.created_at)}
+                    </TableCell>
+                    <TableCell>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="rounded-full">
+                            <MoreHorizontal />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onSelect={() => openInvoicePdf(i.id)}>
+                            <FileText className="size-4" /> Open PDF
+                          </DropdownMenuItem>
+                          {isStaff && !cancelled && (
+                            <DropdownMenuItem
+                              disabled={resend.isPending}
+                              onSelect={() => resend.mutate(i.id)}
+                            >
+                              <Send className="size-4" /> Re-send email
                             </DropdownMenuItem>
-                            {isStaff && !cancelled && (
-                              <DropdownMenuItem
-                                disabled={resend.isPending}
-                                onSelect={() => resend.mutate(i.id)}
-                              >
-                                <Send className="size-4" /> Re-send email
-                              </DropdownMenuItem>
-                            )}
-                            {isStaff && !cancelled && (
-                              <DropdownMenuItem
-                                className="text-destructive focus:text-destructive"
-                                onSelect={() => setCancelling(i)}
-                              >
-                                <Ban className="size-4" /> Cancel invoice
-                              </DropdownMenuItem>
-                            )}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </div>
-
-          {count > PAGE_SIZE && (
-            <div className="bg-muted/50 flex items-center justify-between border-t px-6 py-3">
-              <span className="text-muted-foreground text-sm">
-                Page {page} of {totalPages} · {count} invoices
-              </span>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  disabled={page <= 1}
-                  onClick={() => setPage((p) => p - 1)}
-                >
-                  <ChevronLeft />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  disabled={page >= totalPages}
-                  onClick={() => setPage((p) => p + 1)}
-                >
-                  <ChevronRight />
-                </Button>
-              </div>
-            </div>
-          )}
+                          )}
+                          {isStaff && !cancelled && (
+                            <DropdownMenuItem
+                              className="text-destructive focus:text-destructive"
+                              onSelect={() => setCancelling(i)}
+                            >
+                              <Ban className="size-4" /> Cancel invoice
+                            </DropdownMenuItem>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
         </div>
-      )}
+
+        {count > PAGE_SIZE && (
+          <div className="bg-muted/50 flex items-center justify-between border-t px-6 py-3">
+            <span className="text-muted-foreground text-sm">
+              Page {page} of {totalPages} · {count} invoices
+            </span>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="icon"
+                disabled={page <= 1}
+                onClick={() => setPage((p) => p - 1)}
+              >
+                <ChevronLeft />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                disabled={page >= totalPages}
+                onClick={() => setPage((p) => p + 1)}
+              >
+                <ChevronRight />
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
 
       <InvoiceEmailConfigDialog open={configOpen} onOpenChange={setConfigOpen} />
       <ReasonDialog

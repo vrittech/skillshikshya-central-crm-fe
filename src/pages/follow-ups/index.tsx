@@ -14,7 +14,6 @@ import {
 import { ListPager } from "@/components/list-pager";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useDataSource } from "@/context/data-source";
 import { type FollowUpRow, useCompleteFollowup, useFollowUps } from "@/hooks/use-followups";
 import { useRole } from "@/context/role";
 import { formatDateTime, formatPhone, initialsOf, relativeToToday } from "@/lib/leads-format";
@@ -34,7 +33,7 @@ function FollowUpItem({ row, canComplete }: { row: FollowUpRow; canComplete: boo
   return (
     <div className="hover:bg-accent/50 flex items-center gap-3 px-4 py-3 transition-colors">
       <Link to={`/leads/${row.leadId}`} className="flex min-w-0 flex-1 items-center gap-3">
-        <span className="bg-brand-fixed-dim/30 text-brand-container flex size-9 shrink-0 items-center justify-center rounded-full text-xs font-bold">
+        <span className="bg-brand-fixed-dim/30 text-brand-container dark:text-brand-fixed flex size-9 shrink-0 items-center justify-center rounded-full text-xs font-bold">
           {initialsOf(row.leadName)}
         </span>
         <div className="min-w-0 flex-1">
@@ -76,7 +75,6 @@ function FollowUpItem({ row, canComplete }: { row: FollowUpRow; canComplete: boo
 }
 
 export default function FollowUpsPage() {
-  const { isMock } = useDataSource();
   const { can } = useRole();
   const canComplete = can("followups.complete");
   const [search, setSearch] = useState("");
@@ -108,7 +106,6 @@ export default function FollowUpsPage() {
         <h1 className="font-headline mt-1 text-3xl font-semibold tracking-tight">Follow-ups</h1>
         <p className="text-muted-foreground mt-1 text-sm">
           Scheduled touchpoints across all leads, soonest first.
-          {isMock && " Previewing mock data."}
         </p>
       </div>
 
@@ -128,8 +125,7 @@ export default function FollowUpsPage() {
               <TabsTrigger value="upcoming">Upcoming ({counts.upcoming})</TabsTrigger>
             </TabsList>
           </Tabs>
-          {!isMock && (
-            <Select
+          <Select
               value={kind}
               onValueChange={(v) => {
                 setKind(v as typeof kind);
@@ -145,8 +141,7 @@ export default function FollowUpsPage() {
                 <SelectItem value="other">Other</SelectItem>
               </SelectContent>
             </Select>
-          )}
-          {!isMock && canComplete && (
+          {canComplete && (
             <Button size="sm" variant="outline" onClick={() => setPickerOpen(true)}>
               <Plus /> Add Follow-up
             </Button>

@@ -27,12 +27,10 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useRole } from "@/context/role";
 import {
-  counselorName,
   EDUCATION_LEVELS,
   labelOf,
   LEARNING_MODES,
   SHIFTS,
-  sourceLabel,
 } from "@/data/lead-lookups";
 import {
   AlertDialog,
@@ -45,7 +43,6 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useDataSource } from "@/context/data-source";
 import { useCompleteFollowup } from "@/hooks/use-followups";
 import { useDeleteLead, useLead } from "@/hooks/use-leads";
 import { EnquiriesPanel } from "@/pages/leads/components/enquiries-panel";
@@ -54,15 +51,13 @@ import {
   formatDate,
   formatDateTime,
   formatDuration,
-  formatNPR,
   formatPhone,
   initialsOf,
   isOverdue,
   relativeToToday,
 } from "@/lib/leads-format";
 import { cn } from "@/lib/utils";
-import type { Activity, Lead, LeadCustomData } from "@/types/leads";
-import { ActivityTimeline } from "./components/activity-timeline";
+import type { Activity, LeadCustomData } from "@/types/leads";
 import { LeadTimeline } from "./components/lead-timeline";
 import { EditCallDialog } from "./components/edit-call-dialog";
 import { LeadActionDialogs, type LeadAction } from "./components/lead-action-dialogs";
@@ -243,15 +238,6 @@ function CallHistory({
   );
 }
 
-/* ---------------------------------------------------------------- payments */
-
-function paymentSummary(lead: Lead) {
-  const agreed = lead.enrollment?.agreedAmount ?? 0;
-  const paid = lead.payments.filter((p) => p.status === "successful").reduce((s, p) => s + p.amount, 0);
-  const remaining = Math.max(0, agreed - paid);
-  return { agreed, paid, remaining, isFullPaid: agreed > 0 && remaining <= 0 };
-}
-
 /* ------------------------------------------------------------------- page */
 
 const TAB_ACTIVE =
@@ -262,7 +248,6 @@ export default function LeadDetailPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { can } = useRole();
-  const { source } = useDataSource();
   const { lead, isLoading, notFound } = useLead(id);
   const [action, setAction] = useState<LeadAction>(null);
   const [editingCall, setEditingCall] = useState<Activity | null>(null);
@@ -286,9 +271,7 @@ export default function LeadDetailPage() {
         <h1 className="font-headline text-xl font-semibold">Lead not found</h1>
         <p className="text-muted-foreground text-sm">
           The lead <span className="font-mono">{id}</span> could not be found.{" "}
-          {source === "api"
-            ? "It may have been deleted or the link is broken."
-            : "It doesn’t exist in the mock dataset."}
+          It may have been deleted or the link is broken.
         </p>
         <Button variant="outline" asChild>
           <Link to="/leads">
@@ -302,7 +285,6 @@ export default function LeadDetailPage() {
   const primary = lead.courseInterests.find((c) => c.isPrimary) ?? lead.courseInterests[0];
   const additional = lead.courseInterests.filter((c) => !c.isPrimary);
   const dyn = dynamicRows(lead.customData);
-  const pay = paymentSummary(lead);
   // The earliest open follow-up (the list comes newest first).
   const nextFollowUp = lead.followUps
     .filter((f) => f.status === "pending" || f.status === "overdue")
@@ -335,14 +317,14 @@ export default function LeadDetailPage() {
                     {" "}
                     · Assigned to{" "}
                     <span className="text-foreground font-medium">
-                      {lead.assignedToName ?? counselorName(lead.assignedTo)}
+                      {lead.assignedToName ?? "Not yet assigned"}
                     </span>
                   </>
                 )}
               </p>
               <div className="flex flex-wrap items-center gap-2 pt-1">
-                <StatusBadge status={lead.status} name={lead.statusName} color={lead.statusColor} />
-                <PriorityBadge priority={lead.priority} name={lead.priorityName} color={lead.priorityColor} />
+                <StatusBadge name={lead.statusName} color={lead.statusColor} />
+                <PriorityBadge name={lead.priorityName} color={lead.priorityColor} />
                 <ScoreBar score={lead.score} />
               </div>
             </div>
@@ -375,7 +357,7 @@ export default function LeadDetailPage() {
                 </Button>
               </>
             )}
-            {source === "api" && lead.isConverted && (
+            {lead.isConverted && (
               <Badge variant="brand" className="gap-1">
                 <GraduationCap className="size-3.5" /> Already a student
               </Badge>
@@ -393,8 +375,10 @@ export default function LeadDetailPage() {
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 {lead.email && (
-                  <DropdownMenuItem onSelect={() => toast.info("Email — prototype")}>
-                    <Mail /> Email
+                  <DropdownMenuItem asChild>
+                    <a href={`mailto:${lead.email}`}>
+                      <Mail /> Email
+                    </a>
                   </DropdownMenuItem>
                 )}
                 {can("leads.assign") && (
@@ -402,7 +386,7 @@ export default function LeadDetailPage() {
                     <UserPlus /> Assign
                   </DropdownMenuItem>
                 )}
-                {source === "api" && lead.apiId != null && can("leads.delete") && (
+                {lead.apiId != null && can("leads.delete") && (
                   <>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem variant="destructive" onSelect={() => setDeleteOpen(true)}>
@@ -421,7 +405,7 @@ export default function LeadDetailPage() {
         <Tabs defaultValue={searchParams.get("tab") ?? "overview"}>
           <TabsList className="h-auto w-full flex-wrap justify-start gap-1 rounded-none border-b bg-transparent p-2">
             <TabsTrigger value="overview" className={TAB_ACTIVE}>Overview</TabsTrigger>
-            {source === "api" && lead.apiId != null && (
+            {lead.apiId != null && (
               <TabsTrigger value="enquiries" className={TAB_ACTIVE}>Enquiries</TabsTrigger>
             )}
             <TabsTrigger value="history" className={TAB_ACTIVE}>History</TabsTrigger>
@@ -429,9 +413,6 @@ export default function LeadDetailPage() {
             <TabsTrigger value="followups" className={TAB_ACTIVE}>Follow-ups</TabsTrigger>
             <TabsTrigger value="enrollment" className={TAB_ACTIVE}>Enrollment</TabsTrigger>
             <TabsTrigger value="payments" className={TAB_ACTIVE}>Payments</TabsTrigger>
-            {source !== "api" && (
-              <TabsTrigger value="audit" className={TAB_ACTIVE}>Audit History</TabsTrigger>
-            )}
           </TabsList>
 
           <div className="p-5">
@@ -441,13 +422,13 @@ export default function LeadDetailPage() {
               <div className="space-y-6">
                 <Section title="Lead details">
                   <div className="grid gap-3 sm:grid-cols-2">
-                    <Fact label="Source" value={lead.sourceName ?? sourceLabel(lead.source)} />
+                    <Fact label="Source" value={lead.sourceName ?? "—"} />
                     <Fact label="Campaign" value={lead.campaign ?? "—"} />
                     <Fact
                       label="Priority"
                       value={
                         lead.priority || lead.priorityName ? (
-                          <PriorityBadge priority={lead.priority} name={lead.priorityName} color={lead.priorityColor} />
+                          <PriorityBadge name={lead.priorityName} color={lead.priorityColor} />
                         ) : (
                           "—"
                         )
@@ -550,16 +531,11 @@ export default function LeadDetailPage() {
                               variant="outline"
                               disabled={completeFollowup.isPending}
                               onClick={() => {
-                                if (source === "api" && lead.apiId != null) {
-                                  completeFollowup.mutate({
-                                    leadApiId: lead.apiId,
-                                    followupId: Number(nextFollowUp.id.replace(/\D/g, "")),
-                                  });
-                                } else {
-                                  toast.success("Follow-up completed", {
-                                    description: "Mock preview — not saved.",
-                                  });
-                                }
+                                if (lead.apiId == null) return;
+                                completeFollowup.mutate({
+                                  leadApiId: lead.apiId,
+                                  followupId: Number(nextFollowUp.id.replace(/\D/g, "")),
+                                });
                               }}
                             >
                               Complete
@@ -585,11 +561,7 @@ export default function LeadDetailPage() {
 
             {/* History: everything about the person, newest first */}
             <TabsContent value="history">
-              {source === "api" && lead.apiId != null ? (
-                <LeadTimeline leadId={lead.apiId} />
-              ) : (
-                <ActivityTimeline activities={lead.activities} />
-              )}
+              {lead.apiId != null && <LeadTimeline leadId={lead.apiId} />}
             </TabsContent>
 
             {/* Calls */}
@@ -607,7 +579,7 @@ export default function LeadDetailPage() {
                 <CallHistory
                   calls={calls}
                   onEdit={
-                    source === "api" && can("leads.log_activity") ? setEditingCall : undefined
+                    can("leads.log_activity") ? setEditingCall : undefined
                   }
                 />
               </Section>
@@ -654,7 +626,7 @@ export default function LeadDetailPage() {
             </TabsContent>
 
             {/* Enquiries */}
-            {source === "api" && lead.apiId != null && (
+            {lead.apiId != null && (
               <TabsContent value="enquiries">
                 <EnquiriesPanel leadId={lead.apiId} />
               </TabsContent>
@@ -662,138 +634,23 @@ export default function LeadDetailPage() {
 
             {/* Enrollment */}
             <TabsContent value="enrollment">
-              {source === "api" ? (
-                <EnrollmentsPanel
-                  leadId={lead.apiId}
-                  primaryCourseId={lead.primaryCourseId}
-                  canManage={can("enrollment.manage")}
-                />
-              ) : lead.enrollment ? (
-                <div className="space-y-3">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div>
-                      <p className="font-headline text-lg font-semibold">{lead.enrollment.courseName}</p>
-                      <p className="text-muted-foreground text-sm">Batch {lead.enrollment.batch}</p>
-                    </div>
-                    <span className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 rounded-full px-3 py-1 text-xs font-medium capitalize">
-                      {lead.enrollment.status}
-                    </span>
-                  </div>
-                  <div className="grid gap-1 sm:grid-cols-2">
-                    <InfoRow label="Enrolled" value={formatDate(lead.enrollment.enrolledAt)} />
-                    <InfoRow label="Listed fee" value={formatNPR(lead.enrollment.listedFee)} />
-                    <InfoRow label="Standard discount" value={formatNPR(lead.enrollment.standardDiscount)} />
-                    <InfoRow label="Additional discount" value={formatNPR(lead.enrollment.additionalDiscount)} />
-                    <InfoRow label="Agreed amount" value={formatNPR(lead.enrollment.agreedAmount)} />
-                    <InfoRow label="Paid" value={formatNPR(pay.paid)} />
-                    <InfoRow label="Remaining" value={formatNPR(pay.remaining)} />
-                  </div>
-                  {lead.enrollment.remarks && (
-                    <p className="text-muted-foreground text-sm">{lead.enrollment.remarks}</p>
-                  )}
-                  {can("payment.record") && (
-                    <div className="flex gap-2 pt-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => toast.info("Add payment — switch to Live to record")}
-                      >
-                        Add Payment
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="py-8 text-center">
-                  <p className="text-muted-foreground text-sm">This lead is not enrolled yet.</p>
-                  {can("enrollment.create") && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="mt-3"
-                      onClick={() => toast.info("Create enrollment — switch to Live to create")}
-                    >
-                      Create Enrollment
-                    </Button>
-                  )}
-                </div>
-              )}
+              <EnrollmentsPanel
+                leadId={lead.apiId}
+                primaryCourseId={lead.primaryCourseId}
+                canManage={can("enrollment.manage")}
+              />
             </TabsContent>
 
             {/* Payments */}
             <TabsContent value="payments">
-              {source === "api" ? (
-                <LeadPaymentsPanel leadId={lead.apiId} />
-              ) : lead.payments.length > 0 ? (
-                <ul className="divide-border divide-y">
-                  {lead.payments.map((p) => (
-                    <li key={p.id} className="flex items-center justify-between gap-4 py-3">
-                      <div>
-                        <p className="text-sm font-medium">{formatNPR(p.amount)}</p>
-                        <p className="text-muted-foreground text-xs">
-                          {formatDate(p.paidAt)} · {p.method} · {p.reference ?? "—"} · by {p.receivedBy}
-                        </p>
-                      </div>
-                      <span className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 rounded-full px-2.5 py-0.5 text-xs font-medium capitalize">
-                        {p.status}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="text-muted-foreground py-8 text-center text-sm">No payments recorded.</p>
-              )}
-            </TabsContent>
-
-            {/* Audit */}
-            <TabsContent value="audit" className="grid gap-6 lg:grid-cols-2">
-              <Section title="Status history">
-                <ul className="space-y-3">
-                  {lead.statusHistory.map((h) => (
-                    <li key={h.id} className="text-sm">
-                      <p className="flex flex-wrap items-center gap-1">
-                        {h.from ? (
-                          <>
-                            <StatusBadge status={h.from} /> →
-                          </>
-                        ) : (
-                          "Created as "
-                        )}
-                        <StatusBadge status={h.to} />
-                      </p>
-                      <p className="text-muted-foreground text-xs">
-                        {formatDateTime(h.at)} · by {h.by}
-                      </p>
-                    </li>
-                  ))}
-                </ul>
-              </Section>
-              <Section title="Assignment history">
-                {lead.assignmentHistory.length > 0 ? (
-                  <ul className="space-y-3">
-                    {lead.assignmentHistory.map((h) => (
-                      <li key={h.id} className="text-sm">
-                        <p>
-                          {h.from ? counselorName(h.from) : "Unassigned"} →{" "}
-                          <span className="font-medium">{counselorName(h.to)}</span>
-                        </p>
-                        <p className="text-muted-foreground text-xs">
-                          {formatDateTime(h.at)} · by {h.by}
-                        </p>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="text-muted-foreground text-sm">No assignment changes.</p>
-                )}
-              </Section>
+              <LeadPaymentsPanel leadId={lead.apiId} />
             </TabsContent>
           </div>
         </Tabs>
       </Card>
 
       <LeadActionDialogs action={action} lead={lead} onClose={() => setAction(null)} />
-      {source === "api" && lead.apiId != null && (
+      {lead.apiId != null && (
         <EditCallDialog
           leadId={lead.apiId}
           call={editingCall}

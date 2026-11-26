@@ -1,10 +1,10 @@
 /**
  * Maps backend wire types (`types/leads-api.ts`) to the rich UI model
- * (`types/leads.ts`) so the existing components render live data unchanged.
+ * (`types/leads.ts`) that the components render.
  *
- * Live leads carry admin-defined status/priority as `*Name`/`*Color` display
+ * Leads carry admin-defined status/priority as `*Name`/`*Color` display
  * fields (the badges read those); the fixed-code fields are placeholders and
- * unused on the API path. Fields the BE doesn't provide yet (custom data,
+ * unused. Fields the BE doesn't provide yet (custom data,
  * multi-course, enrollment, payments) come back empty — see lead-additional.md.
  */
 

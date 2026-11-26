@@ -7,7 +7,6 @@ import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/context/auth";
-import { useDataSource } from "@/context/data-source";
 import { useCourseBatch } from "@/hooks/use-batches";
 import { formatDate } from "@/lib/leads-format";
 import { batchShift } from "@/lib/time-slots";
@@ -43,7 +42,6 @@ function Seats({ batch }: { batch: CourseBatch }) {
 
 export default function BatchDetailPage() {
   const { id } = useParams();
-  const { source } = useDataSource();
   const { hasPerm } = useAuth();
   const { data: batch, isLoading, isError } = useCourseBatch(id ? Number(id) : null);
   const [editing, setEditing] = useState(false);
@@ -56,17 +54,6 @@ export default function BatchDetailPage() {
       <ArrowLeft className="size-4" /> Back to batches
     </Link>
   );
-
-  if (source !== "api") {
-    return (
-      <div className="space-y-6">
-        {back}
-        <div className="text-muted-foreground rounded-2xl border border-dashed py-16 text-center text-sm">
-          Switch to Live data to see this batch.
-        </div>
-      </div>
-    );
-  }
 
   if (isLoading) {
     return (

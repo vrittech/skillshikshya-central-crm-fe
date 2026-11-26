@@ -1,11 +1,6 @@
 /**
- * Lead-management domain types for the static CRM prototype.
- *
- * These mirror the normalized model in the "CRM Lead Management System Plan":
- * a core lead record + controlled lookups + related tables (course interests,
- * activities, follow-ups, enrollment, payments, history). They are intentionally
- * frontend-shaped (camelCase, resolved lookup labels) so the UI can render mock
- * data today and swap in the real API later with minimal churn.
+ * Lead-management domain types: the UI shape of a lead (camelCase, resolved
+ * lookup labels). `data/lead-adapters.ts` maps the API rows into it.
  */
 
 /** Lead lifecycle status (the plan's controlled `lead_statuses`). */

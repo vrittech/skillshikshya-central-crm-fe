@@ -48,7 +48,6 @@ import {
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/context/auth";
-import { useDataSource } from "@/context/data-source";
 import { useBranches } from "@/hooks/use-branches";
 import {
   useAddTeamsAccounts,
@@ -469,8 +468,6 @@ function TakenBackTable({ search, branchId }: { search: string; branchId?: numbe
 }
 
 export default function TeamsPage() {
-  const { source } = useDataSource();
-  const isApi = source === "api";
   const { user, hasPerm } = useAuth();
   const isStaff = !!user && (user.is_staff || user.is_superuser);
   const [tab, setTab] = useState<Tab>("all");
@@ -482,7 +479,7 @@ export default function TeamsPage() {
   const [takingBack, setTakingBack] = useState<{ id: number; account: string } | null>(null);
   const [retiring, setRetiring] = useState<ApiTeamsAccount | null>(null);
   const retire = useRetireTeamsAccount();
-  const branches = useBranches(1, 100, "", isApi && isStaff);
+  const branches = useBranches(1, 100, "", isStaff);
 
   useEffect(() => {
     const t = setTimeout(() => setDebounced(search.trim()), 300);
@@ -490,14 +487,14 @@ export default function TeamsPage() {
   }, [search]);
 
   const branchId = branch === "all" ? undefined : Number(branch);
-  const summary = useTeamsSummary({ branch_id: branchId }, isApi);
+  const summary = useTeamsSummary({ branch_id: branchId });
   const accounts = useTeamsAccounts(
     {
       branch_id: branchId,
       search: debounced || undefined,
       state: tab === "all" || tab === "taken_back" ? undefined : tab,
     },
-    isApi && tab !== "taken_back",
+    tab !== "taken_back",
   );
   const rows = useMemo(() => accounts.data ?? [], [accounts.data]);
   const s = summary.data;
@@ -515,7 +512,7 @@ export default function TeamsPage() {
             Teams licences
           </h1>
         </div>
-        {isApi && hasPerm("lead.add_teamsaccount") && (
+        {hasPerm("lead.add_teamsaccount") && (
           <Button variant="brand" onClick={() => setAdding(true)}>
             <Plus />
             Add accounts
@@ -523,105 +520,97 @@ export default function TeamsPage() {
         )}
       </div>
 
-      {!isApi ? (
-        <div className="text-muted-foreground rounded-2xl border border-dashed py-16 text-center text-sm">
-          Switch to Live data to see Teams licences.
-        </div>
-      ) : (
-        <>
-          <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-5">
-            <Kpi
-              label="Total"
-              value={s?.total ?? 0}
-              loading={summary.isLoading}
-              active={tab === "all"}
-              onClick={() => setTab("all")}
-            />
-            <Kpi
-              label="Ready to give"
-              value={s?.ready ?? 0}
-              loading={summary.isLoading}
-              active={tab === "ready"}
-              onClick={() => setTab("ready")}
-            />
-            <Kpi
-              label="In use"
-              value={s?.in_use ?? 0}
-              loading={summary.isLoading}
-              active={tab === "in_use"}
-              onClick={() => setTab("in_use")}
-            />
-            <Kpi
-              label="Safe to remove"
-              value={s?.safe_to_remove ?? 0}
-              loading={summary.isLoading}
-              active={tab === "safe_to_remove"}
-              tone={s?.safe_to_remove ? "text-sky-700 dark:text-sky-300" : undefined}
-              onClick={() => setTab("safe_to_remove")}
-            />
-            <Kpi
-              label="Action required"
-              value={s?.action_required ?? 0}
-              loading={summary.isLoading}
-              active={tab === "action_required"}
-              tone={s?.action_required ? "text-amber-700 dark:text-amber-400" : undefined}
-              onClick={() => setTab("action_required")}
-            />
-          </div>
+      <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-5">
+        <Kpi
+          label="Total"
+          value={s?.total ?? 0}
+          loading={summary.isLoading}
+          active={tab === "all"}
+          onClick={() => setTab("all")}
+        />
+        <Kpi
+          label="Ready to give"
+          value={s?.ready ?? 0}
+          loading={summary.isLoading}
+          active={tab === "ready"}
+          onClick={() => setTab("ready")}
+        />
+        <Kpi
+          label="In use"
+          value={s?.in_use ?? 0}
+          loading={summary.isLoading}
+          active={tab === "in_use"}
+          onClick={() => setTab("in_use")}
+        />
+        <Kpi
+          label="Safe to remove"
+          value={s?.safe_to_remove ?? 0}
+          loading={summary.isLoading}
+          active={tab === "safe_to_remove"}
+          tone={s?.safe_to_remove ? "text-sky-700 dark:text-sky-300" : undefined}
+          onClick={() => setTab("safe_to_remove")}
+        />
+        <Kpi
+          label="Action required"
+          value={s?.action_required ?? 0}
+          loading={summary.isLoading}
+          active={tab === "action_required"}
+          tone={s?.action_required ? "text-amber-700 dark:text-amber-400" : undefined}
+          onClick={() => setTab("action_required")}
+        />
+      </div>
 
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <Tabs value={tab} onValueChange={(v) => setTab(v as Tab)}>
-              <TabsList className="h-auto flex-wrap">
-                {TABS.map((t) => (
-                  <TabsTrigger key={t.value} value={t.value}>
-                    {t.label}
-                  </TabsTrigger>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <Tabs value={tab} onValueChange={(v) => setTab(v as Tab)}>
+          <TabsList className="h-auto flex-wrap">
+            {TABS.map((t) => (
+              <TabsTrigger key={t.value} value={t.value}>
+                {t.label}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
+        <div className="flex flex-wrap items-center gap-2">
+          {isStaff && (
+            <Select value={branch} onValueChange={setBranch}>
+              <SelectTrigger className="w-44">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All branches</SelectItem>
+                {(branches.data?.results ?? []).map((b) => (
+                  <SelectItem key={b.id} value={String(b.id)}>
+                    {b.name}
+                  </SelectItem>
                 ))}
-              </TabsList>
-            </Tabs>
-            <div className="flex flex-wrap items-center gap-2">
-              {isStaff && (
-                <Select value={branch} onValueChange={setBranch}>
-                  <SelectTrigger className="w-44">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All branches</SelectItem>
-                    {(branches.data?.results ?? []).map((b) => (
-                      <SelectItem key={b.id} value={String(b.id)}>
-                        {b.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-              <div className="relative min-w-[16rem]">
-                <Search className="text-muted-foreground absolute top-2.5 left-3 size-4" />
-                <Input
-                  placeholder="Search account or student…"
-                  className="rounded-full pl-9"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                />
-              </div>
-            </div>
+              </SelectContent>
+            </Select>
+          )}
+          <div className="relative min-w-[16rem]">
+            <Search className="text-muted-foreground absolute top-2.5 left-3 size-4" />
+            <Input
+              placeholder="Search account or student…"
+              className="rounded-full pl-9"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
           </div>
+        </div>
+      </div>
 
-          <div className="bg-card overflow-hidden rounded-2xl border">
-            {tab === "taken_back" ? (
-              <TakenBackTable search={debounced} branchId={branchId} />
-            ) : (
-              <AccountsTable
-                rows={rows}
-                loading={accounts.isLoading}
-                onSend={(r) => setSending(licenceOf(r))}
-                onTakeBack={(r) => setTakingBack(licenceOf(r))}
-                onRetire={setRetiring}
-              />
-            )}
-          </div>
-        </>
-      )}
+      <div className="bg-card overflow-hidden rounded-2xl border">
+        {tab === "taken_back" ? (
+          <TakenBackTable search={debounced} branchId={branchId} />
+        ) : (
+          <AccountsTable
+            rows={rows}
+            loading={accounts.isLoading}
+            onSend={(r) => setSending(licenceOf(r))}
+            onTakeBack={(r) => setTakingBack(licenceOf(r))}
+            onRetire={setRetiring}
+          />
+        )}
+      </div>
 
       <AddAccountsDialog open={adding} onClose={() => setAdding(false)} />
       <SendTeamsDetailsDialog licence={sending} onClose={() => setSending(null)} />

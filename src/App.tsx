@@ -1,6 +1,5 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import { AppLayout } from "@/components/layout/app-layout";
-import { DataSourceProvider } from "@/context/data-source";
 import { RoleProvider } from "@/context/role";
 import BatchProfitPage from "@/pages/batch-profit";
 import CallsPage from "@/pages/calls";
@@ -33,15 +32,14 @@ import UsersPage from "@/pages/users";
 
 export default function App() {
   return (
-    <DataSourceProvider>
-      <RoleProvider>
+    <RoleProvider>
         <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route element={<AppLayout />}>
           <Route path="/" element={<DashboardPage />} />
 
-          {/* Leads — static prototype backed by mock data */}
+          {/* Leads */}
           <Route path="/leads" element={<LeadsPage />} />
           <Route path="/leads/new" element={<LeadFormPage />} />
           <Route path="/leads/recycle-bin" element={<RecycleBinPage />} />
@@ -80,7 +78,6 @@ export default function App() {
           <Route path="*" element={<ComingSoonPage title="Not found" />} />
           </Route>
         </Routes>
-      </RoleProvider>
-    </DataSourceProvider>
+    </RoleProvider>
   );
 }

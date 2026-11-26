@@ -161,7 +161,7 @@ export default function UsersPage() {
               <TableRow key={u.id}>
                 <TableCell>
                   <div className="flex items-center gap-3">
-                    <span className="bg-brand-fixed-dim/30 text-brand-container flex size-9 shrink-0 items-center justify-center rounded-full text-xs font-bold">
+                    <span className="bg-brand-fixed-dim/30 text-brand-container dark:text-brand-fixed flex size-9 shrink-0 items-center justify-center rounded-full text-xs font-bold">
                       {u.name
                         .split(" ")
                         .map((p) => p[0])

@@ -14,7 +14,6 @@ import {
 import { ListPager } from "@/components/list-pager";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { useDataSource } from "@/context/data-source";
 import { useRole } from "@/context/role";
 import { usePayments } from "@/hooks/use-billing";
 import { formatDateTime, formatNPR } from "@/lib/leads-format";
@@ -44,7 +43,6 @@ const METHODS: { value: ApiPaymentMethod; label: string }[] = [
 
 export default function PaymentsPage() {
   const navigate = useNavigate();
-  const { isMock, source } = useDataSource();
   const { can } = useRole();
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<ApiPaymentStatus | "all">("all");
@@ -52,7 +50,7 @@ export default function PaymentsPage() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
   const [payOpen, setPayOpen] = useState(false);
-  const canEdit = source === "api" && can("payment.manage");
+  const canEdit = can("payment.manage");
   // Successful total for the filters across every page, not just this one.
   const { rows, count, successfulTotal, isLoading } = usePayments({
     page,
@@ -68,7 +66,7 @@ export default function PaymentsPage() {
         <p className="text-brand font-mono text-[11px] font-bold tracking-wider uppercase">CRM Workspace</p>
         <h1 className="font-headline mt-1 text-3xl font-semibold tracking-tight">Payments</h1>
         <p className="text-muted-foreground mt-1 text-sm">
-          Payment ledger across all enrollments.{isMock && " Previewing mock data."}
+          Payment ledger across all enrollments.
         </p>
       </div>
 
@@ -130,7 +128,7 @@ export default function PaymentsPage() {
               {formatNPR(successfulTotal)}
             </p>
           </div>
-          {source === "api" && can("payment.record") && (
+          {can("payment.record") && (
             <Button variant="brand" onClick={() => setPayOpen(true)}>
               <CreditCard /> Record Payment
             </Button>

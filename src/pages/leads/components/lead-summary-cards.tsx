@@ -2,23 +2,6 @@ import { CalendarClock, GraduationCap, Hourglass, Sparkles, TriangleAlert } from
 import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import type { LeadSummary } from "@/services/leads.service";
-import type { LeadListItem } from "@/types/leads";
-import { isDueToday, isOverdue, TODAY } from "@/lib/leads-format";
-
-function countEnrolledInMonth(leads: LeadListItem[], year: number, month: number): number {
-  return leads.filter((l) => {
-    if (l.status !== "enrolled") return false;
-    const d = new Date(l.createdAt);
-    return d.getFullYear() === year && d.getMonth() === month;
-  }).length;
-}
-
-function leadsCreatedInWindow(leads: LeadListItem[], startMs: number, endMs: number): number {
-  return leads.filter((l) => {
-    const t = new Date(l.createdAt).getTime();
-    return t >= startMs && t < endMs;
-  }).length;
-}
 
 interface Counts {
   newLeads: number;
@@ -31,27 +14,7 @@ interface Counts {
   enrolledLastMonth: number;
 }
 
-/** Mock preview: counted from the in-memory leads. */
-function mockCounts(leads: LeadListItem[]): Counts {
-  const now = TODAY.getTime();
-  const week = 7 * 24 * 60 * 60 * 1000;
-  const lastMonth = TODAY.getMonth() === 0 ? 11 : TODAY.getMonth() - 1;
-  const lastMonthYear = TODAY.getMonth() === 0 ? TODAY.getFullYear() - 1 : TODAY.getFullYear();
-  return {
-    newLeads: leads.filter((l) => l.status === "new").length,
-    newThisWeek: leadsCreatedInWindow(leads, now - week, now),
-    newLastWeek: leadsCreatedInWindow(leads, now - 2 * week, now - week),
-    dueToday: leads.filter((l) => isDueToday(l.nextFollowUpAt)).length,
-    hotDue: leads.filter((l) => isDueToday(l.nextFollowUpAt) && l.priority === "hot").length,
-    overdue: leads.filter(
-      (l) => l.nextFollowUpAt && isOverdue(l.nextFollowUpAt) && l.status !== "enrolled",
-    ).length,
-    enrolled: countEnrolledInMonth(leads, TODAY.getFullYear(), TODAY.getMonth()),
-    enrolledLastMonth: countEnrolledInMonth(leads, lastMonthYear, lastMonth),
-  };
-}
-
-/** Live data: the server counts every lead the user can see, not just this page. */
+/** The server counts every lead the user can see, not just this page. */
 function liveCounts(s: LeadSummary): Counts {
   return {
     newLeads: s.new_this_week,
@@ -71,24 +34,19 @@ function change(now: number, before: number, period: string) {
 }
 
 export function LeadSummaryCards({
-  live,
-  leads,
   summary,
   pendingActive,
   onPendingClick,
 }: {
-  live: boolean;
-  /** Mock preview only: the cards are counted from these. */
-  leads: LeadListItem[];
-  /** Live data: the counts from GET /api/leads/summary/; undefined while loading. */
+  /** The counts from GET /api/leads/summary/; undefined while loading. */
   summary?: LeadSummary;
   /** The list below shows only those leads. */
   pendingActive: boolean;
   onPendingClick: () => void;
 }) {
-  // Live counts are unknown until the summary loads: the cards show "—".
-  const counts = live ? (summary ? liveCounts(summary) : null) : mockCounts(leads);
-  const pendingEnrollment = live ? summary?.pending_enrollment : 0;
+  // Counts are unknown until the summary loads: the cards show "—".
+  const counts = summary ? liveCounts(summary) : null;
+  const pendingEnrollment = summary?.pending_enrollment;
   const shown = (pick: (c: Counts) => number) => (counts ? pick(counts) : "—");
   const newLeadsDelta = counts ? change(counts.newThisWeek, counts.newLastWeek, "week") : "";
   const enrolledDelta = counts ? change(counts.enrolled, counts.enrolledLastMonth, "month") : "";

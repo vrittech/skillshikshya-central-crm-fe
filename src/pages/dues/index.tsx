@@ -24,7 +24,6 @@ import {
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/context/auth";
-import { useDataSource } from "@/context/data-source";
 import { useBranches } from "@/hooks/use-branches";
 import { useDueInMonth, useWhoOwes } from "@/hooks/use-reports";
 import { daysText } from "@/lib/due-dates";
@@ -459,11 +458,9 @@ function DueInMonth({ branchId }: { branchId?: number }) {
 /* ------------------------------------------------------------ page */
 
 export default function DuesPage() {
-  const { source } = useDataSource();
-  const isApi = source === "api";
   const { user } = useAuth();
   const isStaff = !!user?.is_staff;
-  const branches = useBranches(1, 100, "", isApi && isStaff);
+  const branches = useBranches(1, 100, "", isStaff);
   const [branch, setBranch] = useState("all");
   const branchId = useMemo(() => (branch === "all" ? undefined : Number(branch)), [branch]);
 
@@ -476,7 +473,7 @@ export default function DuesPage() {
           </p>
           <h1 className="font-headline mt-1 text-3xl font-semibold tracking-tight">Dues</h1>
         </div>
-        {isApi && isStaff && (
+        {isStaff && (
           <Select value={branch} onValueChange={setBranch}>
             <SelectTrigger className="w-44">
               <SelectValue />
@@ -493,24 +490,18 @@ export default function DuesPage() {
         )}
       </div>
 
-      {!isApi ? (
-        <div className="text-muted-foreground rounded-2xl border border-dashed py-16 text-center text-sm">
-          Switch to Live data to see dues.
-        </div>
-      ) : (
-        <Tabs defaultValue="who-owes">
-          <TabsList>
-            <TabsTrigger value="who-owes">Who owes</TabsTrigger>
-            <TabsTrigger value="due-in-month">Due by month</TabsTrigger>
-          </TabsList>
-          <TabsContent value="who-owes" className="mt-4">
-            <WhoOwes branchId={branchId} />
-          </TabsContent>
-          <TabsContent value="due-in-month" className="mt-4">
-            <DueInMonth branchId={branchId} />
-          </TabsContent>
-        </Tabs>
-      )}
+      <Tabs defaultValue="who-owes">
+        <TabsList>
+          <TabsTrigger value="who-owes">Who owes</TabsTrigger>
+          <TabsTrigger value="due-in-month">Due by month</TabsTrigger>
+        </TabsList>
+        <TabsContent value="who-owes" className="mt-4">
+          <WhoOwes branchId={branchId} />
+        </TabsContent>
+        <TabsContent value="due-in-month" className="mt-4">
+          <DueInMonth branchId={branchId} />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

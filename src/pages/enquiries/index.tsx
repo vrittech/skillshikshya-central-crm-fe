@@ -19,7 +19,6 @@ import {
 } from "@/components/ui/table";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/context/auth";
-import { useDataSource } from "@/context/data-source";
 import { useBranches } from "@/hooks/use-branches";
 import { useCourses } from "@/hooks/use-courses";
 import { useEnquiryFunnel } from "@/hooks/use-reports";
@@ -196,11 +195,9 @@ function BreakdownTable({
 }
 
 export default function EnquiriesReportPage() {
-  const { source } = useDataSource();
-  const isApi = source === "api";
   const { user } = useAuth();
   const isStaff = !!user?.is_staff;
-  const branches = useBranches(1, 100, "", isApi && isStaff);
+  const branches = useBranches(1, 100, "", isStaff);
   const courses = useCourses(1, 100, "");
   const [branch, setBranch] = useState("all");
   const [course, setCourse] = useState("all");
@@ -216,7 +213,7 @@ export default function EnquiriesReportPage() {
     }),
     [branch, course, from, to],
   );
-  const { data, isLoading } = useEnquiryFunnel(params, isApi);
+  const { data, isLoading } = useEnquiryFunnel(params);
   const s = data?.summary;
   const current = BREAKDOWNS.find((b) => b.value === breakdown)!;
 
@@ -229,126 +226,116 @@ export default function EnquiriesReportPage() {
           </p>
           <h1 className="font-headline mt-1 text-3xl font-semibold tracking-tight">Enquiries</h1>
         </div>
-        {isApi && (
-          <div className="flex flex-wrap gap-2">
-            <Select value={course} onValueChange={setCourse}>
+        <div className="flex flex-wrap gap-2">
+          <Select value={course} onValueChange={setCourse}>
+            <SelectTrigger className="w-44">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All courses</SelectItem>
+              {courses.data?.results.map((c) => (
+                <SelectItem key={c.id} value={String(c.id)}>
+                  {c.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {isStaff && (
+            <Select value={branch} onValueChange={setBranch}>
               <SelectTrigger className="w-44">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All courses</SelectItem>
-                {courses.data?.results.map((c) => (
-                  <SelectItem key={c.id} value={String(c.id)}>
-                    {c.name}
+                <SelectItem value="all">All branches</SelectItem>
+                {branches.data?.results.map((b) => (
+                  <SelectItem key={b.id} value={String(b.id)}>
+                    {b.name}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
-            {isStaff && (
-              <Select value={branch} onValueChange={setBranch}>
-                <SelectTrigger className="w-44">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All branches</SelectItem>
-                  {branches.data?.results.map((b) => (
-                    <SelectItem key={b.id} value={String(b.id)}>
-                      {b.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-            <Input
-              type="date"
-              className="w-40"
-              value={from}
-              onChange={(e) => setFrom(e.target.value)}
-              title="From"
-            />
-            <Input
-              type="date"
-              className="w-40"
-              value={to}
-              onChange={(e) => setTo(e.target.value)}
-              title="To"
-            />
-          </div>
-        )}
+          )}
+          <Input
+            type="date"
+            className="w-40"
+            value={from}
+            onChange={(e) => setFrom(e.target.value)}
+            title="From"
+          />
+          <Input
+            type="date"
+            className="w-40"
+            value={to}
+            onChange={(e) => setTo(e.target.value)}
+            title="To"
+          />
+        </div>
       </div>
 
-      {!isApi ? (
-        <div className="text-muted-foreground rounded-2xl border border-dashed py-16 text-center text-sm">
-          Switch to Live data to see enquiries.
+      <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
+        <Kpi label="Enquiries" value={s?.enquiries} loading={isLoading} />
+        <Kpi label="Won" value={s?.won} loading={isLoading} />
+        <Kpi label="Lost" value={s?.lost} loading={isLoading} tone={s?.lost ? "text-destructive" : undefined} />
+        <Kpi label="Open" value={s?.open} loading={isLoading} />
+        <Kpi
+          label={`No move ${s?.stale_days ?? 14}+ days`}
+          value={s?.stale}
+          loading={isLoading}
+        />
+        <Kpi label="Win rate" value={s && pct(s.win_rate)} loading={isLoading} />
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-[1.4fr_0.6fr]">
+        <div className="bg-card overflow-hidden rounded-2xl border">
+          <p className="border-b px-6 py-3 text-sm font-semibold">Stages</p>
+          <FunnelTable data={data} loading={isLoading} />
         </div>
-      ) : (
-        <>
-          <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
-            <Kpi label="Enquiries" value={s?.enquiries} loading={isLoading} />
-            <Kpi label="Won" value={s?.won} loading={isLoading} />
-            <Kpi label="Lost" value={s?.lost} loading={isLoading} tone={s?.lost ? "text-destructive" : undefined} />
-            <Kpi label="Open" value={s?.open} loading={isLoading} />
-            <Kpi
-              label={`No move ${s?.stale_days ?? 14}+ days`}
-              value={s?.stale}
-              loading={isLoading}
-            />
-            <Kpi label="Win rate" value={s && pct(s.win_rate)} loading={isLoading} />
-          </div>
-
-          <div className="grid gap-6 lg:grid-cols-[1.4fr_0.6fr]">
-            <div className="bg-card overflow-hidden rounded-2xl border">
-              <p className="border-b px-6 py-3 text-sm font-semibold">Stages</p>
-              <FunnelTable data={data} loading={isLoading} />
-            </div>
-            <div className="bg-card overflow-hidden rounded-2xl border">
-              <p className="border-b px-6 py-3 text-sm font-semibold">Lost reasons</p>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="pl-6">Reason</TableHead>
-                    <TableHead className="text-right">Lost</TableHead>
-                    <TableHead className="pr-6 text-right">Share</TableHead>
+        <div className="bg-card overflow-hidden rounded-2xl border">
+          <p className="border-b px-6 py-3 text-sm font-semibold">Lost reasons</p>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="pl-6">Reason</TableHead>
+                <TableHead className="text-right">Lost</TableHead>
+                <TableHead className="pr-6 text-right">Share</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {isLoading && <Loading cols={3} />}
+              {!isLoading && (data?.lost_by_reason.length ?? 0) === 0 && (
+                <Empty cols={3} text="No lost enquiries." />
+              )}
+              {!isLoading &&
+                data?.lost_by_reason.map((r) => (
+                  <TableRow key={r.reason}>
+                    <TableCell className="pl-6">{r.label}</TableCell>
+                    <TableCell className="text-right tabular-nums">{r.count}</TableCell>
+                    <TableCell className="pr-6 text-right tabular-nums">{pct(r.rate)}</TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {isLoading && <Loading cols={3} />}
-                  {!isLoading && (data?.lost_by_reason.length ?? 0) === 0 && (
-                    <Empty cols={3} text="No lost enquiries." />
-                  )}
-                  {!isLoading &&
-                    data?.lost_by_reason.map((r) => (
-                      <TableRow key={r.reason}>
-                        <TableCell className="pl-6">{r.label}</TableCell>
-                        <TableCell className="text-right tabular-nums">{r.count}</TableCell>
-                        <TableCell className="pr-6 text-right tabular-nums">{pct(r.rate)}</TableCell>
-                      </TableRow>
-                    ))}
-                </TableBody>
-              </Table>
-            </div>
-          </div>
+                ))}
+            </TableBody>
+          </Table>
+        </div>
+      </div>
 
-          <div className="bg-card overflow-hidden rounded-2xl border">
-            <div className="border-b px-4 py-2">
-              <Tabs value={breakdown} onValueChange={(v) => setBreakdown(v as Breakdown)}>
-                <TabsList>
-                  {BREAKDOWNS.map((b) => (
-                    <TabsTrigger key={b.value} value={b.value}>
-                      {b.label}
-                    </TabsTrigger>
-                  ))}
-                </TabsList>
-              </Tabs>
-            </div>
-            <BreakdownTable
-              rows={data?.[breakdown] ?? []}
-              column={current.column}
-              loading={isLoading}
-            />
-          </div>
-        </>
-      )}
+      <div className="bg-card overflow-hidden rounded-2xl border">
+        <div className="border-b px-4 py-2">
+          <Tabs value={breakdown} onValueChange={(v) => setBreakdown(v as Breakdown)}>
+            <TabsList>
+              {BREAKDOWNS.map((b) => (
+                <TabsTrigger key={b.value} value={b.value}>
+                  {b.label}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </Tabs>
+        </div>
+        <BreakdownTable
+          rows={data?.[breakdown] ?? []}
+          column={current.column}
+          loading={isLoading}
+        />
+      </div>
     </div>
   );
 }

@@ -38,7 +38,6 @@ import {
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/context/auth";
-import { useDataSource } from "@/context/data-source";
 import {
   useBatches,
   useCourseBatches,
@@ -58,23 +57,10 @@ const ALL_STATUSES = "all";
 
 export default function BatchesPage({ defaultTab = "course-batches" }: { defaultTab?: "course-batches" | "slots" }) {
   const { hasPerm } = useAuth();
-  const { source } = useDataSource();
-  const isApi = source === "api";
   const navigate = useNavigate();
   const tab = defaultTab;
   const setTab = (next: "course-batches" | "slots") =>
     navigate(next === "slots" ? "/batches/shifts" : "/batches");
-
-  if (!isApi) {
-    return (
-      <div className="space-y-6">
-        <PageHeading />
-        <div className="text-muted-foreground rounded-2xl border border-dashed py-16 text-center text-sm">
-          Switch to Live data to see batches.
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-6">

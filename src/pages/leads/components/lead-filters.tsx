@@ -20,7 +20,6 @@ export interface LeadFilterState {
   /** Enrollment status ("all" = any) — maps to `?enrollment_status=`. */
   enrollment: string;
   overdueOnly: boolean;
-  unassignedOnly: boolean;
   /** Exact created day, `YYYY-MM-DD` ("" = unset) — maps to `?created_date=`. */
   createdDate: string;
   /** Created on or after, `YYYY-MM-DD` ("" = unset) — maps to `?from_date=`. */
@@ -38,7 +37,6 @@ export const DEFAULT_FILTERS: LeadFilterState = {
   priority: "all",
   enrollment: "all",
   overdueOnly: false,
-  unassignedOnly: false,
   createdDate: "",
   dateFrom: "",
   dateTo: "",
@@ -71,8 +69,6 @@ interface Props {
   value: LeadFilterState;
   onChange: (next: LeadFilterState) => void;
   options: LeadFilterOptions;
-  /** API path can't filter unassigned server-side; hide those toggles. */
-  showScopeToggles?: boolean;
 }
 
 /** How many filters (search aside) differ from the defaults. */
@@ -190,7 +186,7 @@ function FilterToggle({
  * Search and the date filters on top, every other filter below. Both rows
  * wrap onto more lines, so nothing scrolls sideways.
  */
-export function LeadFilters({ value, onChange, options, showScopeToggles = true }: Props) {
+export function LeadFilters({ value, onChange, options }: Props) {
   const set = <K extends keyof LeadFilterState>(key: K, v: LeadFilterState[K]) =>
     onChange({ ...value, [key]: v });
   const activeCount = activeFilterCount(value);
@@ -223,17 +219,11 @@ export function LeadFilters({ value, onChange, options, showScopeToggles = true 
           onChange={(v) => set("assignedTo", v)}
           allLabel="All counselors"
           options={options.counselors}
-          extra={showScopeToggles ? [{ value: "unassigned", label: "Unassigned" }] : undefined}
         />
         <FilterSelect label="Priority" value={value.priority} onChange={(v) => set("priority", v)} allLabel="All priorities" options={options.priorities} />
         <FilterToggle active={value.overdueOnly} onClick={() => set("overdueOnly", !value.overdueOnly)}>
           Overdue
         </FilterToggle>
-        {showScopeToggles && (
-          <FilterToggle active={value.unassignedOnly} onClick={() => set("unassignedOnly", !value.unassignedOnly)}>
-            Unassigned
-          </FilterToggle>
-        )}
         {activeCount > 0 && (
           <Button
             variant="ghost"

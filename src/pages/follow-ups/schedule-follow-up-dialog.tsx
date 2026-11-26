@@ -21,7 +21,6 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/context/auth";
-import { useDataSource } from "@/context/data-source";
 import { formatDateToNepalIso, toNepalIso } from "@/lib/leads-format";
 import { useAddFollowup } from "@/hooks/use-leads";
 import { useLeadOptions } from "@/hooks/use-lead-options";
@@ -62,7 +61,6 @@ export function ScheduleFollowUpDialog({
   /** Inline lead picker when opened without a preset lead (global flow). */
   allowLeadPick?: boolean;
 }) {
-  const { isMock } = useDataSource();
   const { user } = useAuth();
   const needsLead = allowLeadPick && leadApiId == null;
   const [pickedLeadId, setPickedLeadId] = useState("");
@@ -72,7 +70,7 @@ export function ScheduleFollowUpDialog({
   const effectiveLeadName =
     leadName ?? leadOptionsQ.options.find((o) => o.value === pickedLeadId)?.label.split(" · ")[0];
   const addFollowup = useAddFollowup(effectiveLeadId);
-  const counselorsQ = useCounselors("", undefined, !isMock);
+  const counselorsQ = useCounselors("", undefined, open);
   const [fu, setFu] = useState<FollowUpForm>(EMPTY_FU);
 
   useEffect(() => {
@@ -85,14 +83,12 @@ export function ScheduleFollowUpDialog({
   const setF = <K extends keyof FollowUpForm>(k: K, v: FollowUpForm[K]) =>
     setFu((f) => ({ ...f, [k]: v }));
 
-  const counselorOptions = isMock
-    ? []
-    : (counselorsQ.data?.results ?? []).map((u) => ({ value: String(u.id), label: u.name }));
+  const counselorOptions = (counselorsQ.data?.results ?? []).map((u) => ({ value: String(u.id), label: u.name }));
   const fuAssigned = fu.assignedTo || (user?.id != null ? String(user.id) : "");
 
   function submit() {
-    if (isMock || effectiveLeadId == null) {
-      toast.info(isMock ? "Switch to Live to schedule follow-ups." : "Pick a lead first.");
+    if (effectiveLeadId == null) {
+      toast.error("Pick a lead first.");
       return;
     }
     if (!fu.scheduledAt) {

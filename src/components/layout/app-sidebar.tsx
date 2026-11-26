@@ -76,8 +76,7 @@ export function AppSidebar({ open, onClose }: { open: boolean; onClose: () => vo
     window.localStorage.setItem(COLLAPSE_KEY, collapsed ? "1" : "0");
   }, [collapsed]);
 
-  // Nav visibility is driven by the previewed mock role (and real staff flag for
-  // the admin section), demonstrating permission-aware navigation before RBAC ships.
+  // Nav items follow the user's permissions; the admin section is staff only.
   const visible = (item: NavItem) => !item.cap || can(item.cap);
   const items = [...navItems, ...(user?.is_staff ? adminItems : [])].filter(visible);
   const showSettings = !!user?.is_staff && visible(settingsItem);
@@ -158,7 +157,7 @@ export function AppSidebar({ open, onClose }: { open: boolean; onClose: () => vo
               Sankhamul, Kathmandu
             </p>
             <p className="text-sidebar-foreground/45 font-mono text-[10px] font-medium tracking-wider">
-              CRM v0.1.0 · Static Preview
+              CRM v0.1.0
             </p>
           </div>
         </div>

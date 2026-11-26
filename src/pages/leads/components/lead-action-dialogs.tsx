@@ -20,8 +20,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/context/auth";
-import { useDataSource } from "@/context/data-source";
-import { CALL_OUTCOMES, COUNSELORS, counselorName } from "@/data/lead-lookups";
+import { CALL_OUTCOMES } from "@/data/lead-lookups";
 import { formatDateToNepalIso, toNepalIso } from "@/lib/leads-format";
 import { useAddCall, useAddFollowup, useAssignLead } from "@/hooks/use-leads";
 import { useCounselors } from "@/hooks/use-users";
@@ -86,12 +85,11 @@ const REMINDER_OFFSETS_MS: Record<FollowUpForm["reminder"], number> = {
  */
 export function LeadActionDialogs({ action, lead, onClose }: Props) {
   const name = lead?.fullName ?? "lead";
-  const { isMock } = useDataSource();
   const { user } = useAuth();
   const addCall = useAddCall(lead?.apiId);
   const addFollowup = useAddFollowup(lead?.apiId);
   const assignLead = useAssignLead();
-  const counselorsQ = useCounselors("", undefined, !isMock);
+  const counselorsQ = useCounselors("", undefined, action != null);
   const [call, setCall] = useState<CallForm>(EMPTY_CALL);
   const [fu, setFu] = useState<FollowUpForm>(EMPTY_FU);
   const [assignTo, setAssignTo] = useState("");
@@ -105,25 +103,13 @@ export function LeadActionDialogs({ action, lead, onClose }: Props) {
   const setF = <K extends keyof FollowUpForm>(k: K, v: FollowUpForm[K]) =>
     setFu((f) => ({ ...f, [k]: v }));
 
-  // Real counselors (Counselor role) on the live path; mock list otherwise.
-  const counselorOptions = isMock
-    ? COUNSELORS.map((c) => ({ value: c.id, label: c.name }))
-    : (counselorsQ.data?.results ?? []).map((u) => ({ value: String(u.id), label: u.name }));
+  // Counselors (Counselor role) the lead can be given to.
+  const counselorOptions = (counselorsQ.data?.results ?? []).map((u) => ({ value: String(u.id), label: u.name }));
   // Default the follow-up owner to the lead's counsellor, else the current user.
   const fuAssigned = fu.assignedTo || lead?.assignedTo || (user?.id != null ? String(user.id) : "");
 
-  function done(message: string) {
-    toast.success(message, { description: "Static prototype — no data was changed." });
-    onClose();
-  }
-
   function submitCall() {
-    // Mock path (or a lead with no backend id) can't persist — keep the toast.
-    if (isMock || lead?.apiId == null) {
-      done("Call logged");
-      setCall(EMPTY_CALL);
-      return;
-    }
+    if (lead?.apiId == null) return;
     addCall.mutate(
       {
         call_timestamp: new Date().toISOString(),
@@ -147,11 +133,7 @@ export function LeadActionDialogs({ action, lead, onClose }: Props) {
   }
 
   function submitFollowUp() {
-    if (isMock || lead?.apiId == null) {
-      done("Follow-up scheduled");
-      setFu(EMPTY_FU);
-      return;
-    }
+    if (lead?.apiId == null) return;
     if (!fu.scheduledAt) {
       toast.error("Pick a date & time for the follow-up.");
       return;
@@ -347,7 +329,7 @@ export function LeadActionDialogs({ action, lead, onClose }: Props) {
             <DialogDescription>
               Currently{" "}
               {lead?.assignedTo
-                ? `assigned to ${lead.assignedToName ?? counselorName(lead.assignedTo)}`
+                ? `assigned to ${lead.assignedToName ?? "Not yet assigned"}`
                 : "in the unassigned pool"}
               .
             </DialogDescription>
@@ -377,10 +359,7 @@ export function LeadActionDialogs({ action, lead, onClose }: Props) {
               variant="brand"
               disabled={assignLead.isPending}
               onClick={() => {
-                if (isMock || lead?.apiId == null) {
-                  done("Lead reassigned");
-                  return;
-                }
+                if (lead?.apiId == null) return;
                 if (!assignTo) {
                   toast.error("Select a counselor.");
                   return;

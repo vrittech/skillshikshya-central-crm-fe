@@ -5,7 +5,6 @@ import { BatchLink } from "@/components/batch-link";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useDataSource } from "@/context/data-source";
 import { useRole } from "@/context/role";
 import { useEnrollmentPage } from "@/hooks/use-leads";
 import { formatDate } from "@/lib/leads-format";
@@ -35,7 +34,6 @@ function SittingIn({ enrollment: e }: { enrollment: ApiEnrollment }) {
 
 export default function EnrollmentDetailPage() {
   const { id } = useParams();
-  const { source } = useDataSource();
   const { can } = useRole();
   const { data, isLoading, isError } = useEnrollmentPage(id ? Number(id) : undefined);
   const [editing, setEditing] = useState(false);
@@ -47,17 +45,6 @@ export default function EnrollmentDetailPage() {
       <ArrowLeft className="size-4" /> Back to enrollments
     </Link>
   );
-
-  if (source !== "api") {
-    return (
-      <div className="space-y-6">
-        {back}
-        <div className="text-muted-foreground rounded-2xl border border-dashed py-16 text-center text-sm">
-          Switch to Live data to see this enrollment.
-        </div>
-      </div>
-    );
-  }
 
   if (isLoading) {
     return (

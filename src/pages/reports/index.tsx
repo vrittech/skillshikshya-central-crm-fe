@@ -1,4 +1,4 @@
-import { Download, Filter } from "lucide-react";
+import { Download } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { DonutChart, FunnelChart, HBarList, MiniBars } from "@/components/charts";
@@ -22,7 +22,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useAuth } from "@/context/auth";
-import { useDataSource } from "@/context/data-source";
 import { useBranches } from "@/hooks/use-branches";
 import {
   useConversionReport,
@@ -33,14 +32,6 @@ import {
   useReportsOverview,
   useRevenueReport,
 } from "@/hooks/use-reports";
-import {
-  counselorLeaderboard,
-  courseDemand,
-  KPIS,
-  leadFunnel,
-  priorityMix,
-  sourceBreakdown,
-} from "@/data/lead-analytics";
 import { formatNPR } from "@/lib/leads-format";
 import type { ReportBaseParams } from "@/types/reports-api";
 
@@ -73,7 +64,7 @@ function Kpi({
   );
 }
 
-function LiveReports() {
+export default function ReportsPage() {
   const { user } = useAuth();
   const isStaff = !!user?.is_staff;
   const branches = useBranches(1, 100, "", isStaff);
@@ -478,141 +469,6 @@ function LiveReports() {
           </Card>
         </>
       )}
-    </div>
-  );
-}
-
-export default function ReportsPage() {
-  const { source } = useDataSource();
-  if (source === "api") return <LiveReports />;
-
-  return <MockReports />;
-}
-
-function MockReports() {
-  const funnel = leadFunnel();
-  const sources = sourceBreakdown();
-  const leaders = counselorLeaderboard();
-  const courses = courseDemand();
-  const priorities = priorityMix();
-
-  return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <p className="text-brand font-mono text-[11px] font-bold tracking-wider uppercase">
-            Modern analytics
-          </p>
-          <h1 className="font-headline mt-1 text-3xl font-semibold tracking-tight">Reports</h1>
-          <p className="text-muted-foreground mt-1 text-sm">
-            Source performance, conversion, course demand, counselor output, and revenue.
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={() => toast.info("Filters — prototype")}>
-            <Filter /> Filters
-          </Button>
-          <Button variant="outline" onClick={() => toast.info("Export — prototype")}>
-            <Download /> Export PDF
-          </Button>
-        </div>
-      </div>
-
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Lead sources</CardTitle>
-            <CardDescription>Share of leads by acquisition channel</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <DonutChart slices={sources} />
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Conversion funnel</CardTitle>
-            <CardDescription>Leads reaching each stage</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <HBarList data={funnel.map((f) => ({ label: f.label, value: f.count }))} />
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid gap-4 lg:grid-cols-3">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Course demand</CardTitle>
-            <CardDescription>Top primary course interests</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <HBarList data={courses} />
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Priority mix</CardTitle>
-            <CardDescription>Hot / Warm / Cool / Cold</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <MiniBars values={priorities.map((p) => p.value)} />
-            <div className="text-muted-foreground mt-2 flex justify-between text-xs">
-              {priorities.map((p) => (
-                <span key={p.label}>{p.label}</span>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Counselor output</CardTitle>
-            <CardDescription>Admissions closed</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <HBarList
-              data={leaders.map((l) => ({ label: l.name.split(" ")[0], value: l.admissions }))}
-            />
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid gap-4 lg:grid-cols-3">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Revenue trend</CardTitle>
-            <CardDescription>Collected fees (last 7 weeks)</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <MiniBars values={[73, 56, 67, 49, 76, 62, 84]} />
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Campaign quality</CardTitle>
-            <CardDescription>Avg. lead score by campaign</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <MiniBars values={[66, 74, 46, 81, 53]} />
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Enrollment</CardTitle>
-            <CardDescription>Batch fill rate</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <MiniBars values={[58, 64, 79, 51, 69]} />
-          </CardContent>
-        </Card>
-      </div>
-
-      <p className="text-muted-foreground text-center text-xs">
-        Static preview — figures derive from the mock lead dataset. Enrolled revenue booked to date:{" "}
-        <span className="text-foreground font-semibold">{formatNPR(KPIS.revenue)}</span>.
-      </p>
     </div>
   );
 }

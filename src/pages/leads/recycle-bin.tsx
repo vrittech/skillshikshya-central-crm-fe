@@ -14,15 +14,12 @@ import {
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { useDataSource } from "@/context/data-source";
 import { useRole } from "@/context/role";
-import { sourceLabel } from "@/data/lead-lookups";
 import { usePurgeLead, useRecycleBin, useRestoreLead } from "@/hooks/use-leads";
 import { formatDate, formatPhone, initialsOf } from "@/lib/leads-format";
 
 export default function RecycleBinPage() {
   const { can } = useRole();
-  const { isMock } = useDataSource();
   const [page, setPage] = useState(1);
   const [pageSize] = useState(25);
   const [purgeId, setPurgeId] = useState<number | null>(null);
@@ -50,7 +47,6 @@ export default function RecycleBinPage() {
         <h1 className="font-headline mt-1 text-3xl font-semibold tracking-tight">Recycle Bin</h1>
         <p className="text-muted-foreground mt-1 text-sm">
           Soft-deleted leads. Restore them to the active list, or permanently delete them.
-          {isMock && " Switch to the live data source to see deleted leads."}
         </p>
       </div>
 
@@ -101,7 +97,7 @@ export default function RecycleBinPage() {
                     <TableCell>
                       <p className="line-clamp-1 max-w-[15rem] text-sm">{lead.primaryCourse ?? "—"}</p>
                     </TableCell>
-                    <TableCell className="text-sm">{lead.sourceName ?? sourceLabel(lead.source)}</TableCell>
+                    <TableCell className="text-sm">{lead.sourceName ?? "—"}</TableCell>
                     <TableCell className="text-muted-foreground text-sm">{formatDate(lead.deletedAt ?? undefined)}</TableCell>
                     <TableCell>
                       <div className="flex items-center justify-end gap-2">

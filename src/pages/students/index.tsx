@@ -13,7 +13,6 @@ import {
 import { ListPager } from "@/components/list-pager";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { useDataSource } from "@/context/data-source";
 import { useStudents } from "@/hooks/use-students";
 import { apiErrorMessage } from "@/lib/api";
 import { formatDate, initialsOf } from "@/lib/leads-format";
@@ -40,8 +39,6 @@ const STATUS_FILTERS: { value: string; label: string }[] = [
 ];
 
 export default function StudentsPage() {
-  const { source } = useDataSource();
-  const isApi = source === "api";
   const [search, setSearch] = useState("");
   const [debounced, setDebounced] = useState("");
   const [status, setStatus] = useState("all");
@@ -67,7 +64,7 @@ export default function StudentsPage() {
   );
 
   const { data, isLoading } = useStudents(params);
-  const rows = isApi ? data?.results ?? [] : [];
+  const rows = data?.results ?? [];
 
   async function handleExport() {
     setExporting(true);
@@ -93,128 +90,119 @@ export default function StudentsPage() {
           <h1 className="font-headline mt-1 text-3xl font-semibold tracking-tight">Students</h1>
           <p className="text-muted-foreground mt-1 text-sm">
             Enrolled students.
-            {!isApi && " Switch the data source to Live to manage students."}
           </p>
         </div>
-        {isApi && (
-          <div className="flex items-center gap-2">
-            <Button variant="outline" onClick={handleExport} disabled={exporting}>
-              <Download /> {exporting ? "Exporting…" : "Export CSV"}
-            </Button>
-            <Button variant="brand" onClick={() => setFormOpen(true)}>
-              <Plus /> New Student
-            </Button>
-          </div>
-        )}
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={handleExport} disabled={exporting}>
+            <Download /> {exporting ? "Exporting…" : "Export CSV"}
+          </Button>
+          <Button variant="brand" onClick={() => setFormOpen(true)}>
+            <Plus /> New Student
+          </Button>
+        </div>
       </div>
 
-      {!isApi ? (
-        <div className="text-muted-foreground rounded-2xl border border-dashed py-16 text-center text-sm">
-          Switch to Live data to see students.
-        </div>
-      ) : (
-        <div className="bg-card overflow-hidden rounded-2xl border shadow-[0_1px_3px_0_rgba(0,0,0,0.05),0_1px_2px_-1px_rgba(0,0,0,0.05)]">
-          <div className="flex flex-wrap items-center gap-2 border-b p-4">
-            <div className="relative min-w-[16rem] flex-1">
-              <Search className="text-muted-foreground absolute top-2.5 left-3 size-4" />
-              <Input
-                placeholder="Search students, ID, phone..."
-                className="rounded-full pl-9"
-                value={search}
-                onChange={(e) => {
-                  setSearch(e.target.value);
-                  setPage(1);
-                }}
-              />
-            </div>
-            <Select
-              value={status}
-              onValueChange={(v) => {
-                setStatus(v);
+      <div className="bg-card overflow-hidden rounded-2xl border shadow-[0_1px_3px_0_rgba(0,0,0,0.05),0_1px_2px_-1px_rgba(0,0,0,0.05)]">
+        <div className="flex flex-wrap items-center gap-2 border-b p-4">
+          <div className="relative min-w-[16rem] flex-1">
+            <Search className="text-muted-foreground absolute top-2.5 left-3 size-4" />
+            <Input
+              placeholder="Search students, ID, phone..."
+              className="rounded-full pl-9"
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value);
                 setPage(1);
               }}
-            >
-              <SelectTrigger className="h-9 min-w-[10rem]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {STATUS_FILTERS.map((s) => (
-                  <SelectItem key={s.value} value={s.value}>
-                    {s.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            />
           </div>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Student</TableHead>
-                <TableHead>Student ID</TableHead>
-                <TableHead>Phone</TableHead>
-                <TableHead>Branch</TableHead>
-                <TableHead>Enrolled</TableHead>
-                <TableHead>Status</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {isLoading &&
-                Array.from({ length: 5 }).map((_, i) => (
-                  <TableRow key={i}>
-                    <TableCell colSpan={6}>
-                      <Skeleton className="h-6 w-full" />
-                    </TableCell>
-                  </TableRow>
-                ))}
-              {!isLoading && rows.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={6} className="py-12 text-center">
-                    <GraduationCap className="text-muted-foreground mx-auto size-6" />
-                    <p className="mt-2 text-sm font-semibold">No students yet</p>
-                  </TableCell>
-                </TableRow>
-              )}
-              {rows.map((s) => (
-                <TableRow key={s.id} className="cursor-pointer" onClick={() => setDetailId(s.id)}>
-                  <TableCell>
-                    <div className="flex items-center gap-3">
-                      <span className="bg-brand-fixed-dim/30 text-brand-container flex size-9 items-center justify-center rounded-full text-xs font-bold">
-                        {initialsOf(s.full_name)}
-                      </span>
-                      <div>
-                        <p className="font-semibold">{s.full_name}</p>
-                        {s.email && <p className="text-muted-foreground text-xs">{s.email}</p>}
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell className="font-mono text-sm">{s.student_id}</TableCell>
-                  <TableCell className="text-muted-foreground text-sm">{s.phone}</TableCell>
-                  <TableCell className="text-sm">{s.branch_name ?? "—"}</TableCell>
-                  <TableCell className="text-muted-foreground text-sm">
-                    {s.enrolled_at ? formatDate(s.enrolled_at) : "—"}
-                  </TableCell>
-                  <TableCell>
-                    <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium capitalize ${STATUS_TONE[s.status]}`}>
-                      {s.status}
-                    </span>
+          <Select
+            value={status}
+            onValueChange={(v) => {
+              setStatus(v);
+              setPage(1);
+            }}
+          >
+            <SelectTrigger className="h-9 min-w-[10rem]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {STATUS_FILTERS.map((s) => (
+                <SelectItem key={s.value} value={s.value}>
+                  {s.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Student</TableHead>
+              <TableHead>Student ID</TableHead>
+              <TableHead>Phone</TableHead>
+              <TableHead>Branch</TableHead>
+              <TableHead>Enrolled</TableHead>
+              <TableHead>Status</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {isLoading &&
+              Array.from({ length: 5 }).map((_, i) => (
+                <TableRow key={i}>
+                  <TableCell colSpan={6}>
+                    <Skeleton className="h-6 w-full" />
                   </TableCell>
                 </TableRow>
               ))}
-            </TableBody>
-          </Table>
-          <ListPager
-            page={page}
-            pageSize={pageSize}
-            count={data?.count ?? 0}
-            noun="students"
-            onPage={setPage}
-            onPageSize={(n) => {
-              setPageSize(n);
-              setPage(1);
-            }}
-          />
-        </div>
-      )}
+            {!isLoading && rows.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={6} className="py-12 text-center">
+                  <GraduationCap className="text-muted-foreground mx-auto size-6" />
+                  <p className="mt-2 text-sm font-semibold">No students yet</p>
+                </TableCell>
+              </TableRow>
+            )}
+            {rows.map((s) => (
+              <TableRow key={s.id} className="cursor-pointer" onClick={() => setDetailId(s.id)}>
+                <TableCell>
+                  <div className="flex items-center gap-3">
+                    <span className="bg-brand-fixed-dim/30 text-brand-container dark:text-brand-fixed flex size-9 items-center justify-center rounded-full text-xs font-bold">
+                      {initialsOf(s.full_name)}
+                    </span>
+                    <div>
+                      <p className="font-semibold">{s.full_name}</p>
+                      {s.email && <p className="text-muted-foreground text-xs">{s.email}</p>}
+                    </div>
+                  </div>
+                </TableCell>
+                <TableCell className="font-mono text-sm">{s.student_id}</TableCell>
+                <TableCell className="text-muted-foreground text-sm">{s.phone}</TableCell>
+                <TableCell className="text-sm">{s.branch_name ?? "—"}</TableCell>
+                <TableCell className="text-muted-foreground text-sm">
+                  {s.enrolled_at ? formatDate(s.enrolled_at) : "—"}
+                </TableCell>
+                <TableCell>
+                  <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium capitalize ${STATUS_TONE[s.status]}`}>
+                    {s.status}
+                  </span>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+        <ListPager
+          page={page}
+          pageSize={pageSize}
+          count={data?.count ?? 0}
+          noun="students"
+          onPage={setPage}
+          onPageSize={(n) => {
+            setPageSize(n);
+            setPage(1);
+          }}
+        />
+      </div>
 
       <StudentFormDialog open={formOpen} onClose={() => setFormOpen(false)} />
 

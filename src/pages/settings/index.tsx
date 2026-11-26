@@ -23,10 +23,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { useDataSource } from "@/context/data-source";
 import { useRole } from "@/context/role";
 import { useAuth } from "@/context/auth";
-import { LEAD_PRIORITIES, LEAD_SOURCES, LEAD_STATUSES } from "@/data/lead-lookups";
 import {
   campaignHooks,
   institutionHooks,
@@ -396,23 +394,20 @@ function RowItem({
 
 export default function SettingsPage() {
   const [section, setSection] = useState<Section>("sources");
-  const { source: dataSource } = useDataSource();
   const { can } = useRole();
-  const isApi = dataSource === "api";
-  const canManage = isApi && can("settings.view");
+  const canManage = can("settings.view");
 
   const [editorOpen, setEditorOpen] = useState(false);
   const [editing, setEditing] = useState<Row | null>(null);
   const [deleting, setDeleting] = useState<Row | null>(null);
 
-  // Live lists (API path only).
-  const sourcesQ = useLeadSources(isApi);
-  const campaignsQ = useCampaigns(isApi);
-  const statusesQ = useLeadStatuses(isApi);
-  const prioritiesQ = useLeadPriorities(isApi);
-  const tagsQ = useLeadTags(isApi);
-  const learningModesQ = useLearningModes(isApi);
-  const institutionsQ = useInstitutions(isApi);
+  const sourcesQ = useLeadSources();
+  const campaignsQ = useCampaigns();
+  const statusesQ = useLeadStatuses();
+  const prioritiesQ = useLeadPriorities();
+  const tagsQ = useLeadTags();
+  const learningModesQ = useLearningModes();
+  const institutionsQ = useInstitutions();
 
   // Call every remove hook unconditionally (rules of hooks), then select one.
   const removeSource = sourceHooks.useRemove();
@@ -456,25 +451,12 @@ export default function SettingsPage() {
     }
   }
 
-  function mockRows(): { name: string; meta?: string }[] {
-    switch (section) {
-      case "sources":
-        return LEAD_SOURCES.map((s) => ({ name: s.label, meta: s.value }));
-      case "statuses":
-        return LEAD_STATUSES.map((s) => ({ name: s.label, meta: `${s.category}${s.isTerminal ? " · terminal" : ""}` }));
-      case "priorities":
-        return LEAD_PRIORITIES.map((p) => ({ name: p.label, meta: p.description }));
-      default:
-        return [];
-    }
-  }
-
   const isIntegrations = section === "integrations";
   // Cloud storage, Email and Organisation have their own panels, not the list + editor.
   const isSystem = section === "storage" || section === "email" || section === "organisation";
   const { user } = useAuth();
   // OrbitChat sync-state is staff-only per the API guide.
-  const canManageIntegrations = isApi && !!user?.is_staff;
+  const canManageIntegrations = !!user?.is_staff;
 
   return (
     <div className="space-y-6">
@@ -487,7 +469,6 @@ export default function SettingsPage() {
           <p className="text-muted-foreground mt-1 text-sm">
             Configure the CRM vocabulary — sources, campaigns, statuses, priorities, tags,
             learning modes, and institutions.
-            {!isApi && " Switch the data source to Live to edit."}
           </p>
         </div>
       </div>
@@ -525,7 +506,7 @@ export default function SettingsPage() {
           ) : (
             <Card>
               <CardContent className="text-muted-foreground py-10 text-center text-sm">
-                {isApi ? "Only administrators can manage this." : "Switch the data source to Live to edit."}
+                Only administrators can manage this.
               </CardContent>
             </Card>
           )
@@ -569,8 +550,7 @@ export default function SettingsPage() {
               )}
             </CardHeader>
             <CardContent className="space-y-2">
-              {isApi ? (
-                liveRows().length > 0 ? (
+              {liveRows().length > 0 ? (
                   liveRows().map((r) => (
                     <RowItem
                       key={r.id}
@@ -588,12 +568,7 @@ export default function SettingsPage() {
                   <p className="text-muted-foreground py-8 text-center text-sm">
                     No {heading.toLowerCase()} yet.
                   </p>
-                )
-              ) : (
-                mockRows().map((r, i) => (
-                  <RowItem key={i} row={{ id: i, name: r.name, is_active: true }} meta={r.meta} canManage={false} />
-                ))
-              )}
+                )}
             </CardContent>
           </Card>
         )}

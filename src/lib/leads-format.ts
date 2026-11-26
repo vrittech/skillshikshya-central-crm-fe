@@ -24,7 +24,7 @@ export function toNepalIso(local: string): string {
   return formatDateToNepalIso(d);
 }
 
-/** "Today" for the running app. The mock dataset will shift relative to the real date. */
+/** "Today" when the app loaded. */
 export const TODAY = new Date();
 
 export function formatNPR(amount: number | null | undefined): string {
