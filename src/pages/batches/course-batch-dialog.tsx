@@ -21,10 +21,19 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { useAuth } from "@/context/auth";
 import { useBranchScope } from "@/context/branch-scope";
-import { useBatches, useCreateCourseBatch, useUpdateCourseBatch } from "@/hooks/use-batches";
+import {
+  useBatches,
+  useCreateCourseBatch,
+  useUpdateCourseBatch,
+} from "@/hooks/use-batches";
 import { useBranches } from "@/hooks/use-branches";
 import { useCourses } from "@/hooks/use-courses";
-import type { CourseBatch, CourseBatchMode, CourseBatchPayload, CourseBatchStatus } from "@/types";
+import type {
+  CourseBatch,
+  CourseBatchMode,
+  CourseBatchPayload,
+  CourseBatchStatus,
+} from "@/types";
 import { slotTimes } from "@/lib/time-slots";
 import { BatchDialog } from "./batch-dialog";
 
@@ -103,12 +112,14 @@ export function CourseBatchDialog({
             batch: courseBatch.batch == null ? "" : String(courseBatch.batch),
             start_date: courseBatch.start_date ?? "",
             end_date: courseBatch.end_date ?? "",
-            capacity: courseBatch.capacity == null ? "" : String(courseBatch.capacity),
+            capacity:
+              courseBatch.capacity == null ? "" : String(courseBatch.capacity),
             mode: courseBatch.mode,
             status: courseBatch.status,
             trainer: courseBatch.trainer ?? "",
             is_active: courseBatch.is_active,
-            branch: courseBatch.branch == null ? "" : String(courseBatch.branch),
+            branch:
+              courseBatch.branch == null ? "" : String(courseBatch.branch),
           }
         : { ...EMPTY, branch: scoped != null ? String(scoped) : "" },
     );
@@ -135,7 +146,10 @@ export function CourseBatchDialog({
       ...(isStaff && form.branch ? { branch: Number(form.branch) } : {}),
     };
     if (courseBatch) {
-      update.mutate({ id: courseBatch.id, payload }, { onSuccess: () => onClose() });
+      update.mutate(
+        { id: courseBatch.id, payload },
+        { onSuccess: () => onClose() },
+      );
     } else {
       create.mutate(payload, { onSuccess: () => onClose() });
     }
@@ -145,9 +159,12 @@ export function CourseBatchDialog({
     !!form.start_date && !!form.end_date && form.end_date < form.start_date;
   const seats = Number(form.capacity);
   const seatsTaken = courseBatch?.seats_taken ?? 0;
-  const seatsNotWhole = form.capacity !== "" && !(Number.isInteger(seats) && seats >= 1);
-  const seatsBelowTaken = !seatsNotWhole && form.capacity !== "" && seats < seatsTaken;
-  const missing = !form.name.trim() || !form.course || !form.batch || form.capacity === "";
+  const seatsNotWhole =
+    form.capacity !== "" && !(Number.isInteger(seats) && seats >= 1);
+  const seatsBelowTaken =
+    !seatsNotWhole && form.capacity !== "" && seats < seatsTaken;
+  const missing =
+    !form.name.trim() || !form.course || !form.batch || form.capacity === "";
 
   const errors = {
     name: tried && !form.name.trim() ? "Enter a name." : null,
@@ -161,24 +178,30 @@ export function CourseBatchDialog({
           : seatsBelowTaken
             ? `${seatsTaken} students sit in this batch now, so it needs at least ${seatsTaken} seats.`
             : null,
-    dates: dateRangeInvalid ? "End date cannot be before the start date." : null,
+    dates: dateRangeInvalid
+      ? "End date cannot be before the start date."
+      : null,
   };
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>{courseBatch ? `Edit ${courseBatch.name}` : "New batch"}</DialogTitle>
+          <DialogTitle>
+            {courseBatch ? `Edit ${courseBatch.name}` : "New batch"}
+          </DialogTitle>
         </DialogHeader>
         <form onSubmit={submit} noValidate className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="grid gap-2 sm:col-span-2">
-              <Label htmlFor="cohort-name" required>Name</Label>
+              <Label htmlFor="cohort-name" required>
+                Name
+              </Label>
               <Input
                 id="cohort-name"
                 required
                 aria-invalid={!!errors.name}
-                placeholder="Python Bootcamp"
+                placeholder="Batch Name"
                 value={form.name}
                 onChange={(e) => set("name", e.target.value)}
               />
@@ -220,7 +243,10 @@ export function CourseBatchDialog({
                 )}
               </div>
               <Select value={form.batch} onValueChange={(v) => set("batch", v)}>
-                <SelectTrigger aria-invalid={!!errors.batch} className="min-w-0 [&>span]:text-ellipsis">
+                <SelectTrigger
+                  aria-invalid={!!errors.batch}
+                  className="min-w-0 [&>span]:text-ellipsis"
+                >
                   <SelectValue placeholder="Select shift" />
                 </SelectTrigger>
                 <SelectContent>
@@ -268,7 +294,9 @@ export function CourseBatchDialog({
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="cohort-capacity" required>Seats</Label>
+              <Label htmlFor="cohort-capacity" required>
+                Seats
+              </Label>
               <Input
                 id="cohort-capacity"
                 type="number"
@@ -295,7 +323,10 @@ export function CourseBatchDialog({
 
             <div className="grid gap-2">
               <Label>Mode</Label>
-              <Select value={form.mode} onValueChange={(v) => set("mode", v as CourseBatchMode)}>
+              <Select
+                value={form.mode}
+                onValueChange={(v) => set("mode", v as CourseBatchMode)}
+              >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -319,7 +350,9 @@ export function CourseBatchDialog({
                 <SelectContent>
                   <SelectItem value="upcoming">Upcoming</SelectItem>
                   <SelectItem value="running">Running</SelectItem>
-                  {form.status === "closed" && <SelectItem value="closed">Closed</SelectItem>}
+                  {form.status === "closed" && (
+                    <SelectItem value="closed">Closed</SelectItem>
+                  )}
                 </SelectContent>
               </Select>
             </div>
@@ -327,7 +360,10 @@ export function CourseBatchDialog({
             {isStaff && (
               <div className="grid gap-2 sm:col-span-2">
                 <Label>Branch</Label>
-                <Select value={form.branch || undefined} onValueChange={(v) => set("branch", v)}>
+                <Select
+                  value={form.branch || undefined}
+                  onValueChange={(v) => set("branch", v)}
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="Select branch" />
                   </SelectTrigger>
@@ -359,7 +395,11 @@ export function CourseBatchDialog({
               Cancel
             </Button>
             <Button type="submit" variant="brand" disabled={saving}>
-              {saving ? "Saving…" : courseBatch ? "Save changes" : "Create batch"}
+              {saving
+                ? "Saving…"
+                : courseBatch
+                  ? "Save changes"
+                  : "Create batch"}
             </Button>
           </DialogFooter>
         </form>
