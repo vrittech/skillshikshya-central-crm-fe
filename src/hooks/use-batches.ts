@@ -230,6 +230,8 @@ export function useMarkBatchAttendance() {
     onSuccess: (register) => {
       toast.success("Attendance saved");
       qc.setQueryData(["course-batches", "attendance", register.batch, register.date], register);
+      // The panel opens on today under a null date key; refresh every day of this batch.
+      void qc.invalidateQueries({ queryKey: ["course-batches", "attendance", register.batch] });
       void qc.invalidateQueries({ queryKey: ["course-batches", "close-check", register.batch] });
       void qc.invalidateQueries({ queryKey: ["student"] });
     },
