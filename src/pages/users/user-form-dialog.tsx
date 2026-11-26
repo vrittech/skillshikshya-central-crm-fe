@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Combobox } from "@/components/ui/combobox";
@@ -128,6 +129,9 @@ export function UserFormDialog({
   const isEdit = user != null;
   const { user: currentUser } = useAuth();
   const isStaff = !!currentUser?.is_staff;
+  // Everyone but staff works inside one branch. A staff user adding someone
+  // must pick it; others' new users join their own branch.
+  const needsBranch = isStaff && !(user?.is_staff || user?.is_superuser);
   const [form, setForm] = useState<FormState>(emptyForm);
   const [branchSearch, setBranchSearch] = useState("");
   const [branchLabel, setBranchLabel] = useState("");
@@ -183,6 +187,10 @@ export function UserFormDialog({
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
+    if (needsBranch && !form.branch) {
+      toast.error("Pick a branch.");
+      return;
+    }
     if (isEdit) {
       // Only staff manage groups/active status. For a non-staff self-edit the role
       // select is hidden, so sending groups here would wipe existing membership.
@@ -212,17 +220,11 @@ export function UserFormDialog({
         email: form.email,
         password: form.password,
         ...buildCommon(),
+        ...(isStaff
+          ? { branch: form.branch ? Number(form.branch) : null, groups: form.group ? [Number(form.group)] : [] }
+          : {}),
       };
-      register.mutate(payload, {
-        onSuccess: (data) => {
-          // groups and branch can't be set at registration — patch right after if chosen
-          const post: Record<string, unknown> = {};
-          if (form.group) post.groups = [Number(form.group)];
-          if (form.branch) post.branch = Number(form.branch);
-          if (Object.keys(post).length) update.mutate({ id: data.user.id, payload: post });
-          onOpenChange(false);
-        },
-      });
+      register.mutate(payload, { onSuccess: () => onOpenChange(false) });
     }
   }
 
@@ -231,11 +233,7 @@ export function UserFormDialog({
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>{isEdit ? `Edit ${user.name}` : "Register new user"}</DialogTitle>
-          <DialogDescription>
-            {isEdit
-              ? "Update profile, role, targets, and schedule."
-              : "Creates the account via /auth/register — name, email, and password are required."}
-          </DialogDescription>
+          <DialogDescription className="sr-only">User details</DialogDescription>
         </DialogHeader>
         <form onSubmit={submit} className="space-y-5">
           <div className="grid gap-4 sm:grid-cols-2">
@@ -311,12 +309,12 @@ export function UserFormDialog({
             )}
             {isStaff && (
               <div className="space-y-2">
-                <Label>Branch</Label>
+                <Label required={needsBranch}>Branch</Label>
                 <Combobox
                   value={form.branch}
                   onChange={onPickBranch}
                   options={branchOptions}
-                  placeholder="Unassigned"
+                  placeholder={needsBranch ? "Select branch" : "No branch"}
                   searchPlaceholder="Search branches…"
                   emptyText="No branches found."
                   onSearchChange={setBranchSearch}

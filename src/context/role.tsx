@@ -28,7 +28,8 @@ export type Capability =
   | "users.manage"
   | "minutes.top_up"
   | "settings.view"
-  | "recycle_bin.view";
+  | "recycle_bin.view"
+  | "students.move_branch";
 
 /**
  * The server permission each capability follows. "staff" means staff
@@ -56,6 +57,7 @@ const LIVE_PERMS: Record<Capability, string | string[]> = {
   "minutes.top_up": "staff",
   "settings.view": "staff",
   "recycle_bin.view": "lead.delete_lead",
+  "students.move_branch": "student.move_branch",
 };
 
 interface RoleState {

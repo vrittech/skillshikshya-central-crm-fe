@@ -19,6 +19,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { useAuth } from "@/context/auth";
 import { useBranches } from "@/hooks/use-branches";
 import { useCreateStudent } from "@/hooks/use-students";
 import type { ApiGender, ApiStudentPayload, ApiStudentStatus } from "@/types/leads-api";
@@ -42,7 +43,10 @@ const GENDERS: { value: ApiGender; label: string }[] = [
  * only when one of their enrollments is confirmed (Confirm on the enrollment card).
  */
 export function StudentFormDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const branchesQ = useBranches(1, 100, "", open);
+  const { user } = useAuth();
+  // Branch users' students always join their own branch; staff pick one.
+  const pickBranch = !!user?.is_staff;
+  const branchesQ = useBranches(1, 100, "", open && pickBranch);
   const branches = useMemo(() => branchesQ.data?.results ?? [], [branchesQ.data]);
   const create = useCreateStudent();
 
@@ -71,6 +75,10 @@ export function StudentFormDialog({ open, onClose }: { open: boolean; onClose: (
   function submit() {
     if (!form.full_name?.trim() || !form.phone?.trim()) {
       toast.error("Full name and phone are required.");
+      return;
+    }
+    if (pickBranch && form.branch == null) {
+      toast.error("Pick a branch.");
       return;
     }
     create.mutate(form, { onSuccess: () => onClose() });
@@ -111,8 +119,9 @@ export function StudentFormDialog({ open, onClose }: { open: boolean; onClose: (
               </SelectContent>
             </Select>
           </div>
+          {pickBranch && (
           <div className="grid gap-2">
-            <Label>Branch</Label>
+            <Label required>Branch</Label>
             <Select
               value={form.branch != null ? String(form.branch) : undefined}
               onValueChange={(v) => set("branch", Number(v))}
@@ -121,14 +130,17 @@ export function StudentFormDialog({ open, onClose }: { open: boolean; onClose: (
                 <SelectValue placeholder="Select branch" />
               </SelectTrigger>
               <SelectContent>
-                {branches.map((b) => (
-                  <SelectItem key={b.id} value={String(b.id)}>
-                    {b.name}
-                  </SelectItem>
-                ))}
+                {branches
+                  .filter((b) => b.is_active)
+                  .map((b) => (
+                    <SelectItem key={b.id} value={String(b.id)}>
+                      {b.name}
+                    </SelectItem>
+                  ))}
               </SelectContent>
             </Select>
           </div>
+          )}
           <div className="grid gap-2">
             <Label>Status</Label>
             <Select value={form.status ?? "active"} onValueChange={(v) => set("status", v as ApiStudentStatus)}>

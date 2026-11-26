@@ -551,7 +551,8 @@ export type ApiHistoryAction =
   | "resume_licence"
   | "complete"
   | "undo_complete"
-  | "change_status";
+  | "change_status"
+  | "move_branch";
 
 /** One row of an enrollment's reason trail — GET .../enrollments/{id}/history/. */
 export interface ApiEnrollmentHistory {
@@ -724,6 +725,19 @@ export interface ApiStudentRecentPayment {
   /** Course display name, not an id. */
   course: string | null;
   transaction_reference: string | null;
+}
+
+/** One move of a student to another branch — GET /students/{id}/branch-moves/. */
+export interface ApiBranchMove {
+  id: number;
+  from_branch: number | null;
+  from_branch_name: string | null;
+  to_branch: number;
+  to_branch_name: string;
+  reason: string;
+  moved_by: number;
+  moved_by_name: string;
+  moved_at: string;
 }
 
 export interface ApiStudent {

@@ -1,6 +1,7 @@
 import { api } from "@/lib/api";
 import type { Paginated } from "@/types";
 import type {
+  ApiBranchMove,
   ApiAttendance,
   ApiAttendancePayload,
   ApiAttendanceProfile,
@@ -49,6 +50,15 @@ export const studentsService = {
   },
   async remove(id: number) {
     await api.delete(`/students/${id}/`);
+  },
+  /** Moves the student and their open enrollments to another branch. */
+  async moveBranch(id: number, payload: { branch: number; reason: string }) {
+    const { data } = await api.post<ApiStudent>(`/students/${id}/move-branch/`, payload);
+    return data;
+  },
+  async branchMoves(id: number) {
+    const { data } = await api.get<ApiBranchMove[]>(`/students/${id}/branch-moves/`);
+    return data;
   },
 
   /** Downloads the filtered student list as students.csv (same query params as list). */

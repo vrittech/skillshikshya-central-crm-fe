@@ -83,13 +83,14 @@ export function SeatDialog({
   const [batch, setBatch] = useState("");
   const [day, setDay] = useState(localToday());
   const seat = useSeatAction(leadId);
-  // Only upcoming and running batches of this course take students.
+  // Only upcoming and running batches of this course, at the enrollment's branch, take students.
   const batchesQ = useCourseBatches(
     {
       course: enrollment.course,
       status: ["upcoming", "running"],
       is_active: true,
       page_size: 100,
+      branch_id: enrollment.branch ?? undefined,
     },
     open && needsBatch,
   );

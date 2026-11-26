@@ -105,8 +105,15 @@ export function EnrollmentDialog({
   const coursesQ = useCourses(1, 100, "");
   const courses = useMemo(() => coursesQ.data?.results ?? [], [coursesQ.data]);
   // Closed batches take no one new, so they are not offered.
+  // An enrollment can only plan a batch of its own branch.
   const batchesQ = useCourseBatches(
-    { course: f.course, page_size: 100, is_active: true, status: ["upcoming", "running"] },
+    {
+      course: f.course,
+      page_size: 100,
+      is_active: true,
+      status: ["upcoming", "running"],
+      branch_id: enrollment?.branch ?? undefined,
+    },
     !!f.course,
   );
   const batches = useMemo(() => batchesQ.data?.results ?? [], [batchesQ.data]);

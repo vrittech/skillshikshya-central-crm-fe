@@ -1,4 +1,4 @@
-import { CalendarCheck, ExternalLink, FileText, History, Send, Trash2 } from "lucide-react";
+import { ArrowRightLeft, CalendarCheck, ExternalLink, FileText, History, Send, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
@@ -23,6 +23,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/context/auth";
+import { useRole } from "@/context/role";
 import { useCourses } from "@/hooks/use-courses";
 import { useTeamsLicences } from "@/hooks/use-teams";
 import { openInvoicePdf, useResendInvoice, useStudentInvoices } from "@/hooks/use-invoices";
@@ -32,6 +33,7 @@ import {
   useMarkAttendance,
   useStudent,
   useStudentAttendance,
+  useStudentBranchMoves,
   useStudentDocuments,
 } from "@/hooks/use-students";
 import { formatDate, formatDateTime, formatNPR } from "@/lib/leads-format";
@@ -39,6 +41,7 @@ import { localToday } from "@/lib/seats";
 import { cn } from "@/lib/utils";
 import type { ApiAttendanceStatus, ApiStudentStatus } from "@/types/leads-api";
 import { TeamsStateBadge } from "../leads/components/teams-licence";
+import { MoveBranchDialog } from "./move-branch-dialog";
 
 const STATUS_TONE: Record<ApiStudentStatus, string> = {
   active: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
@@ -363,6 +366,29 @@ function DocumentsTab({ studentId }: { studentId: number }) {
   );
 }
 
+function BranchMoves({ studentId }: { studentId: number }) {
+  const { data: moves } = useStudentBranchMoves(studentId);
+  if (!moves?.length) return null;
+  return (
+    <div>
+      <p className="mb-1 text-sm font-semibold">Branch moves</p>
+      <ul className="divide-border divide-y">
+        {moves.map((m) => (
+          <li key={m.id} className="py-2.5">
+            <p className="text-sm font-medium">
+              {m.from_branch_name ?? "No branch"} → {m.to_branch_name}
+            </p>
+            <p className="text-muted-foreground text-xs">
+              {formatDateTime(m.moved_at)} · {m.moved_by_name}
+            </p>
+            <p className="mt-0.5 text-sm [overflow-wrap:anywhere]">{m.reason}</p>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 /* ------------------------------------------------------------------ sheet */
 
 /** Student detail — profile, payment summary, invoices, attendance, documents. */
@@ -374,6 +400,9 @@ export function StudentDetailSheet({
   onClose: () => void;
 }) {
   const { data: student, isLoading } = useStudent(studentId);
+  const { user } = useAuth();
+  const { can } = useRole();
+  const [moving, setMoving] = useState(false);
 
   return (
     <Sheet open={studentId != null} onOpenChange={(o) => !o && onClose()}>
@@ -393,13 +422,27 @@ export function StudentDetailSheet({
                 <span className="font-mono">{student.student_id}</span> · {student.phone}
                 {student.branch_name ? ` · ${student.branch_name}` : ""}
               </SheetDescription>
-              {student.lead != null && (
-                <Button size="sm" variant="outline" className="w-fit" asChild>
-                  <Link to={`/leads/${student.lead}?tab=history`}>
-                    <History /> Full history
-                  </Link>
-                </Button>
-              )}
+              <div className="flex flex-wrap gap-2">
+                {student.lead != null && (
+                  <Button size="sm" variant="outline" className="w-fit" asChild>
+                    <Link to={`/leads/${student.lead}?tab=history`}>
+                      <History /> Full history
+                    </Link>
+                  </Button>
+                )}
+                {can("students.move_branch") && (
+                  <Button size="sm" variant="outline" className="w-fit" onClick={() => setMoving(true)}>
+                    <ArrowRightLeft /> Move branch
+                  </Button>
+                )}
+              </div>
+              <MoveBranchDialog
+                student={student}
+                open={moving}
+                onOpenChange={setMoving}
+                // A branch user can't see a student once they leave the branch.
+                onMoved={() => !user?.is_staff && onClose()}
+              />
             </>
           )}
         </SheetHeader>
@@ -458,6 +501,8 @@ export function StudentDetailSheet({
                 )}
 
                 <TeamsAccounts studentId={student.id} />
+
+                <BranchMoves studentId={student.id} />
 
                 <div>
                   <p className="mb-1 text-sm font-semibold">Recent payments</p>
