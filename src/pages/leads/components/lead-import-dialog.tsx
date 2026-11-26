@@ -21,6 +21,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useAuth } from "@/context/auth";
+import { useBranchScope } from "@/context/branch-scope";
 import { useBranches } from "@/hooks/use-branches";
 import { useImportLeads, useLeadImportPreview } from "@/hooks/use-leads";
 import { useCounselors } from "@/hooks/use-users";
@@ -180,6 +181,7 @@ export function LeadImportDialog({
 }) {
   const { user } = useAuth();
   const walled = !!user && !user.is_staff && !user.is_superuser && user.branch != null;
+  const scoped = useBranchScope().branchId;
   const [step, setStep] = useState<Step>("file");
   const [file, setFile] = useState<File | null>(null);
   const [dragging, setDragging] = useState(false);
@@ -207,13 +209,14 @@ export function LeadImportDialog({
     if (!open) return;
     setStep("file");
     setFile(null);
-    setDefaults(EMPTY);
+    // An admin looking at one branch imports into it.
+    setDefaults(scoped != null ? { ...EMPTY, branch: String(scoped) } : EMPTY);
     setFileError(null);
     setPreview(null);
     setResult(null);
     setFilter("all");
     setIncludeDuplicates(false);
-  }, [open]);
+  }, [open, scoped]);
 
   const setDefault = (key: DefaultKey) => (v: string) =>
     setDefaults((d) => ({ ...d, [key]: v, ...(key === "branch" ? { counselor: NONE } : {}) }));

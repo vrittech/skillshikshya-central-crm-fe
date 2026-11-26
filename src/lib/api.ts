@@ -1,4 +1,5 @@
 import axios, { AxiosError, type AxiosRequestConfig } from "axios";
+import { withScopedBranch } from "@/lib/branch-scope";
 
 // Auth uses httpOnly cookies set by the backend; the browser attaches them
 // automatically. In dev, Vite proxies /api to the Django server; in Docker,
@@ -8,6 +9,9 @@ export const api = axios.create({
   withCredentials: true,
   headers: { "Content-Type": "application/json" },
 });
+
+// An admin's branch pick narrows every list and report (see branch-scope.ts).
+api.interceptors.request.use(withScopedBranch);
 
 let refreshPromise: Promise<void> | null = null;
 

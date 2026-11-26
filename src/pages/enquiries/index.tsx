@@ -18,8 +18,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useAuth } from "@/context/auth";
-import { useBranches } from "@/hooks/use-branches";
+import { useBranchScope } from "@/context/branch-scope";
 import { useCourses } from "@/hooks/use-courses";
 import { useEnquiryFunnel } from "@/hooks/use-reports";
 import { STAGE_CLASS } from "@/lib/enquiries";
@@ -195,23 +194,20 @@ function BreakdownTable({
 }
 
 export default function EnquiriesReportPage() {
-  const { user } = useAuth();
-  const isStaff = !!user?.is_staff;
-  const branches = useBranches(1, 100, "", isStaff);
   const courses = useCourses(1, 100, "");
-  const [branch, setBranch] = useState("all");
+  const branchId = useBranchScope().branchId ?? undefined;
   const [course, setCourse] = useState("all");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [breakdown, setBreakdown] = useState<Breakdown>("by_course");
   const params = useMemo(
     () => ({
-      branch_id: branch === "all" ? undefined : Number(branch),
+      branch_id: branchId,
       course: course === "all" ? undefined : Number(course),
       start_date: from || undefined,
       end_date: to || undefined,
     }),
-    [branch, course, from, to],
+    [branchId, course, from, to],
   );
   const { data, isLoading } = useEnquiryFunnel(params);
   const s = data?.summary;
@@ -240,21 +236,6 @@ export default function EnquiriesReportPage() {
               ))}
             </SelectContent>
           </Select>
-          {isStaff && (
-            <Select value={branch} onValueChange={setBranch}>
-              <SelectTrigger className="w-44">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All branches</SelectItem>
-                {branches.data?.results.map((b) => (
-                  <SelectItem key={b.id} value={String(b.id)}>
-                    {b.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
           <Input
             type="date"
             className="w-40"

@@ -5,13 +5,6 @@ import { MeterList, type MeterRow } from "@/components/charts";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
@@ -21,8 +14,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { useAuth } from "@/context/auth";
-import { useBranches } from "@/hooks/use-branches";
+import { useBranchScope } from "@/context/branch-scope";
 import {
   useConversionReport,
   useCounselorPerformance,
@@ -84,19 +76,16 @@ function Kpi({
 }
 
 export default function ReportsPage() {
-  const { user } = useAuth();
-  const isStaff = !!user?.is_staff;
-  const branches = useBranches(1, 100, "", isStaff);
 
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
-  const [branchId, setBranchId] = useState("all");
+  const branchId = useBranchScope().branchId ?? undefined;
 
   const params = useMemo<ReportBaseParams>(
     () => ({
       start_date: startDate || undefined,
       end_date: endDate || undefined,
-      branch_id: branchId === "all" ? undefined : Number(branchId),
+      branch_id: branchId,
     }),
     [startDate, endDate, branchId],
   );
@@ -172,21 +161,6 @@ export default function ReportsPage() {
             onChange={(e) => setEndDate(e.target.value)}
             aria-label="End date"
           />
-          {isStaff && (
-            <Select value={branchId} onValueChange={setBranchId}>
-              <SelectTrigger className="w-44">
-                <SelectValue placeholder="All branches" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All branches</SelectItem>
-                {branches.data?.results.map((b) => (
-                  <SelectItem key={b.id} value={String(b.id)}>
-                    {b.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
           <Button variant="outline" onClick={() => toast.info("PDF export — coming soon")}>
             <Download /> Export PDF
           </Button>

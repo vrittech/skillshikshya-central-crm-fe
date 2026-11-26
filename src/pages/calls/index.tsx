@@ -28,9 +28,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { useAuth } from "@/context/auth";
+import { useBranchScope } from "@/context/branch-scope";
 import { CALL_OUTCOMES, CALL_OUTCOME_TONE } from "@/data/lead-lookups";
-import { useBranches } from "@/hooks/use-branches";
 import { useCalls, useCallsSummary } from "@/hooks/use-calls";
 import { useUsers } from "@/hooks/use-users";
 import { formatDateTime, formatDuration, formatPhone } from "@/lib/leads-format";
@@ -212,9 +211,7 @@ function Pager({
 }
 
 export default function CallsPage() {
-  const { user } = useAuth();
-  const isStaff = !!user?.is_staff;
-  const branches = useBranches(1, 100, "", isStaff);
+  const branchId = useBranchScope().branchId ?? undefined;
   const users = useUsers(1, 100);
 
   const [search, setSearch] = useState("");
@@ -224,7 +221,6 @@ export default function CallsPage() {
   const [direction, setDirection] = useState("all");
   const [outcome, setOutcome] = useState("all");
   const [by, setBy] = useState("all");
-  const [branch, setBranch] = useState("all");
   const [page, setPage] = useState(1);
 
   useEffect(() => {
@@ -240,9 +236,9 @@ export default function CallsPage() {
       direction: direction === "all" ? undefined : (direction as CallsFilters["direction"]),
       outcome: outcome === "all" ? undefined : outcome,
       created_by: by === "all" ? undefined : Number(by),
-      branch_id: branch === "all" ? undefined : Number(branch),
+      branch_id: branchId,
     }),
-    [debounced, from, to, direction, outcome, by, branch],
+    [debounced, from, to, direction, outcome, by, branchId],
   );
 
   // Any filter change goes back to the first page.
@@ -263,21 +259,6 @@ export default function CallsPage() {
           </p>
           <h1 className="font-headline mt-1 text-3xl font-semibold tracking-tight">Calls</h1>
         </div>
-        {isStaff && (
-          <Select value={branch} onValueChange={setBranch}>
-            <SelectTrigger className="w-44">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All branches</SelectItem>
-              {branches.data?.results.map((b) => (
-                <SelectItem key={b.id} value={String(b.id)}>
-                  {b.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        )}
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">

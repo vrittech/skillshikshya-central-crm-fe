@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { useAuth } from "@/context/auth";
+import { useBranchScope } from "@/context/branch-scope";
 import { useBatches, useCreateCourseBatch, useUpdateCourseBatch } from "@/hooks/use-batches";
 import { useBranches } from "@/hooks/use-branches";
 import { useCourses } from "@/hooks/use-courses";
@@ -76,9 +77,15 @@ export function CourseBatchDialog({
   const { user, hasPerm } = useAuth();
   const isStaff = !!user?.is_staff;
   const canAddSlot = hasPerm("course.add_batch");
+  const scoped = useBranchScope().branchId;
   const branchesQ = useBranches(1, 100, "", open && isStaff);
   const coursesQ = useCourses(1, 50, courseSearch);
-  const batchesQ = useBatches({ page_size: 100, is_active: true });
+  // Shifts of the batch's branch, and the shared ones.
+  const batchesQ = useBatches({
+    page_size: 100,
+    is_active: true,
+    branch_id: form.branch ? Number(form.branch) : undefined,
+  });
   const slots = batchesQ.data?.results ?? [];
   const create = useCreateCourseBatch();
   const update = useUpdateCourseBatch();
@@ -103,9 +110,9 @@ export function CourseBatchDialog({
             is_active: courseBatch.is_active,
             branch: courseBatch.branch == null ? "" : String(courseBatch.branch),
           }
-        : EMPTY,
+        : { ...EMPTY, branch: scoped != null ? String(scoped) : "" },
     );
-  }, [open, courseBatch]);
+  }, [open, courseBatch, scoped]);
 
   const set = <K extends keyof FormState>(k: K, v: FormState[K]) =>
     setForm((f) => ({ ...f, [k]: v }));

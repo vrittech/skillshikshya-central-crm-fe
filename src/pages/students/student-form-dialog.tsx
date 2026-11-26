@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/context/auth";
+import { useBranchScope } from "@/context/branch-scope";
 import { useBranches } from "@/hooks/use-branches";
 import { useCreateStudent } from "@/hooks/use-students";
 import type { ApiGender, ApiStudentPayload, ApiStudentStatus } from "@/types/leads-api";
@@ -46,6 +47,7 @@ export function StudentFormDialog({ open, onClose }: { open: boolean; onClose: (
   const { user } = useAuth();
   // Branch users' students always join their own branch; staff pick one.
   const pickBranch = !!user?.is_staff;
+  const scoped = useBranchScope().branchId;
   const branchesQ = useBranches(1, 100, "", open && pickBranch);
   const branches = useMemo(() => branchesQ.data?.results ?? [], [branchesQ.data]);
   const create = useCreateStudent();
@@ -60,14 +62,14 @@ export function StudentFormDialog({ open, onClose }: { open: boolean; onClose: (
       email: null,
       gender: null,
       status: "active",
-      branch: null,
+      branch: scoped,
       source: null,
       assigned_counselor: null,
       lead: null,
       enrolled_at: null,
       notes: null,
     });
-  }, [open]);
+  }, [open, scoped]);
 
   const set = <K extends keyof ApiStudentPayload>(k: K, v: ApiStudentPayload[K]) =>
     setForm((f) => ({ ...f, [k]: v }));

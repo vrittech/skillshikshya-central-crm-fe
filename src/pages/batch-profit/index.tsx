@@ -18,8 +18,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { useAuth } from "@/context/auth";
-import { useBranches } from "@/hooks/use-branches";
+import { useBranchScope } from "@/context/branch-scope";
 import { useBatchProfit } from "@/hooks/use-reports";
 import { DateRange } from "@/components/date-range";
 import { formatDate, formatNPR } from "@/lib/leads-format";
@@ -102,21 +101,18 @@ function MoneyCell({
 }
 
 export default function BatchProfitPage() {
-  const { user } = useAuth();
-  const isStaff = !!user?.is_staff;
-  const branches = useBranches(1, 100, "", isStaff);
-  const [branch, setBranch] = useState("all");
+  const branchId = useBranchScope().branchId ?? undefined;
   const [status, setStatus] = useState<Status | "all">("all");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const params = useMemo(
     () => ({
-      branch_id: branch === "all" ? undefined : Number(branch),
+      branch_id: branchId,
       status: status === "all" ? undefined : status,
       start_date: from || undefined,
       end_date: to || undefined,
     }),
-    [branch, status, from, to],
+    [branchId, status, from, to],
   );
   const { data, isLoading } = useBatchProfit(params);
   const s = data?.summary;
@@ -153,21 +149,6 @@ export default function BatchProfitPage() {
               <SelectItem value="closed">Closed</SelectItem>
             </SelectContent>
           </Select>
-          {isStaff && (
-            <Select value={branch} onValueChange={setBranch}>
-              <SelectTrigger className="w-44">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All branches</SelectItem>
-                {branches.data?.results.map((b) => (
-                  <SelectItem key={b.id} value={String(b.id)}>
-                    {b.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
         </div>
       </div>
 

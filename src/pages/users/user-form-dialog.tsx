@@ -25,6 +25,7 @@ import { useBranches } from "@/hooks/use-branches";
 import { useGroups } from "@/hooks/use-groups";
 import { useRegisterUser, useUpdateUser } from "@/hooks/use-users";
 import { useAuth } from "@/context/auth";
+import { useBranchScope } from "@/context/branch-scope";
 import type { RegisterPayload, User } from "@/types";
 
 const WEEKDAYS = [
@@ -132,6 +133,7 @@ export function UserFormDialog({
   // Everyone but staff works inside one branch. A staff user adding someone
   // must pick it; others' new users join their own branch.
   const needsBranch = isStaff && !(user?.is_staff || user?.is_superuser);
+  const scope = useBranchScope();
   const [form, setForm] = useState<FormState>(emptyForm);
   const [branchSearch, setBranchSearch] = useState("");
   const [branchLabel, setBranchLabel] = useState("");
@@ -148,11 +150,13 @@ export function UserFormDialog({
 
   useEffect(() => {
     if (open) {
-      setForm(user ? toForm(user) : emptyForm);
-      setBranchLabel(user?.branch_name ?? "");
+      // A new login starts on the branch an admin is looking at.
+      const scoped = scope.branchId != null ? String(scope.branchId) : "";
+      setForm(user ? toForm(user) : { ...emptyForm, branch: scoped });
+      setBranchLabel(user ? (user.branch_name ?? "") : (scope.branch?.name ?? ""));
       setBranchSearch("");
     }
-  }, [open, user]);
+  }, [open, user, scope.branchId, scope.branch]);
 
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) =>
     setForm((f) => ({ ...f, [key]: value }));

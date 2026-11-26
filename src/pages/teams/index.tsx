@@ -48,6 +48,7 @@ import {
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/context/auth";
+import { useBranchScope } from "@/context/branch-scope";
 import { useBranches } from "@/hooks/use-branches";
 import {
   useAddTeamsAccounts,
@@ -136,6 +137,7 @@ function AddAccountsDialog({ open, onClose }: { open: boolean; onClose: () => vo
   const { user } = useAuth();
   const isStaff = !!user && (user.is_staff || user.is_superuser);
   const [text, setText] = useState("");
+  const scoped = useBranchScope().branchId;
   const [branch, setBranch] = useState("shared");
   const branches = useBranches(1, 100, "", open && isStaff);
   const add = useAddTeamsAccounts();
@@ -144,9 +146,9 @@ function AddAccountsDialog({ open, onClose }: { open: boolean; onClose: () => vo
   useEffect(() => {
     if (open) {
       setText("");
-      setBranch("shared");
+      setBranch(scoped != null ? String(scoped) : "shared");
     }
-  }, [open]);
+  }, [open, scoped]);
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
@@ -468,25 +470,22 @@ function TakenBackTable({ search, branchId }: { search: string; branchId?: numbe
 }
 
 export default function TeamsPage() {
-  const { user, hasPerm } = useAuth();
-  const isStaff = !!user && (user.is_staff || user.is_superuser);
+  const { hasPerm } = useAuth();
   const [tab, setTab] = useState<Tab>("all");
   const [search, setSearch] = useState("");
   const [debounced, setDebounced] = useState("");
-  const [branch, setBranch] = useState("all");
   const [adding, setAdding] = useState(false);
   const [sending, setSending] = useState<{ id: number; account: string } | null>(null);
   const [takingBack, setTakingBack] = useState<{ id: number; account: string } | null>(null);
   const [retiring, setRetiring] = useState<ApiTeamsAccount | null>(null);
   const retire = useRetireTeamsAccount();
-  const branches = useBranches(1, 100, "", isStaff);
 
   useEffect(() => {
     const t = setTimeout(() => setDebounced(search.trim()), 300);
     return () => clearTimeout(t);
   }, [search]);
 
-  const branchId = branch === "all" ? undefined : Number(branch);
+  const branchId = useBranchScope().branchId ?? undefined;
   const summary = useTeamsSummary({ branch_id: branchId });
   const accounts = useTeamsAccounts(
     {
@@ -571,21 +570,6 @@ export default function TeamsPage() {
           </TabsList>
         </Tabs>
         <div className="flex flex-wrap items-center gap-2">
-          {isStaff && (
-            <Select value={branch} onValueChange={setBranch}>
-              <SelectTrigger className="w-44">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All branches</SelectItem>
-                {(branches.data?.results ?? []).map((b) => (
-                  <SelectItem key={b.id} value={String(b.id)}>
-                    {b.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
           <div className="relative min-w-[16rem]">
             <Search className="text-muted-foreground absolute top-2.5 left-3 size-4" />
             <Input

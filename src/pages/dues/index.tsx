@@ -1,17 +1,10 @@
 import { X } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { MonthPicker } from "@/components/month-picker";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -23,8 +16,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useAuth } from "@/context/auth";
-import { useBranches } from "@/hooks/use-branches";
+import { useBranchScope } from "@/context/branch-scope";
 import { useDueInMonth, useWhoOwes } from "@/hooks/use-reports";
 import { daysText } from "@/lib/due-dates";
 import { formatDate, formatNPR } from "@/lib/leads-format";
@@ -458,11 +450,7 @@ function DueInMonth({ branchId }: { branchId?: number }) {
 /* ------------------------------------------------------------ page */
 
 export default function DuesPage() {
-  const { user } = useAuth();
-  const isStaff = !!user?.is_staff;
-  const branches = useBranches(1, 100, "", isStaff);
-  const [branch, setBranch] = useState("all");
-  const branchId = useMemo(() => (branch === "all" ? undefined : Number(branch)), [branch]);
+  const branchId = useBranchScope().branchId ?? undefined;
 
   return (
     <div className="space-y-6">
@@ -473,21 +461,6 @@ export default function DuesPage() {
           </p>
           <h1 className="font-headline mt-1 text-3xl font-semibold tracking-tight">Dues</h1>
         </div>
-        {isStaff && (
-          <Select value={branch} onValueChange={setBranch}>
-            <SelectTrigger className="w-44">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All branches</SelectItem>
-              {branches.data?.results.map((b) => (
-                <SelectItem key={b.id} value={String(b.id)}>
-                  {b.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        )}
       </div>
 
       <Tabs defaultValue="who-owes">

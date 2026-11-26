@@ -1,14 +1,13 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { ArrowDownRight, ArrowUpRight, ChevronRight, Minus } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { Link } from "react-router-dom";
 import { DailyBarChart, MeterList, type DailyDatum, type MeterRow } from "@/components/charts";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/context/auth";
+import { useBranchScope } from "@/context/branch-scope";
 import { useRole } from "@/context/role";
-import { useBranches } from "@/hooks/use-branches";
 import { useLeadSummary } from "@/hooks/use-leads";
 import {
   useConversionReport,
@@ -165,13 +164,11 @@ function RowsSkeleton({ rows = 4 }: { rows?: number }) {
 export default function DashboardPage() {
   const { user } = useAuth();
   const { can } = useRole();
-  const isStaff = !!user?.is_staff;
   const seesReports = can("reports.view");
   const firstName = user?.name?.split(" ")[0] ?? "there";
 
-  const [branch, setBranch] = useState("all");
-  const branchId = branch === "all" ? undefined : Number(branch);
-  const branches = useBranches(1, 100, "", isStaff);
+  const scope = useBranchScope();
+  const branchId = scope.branchId ?? undefined;
 
   const { days, range } = useMemo(() => {
     const now = new Date();
@@ -257,23 +254,11 @@ export default function DashboardPage() {
           <h1 className="font-headline mt-1 text-3xl font-semibold tracking-tight">
             {greeting()}, {firstName}
           </h1>
-          <p className="text-muted-foreground mt-1 text-sm">{LONG_DATE.format(new Date())}</p>
+          <p className="text-muted-foreground mt-1 text-sm">
+            {LONG_DATE.format(new Date())}
+            {scope.branch && ` · ${scope.branch.name}`}
+          </p>
         </div>
-        {isStaff && (
-          <Select value={branch} onValueChange={setBranch}>
-            <SelectTrigger className="w-48">
-              <SelectValue placeholder="All branches" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All branches</SelectItem>
-              {branches.data?.results.map((b) => (
-                <SelectItem key={b.id} value={String(b.id)}>
-                  {b.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        )}
       </div>
 
       {/* KPI row */}

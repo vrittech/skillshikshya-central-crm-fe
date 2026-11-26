@@ -1,5 +1,6 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import { AppLayout } from "@/components/layout/app-layout";
+import { BranchScopeProvider } from "@/context/branch-scope";
 import { RoleProvider } from "@/context/role";
 import BatchProfitPage from "@/pages/batch-profit";
 import CallsPage from "@/pages/calls";
@@ -33,6 +34,7 @@ import UsersPage from "@/pages/users";
 export default function App() {
   return (
     <RoleProvider>
+      <BranchScopeProvider>
         <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
@@ -78,6 +80,7 @@ export default function App() {
           <Route path="*" element={<ComingSoonPage title="Not found" />} />
           </Route>
         </Routes>
+      </BranchScopeProvider>
     </RoleProvider>
   );
 }

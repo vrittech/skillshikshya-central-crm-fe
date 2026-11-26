@@ -1,6 +1,7 @@
 import { KeyRound, LogOut, Menu, Moon, Plus, Search, Sun } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { BranchSwitcher } from "@/components/layout/branch-switcher";
 import { ChangePasswordDialog } from "@/components/layout/change-password-dialog";
 import { NotificationBell } from "@/components/layout/notification-bell";
 import { Button } from "@/components/ui/button";
@@ -55,6 +56,8 @@ export function AppHeader({ onMenuClick }: { onMenuClick: () => void }) {
       </div>
 
       <div className="flex items-center gap-2 md:gap-3">
+        <BranchSwitcher />
+
         {/* Quick Create */}
         <Button variant="brand" size="sm" className="hidden sm:inline-flex" onClick={() => navigate("/leads/new")}>
           <Plus /> Quick Create

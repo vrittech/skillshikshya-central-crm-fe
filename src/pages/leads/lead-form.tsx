@@ -25,6 +25,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { useBranchScope } from "@/context/branch-scope";
 import { buildCustomDataPayload } from "@/data/lead-adapters";
 import { EDUCATION_LEVELS, LEARNING_MODES, SHIFTS } from "@/data/lead-lookups";
 import { useBranches } from "@/hooks/use-branches";
@@ -207,14 +208,18 @@ export default function LeadFormPage() {
   const { lead: existing } = useLead(id);
 
   // Form state (declared early — the counselor query is scoped by the branch).
-  const [form, setForm] = useState<FormState>(EMPTY);
+  // A new lead starts on the branch an admin is looking at.
+  const scope = useBranchScope();
+  const [form, setForm] = useState<FormState>(() =>
+    !editing && scope.branchId != null ? { ...EMPTY, branch: String(scope.branchId) } : EMPTY,
+  );
   const [seeded, setSeeded] = useState(!editing);
   const [branchDialogOpen, setBranchDialogOpen] = useState(false);
 
   // Sticky labels for the searchable comboboxes, so the picked item still shows
   // in the trigger even when it falls outside the current server-search page.
   const [labels, setLabels] = useState({
-    branch: "",
+    branch: editing ? "" : (scope.branch?.name ?? ""),
     counselor: "",
     course: "",
     campaign: "",
