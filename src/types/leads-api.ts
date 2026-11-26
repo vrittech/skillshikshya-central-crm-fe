@@ -566,7 +566,8 @@ export type ApiHistoryAction =
   | "pause_licence"
   | "resume_licence"
   | "complete"
-  | "undo_complete";
+  | "undo_complete"
+  | "change_status";
 
 /** One row of an enrollment's reason trail — GET .../enrollments/{id}/history/. */
 export interface ApiEnrollmentHistory {

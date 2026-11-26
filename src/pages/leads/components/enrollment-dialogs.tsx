@@ -35,7 +35,6 @@ import type {
   ApiDuePart,
   ApiEnrollment,
   ApiEnrollmentPayload,
-  ApiEnrollmentStatus,
   ApiPaymentMethod,
   ApiPaymentPayload,
   ApiPaymentStatus,
@@ -45,15 +44,6 @@ import { formatNPR, toNepalIso } from "@/lib/leads-format";
 import { batchOption, localToday, takesNoOne } from "@/lib/seats";
 import { DuePartsEditor } from "./due-dates";
 
-const ENR_STATUS: ApiEnrollmentStatus[] = [
-  "pending",
-  "confirmed",
-  "active",
-  "completed",
-  "cancelled",
-  "dropped_out",
-  "transferred",
-];
 const PAY_METHODS: ApiPaymentMethod[] = ["cash", "esewa", "khalti", "bank_transfer", "card", "connectips"];
 /** A new payment is pending or successful; Confirm and Void change it later. */
 const PAY_STATUS: ApiPaymentStatus[] = ["successful", "pending"];
@@ -98,7 +88,6 @@ export function EnrollmentDialog({
 }) {
   const [f, setF] = useState<ApiEnrollmentPayload>({});
   const isEdit = !!enrollment;
-  const wasCancelled = enrollment?.status === "cancelled";
   const wasPending = enrollment?.status === "pending";
   // The price can change until the enrollment is confirmed or something is paid.
   const priceLocked = isEdit && !(wasPending && Number(enrollment?.total_paid ?? 0) === 0);
@@ -151,7 +140,6 @@ export function EnrollmentDialog({
         batch: enrollment.batch,
         student: enrollment.student,
         enrollment_date: enrollment.enrollment_date ?? new Date().toISOString().slice(0, 10),
-        status: enrollment.status,
         listed_fee: enrollment.listed_fee,
         standard_discount: enrollment.standard_discount,
         additional_discount: enrollment.additional_discount,
@@ -321,30 +309,6 @@ export function EnrollmentDialog({
               <Label>Enrollment date</Label>
               <Input type="date" value={f.enrollment_date ?? ""} onChange={(e) => set("enrollment_date", e.target.value)} />
             </div>
-            {isEdit && (
-              <div className="grid gap-2">
-                <Label>Status</Label>
-                {/* Confirm, cancel and reinstate are buttons on the card, not options here. */}
-                <Select
-                  value={f.status ?? "pending"}
-                  onValueChange={(v) => set("status", v as ApiEnrollmentStatus)}
-                  disabled={wasCancelled || wasPending}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {ENR_STATUS.filter(
-                      (s) => (wasCancelled || s !== "cancelled") && (wasPending || s !== "pending"),
-                    ).map((s) => (
-                      <SelectItem key={s} value={s} className="capitalize">
-                        {s.replace(/_/g, " ")}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
             {/* The price is fixed once confirmed or paid; later changes are money entries with a reason. */}
             <div className="grid gap-2">
               <Label htmlFor="enrollment-listed-fee">Listed fee</Label>

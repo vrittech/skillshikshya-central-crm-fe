@@ -9,6 +9,7 @@ import type {
   ApiEnrollment,
   ApiEnrollmentHistory,
   ApiEnrollmentPayload,
+  ApiEnrollmentStatus,
   EnrollmentListParams,
   PaymentListParams,
   ApiFollowup,
@@ -228,6 +229,19 @@ export const leadsService = {
     const { data } = await api.post<ApiEnrollment>(
       `/leads/${leadId}/enrollments/${id}/reinstate/`,
       { reason },
+    );
+    return data;
+  },
+  /** Set the status of a confirmed enrollment, with a reason. */
+  async changeEnrollmentStatus(
+    leadId: number,
+    id: number,
+    status: ApiEnrollmentStatus,
+    reason: string,
+  ) {
+    const { data } = await api.post<ApiEnrollment>(
+      `/leads/${leadId}/enrollments/${id}/status/`,
+      { status, reason },
     );
     return data;
   },

@@ -9,6 +9,7 @@ import {
   PencilLine,
   Plus,
   Receipt,
+  RefreshCw,
   RotateCcw,
 } from "lucide-react";
 import { type ReactNode, useEffect, useState } from "react";
@@ -39,8 +40,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
+  useChangeEnrollmentStatus,
   useEnrollmentHistory,
   useEnrollmentPayments,
   useEnrollmentStatusAction,
@@ -89,6 +92,67 @@ const PAYMENT_TONE: Record<ApiPaymentStatus, string> = {
 
 function label(s: string) {
   return s.replace(/_/g, " ");
+}
+
+/** Statuses Change status can set. Confirm, Cancel and Reinstate are their own actions. */
+const STATUS_CHOICES: ApiEnrollmentStatus[] = [
+  "confirmed",
+  "active",
+  "completed",
+  "dropped_out",
+  "transferred",
+];
+
+function ChangeStatusDialog({
+  leadId,
+  enrollment,
+  open,
+  onClose,
+}: {
+  leadId: number;
+  enrollment: ApiEnrollment;
+  open: boolean;
+  onClose: () => void;
+}) {
+  const change = useChangeEnrollmentStatus(leadId);
+  const [status, setStatus] = useState<ApiEnrollmentStatus | "">("");
+
+  useEffect(() => {
+    if (open) setStatus("");
+  }, [open]);
+
+  return (
+    <ReasonDialog
+      open={open}
+      onClose={onClose}
+      title="Change status"
+      description={enrollment.course_name ?? undefined}
+      confirmLabel="Change status"
+      destructive={status === "dropped_out"}
+      pending={change.isPending}
+      confirmDisabled={!status}
+      onConfirm={(reason) =>
+        status &&
+        change.mutate({ id: enrollment.id, status, reason }, { onSuccess: onClose })
+      }
+    >
+      <div className="grid gap-2">
+        <Label required>Status</Label>
+        <Select value={status} onValueChange={(v) => setStatus(v as ApiEnrollmentStatus)}>
+          <SelectTrigger>
+            <SelectValue placeholder="Select status" />
+          </SelectTrigger>
+          <SelectContent>
+            {STATUS_CHOICES.filter((s) => s !== enrollment.status).map((s) => (
+              <SelectItem key={s} value={s} className="capitalize">
+                {label(s)}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+    </ReasonDialog>
+  );
 }
 
 function StatusPill({ status }: { status: ApiEnrollmentStatus }) {
@@ -326,6 +390,7 @@ export function EnrollmentCard({
   const [seatAction, setSeatAction] = useState<ApiSeatAction | null>(null);
   const [statusAction, setStatusAction] = useState<"cancel" | "reinstate" | null>(null);
   const statusMutation = useEnrollmentStatusAction(leadId);
+  const [changeStatusOpen, setChangeStatusOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const isCancelled = enrollment.status === "cancelled";
   const isPending = enrollment.status === "pending";
@@ -430,6 +495,11 @@ export function EnrollmentCard({
                   <DropdownMenuItem onSelect={onEdit}>
                     <PencilLine /> Edit
                   </DropdownMenuItem>
+                  {leadId != null && !isCancelled && !isPending && (
+                    <DropdownMenuItem onSelect={() => setChangeStatusOpen(true)}>
+                      <RefreshCw /> Change status
+                    </DropdownMenuItem>
+                  )}
                   <DropdownMenuSeparator />
                   {isCancelled ? (
                     <DropdownMenuItem onSelect={() => setStatusAction("reinstate")}>
@@ -601,6 +671,15 @@ export function EnrollmentCard({
           )
         }
       />
+
+      {leadId != null && (
+        <ChangeStatusDialog
+          leadId={leadId}
+          enrollment={enrollment}
+          open={changeStatusOpen}
+          onClose={() => setChangeStatusOpen(false)}
+        />
+      )}
     </div>
   );
 }

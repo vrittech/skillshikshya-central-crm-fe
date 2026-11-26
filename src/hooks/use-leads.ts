@@ -30,6 +30,7 @@ import type {
   ApiEnrollment,
   ApiEnrollmentHistory,
   ApiEnrollmentPayload,
+  ApiEnrollmentStatus,
   ApiFollowup,
   ApiLeadCall,
   ApiLeadDocument,
@@ -637,7 +638,6 @@ export function useAddAdjustment(leadId?: number, enrollmentId?: number) {
   });
 }
 
-/** Cancel or reinstate an enrollment. Both need a reason and add a history row. */
 /** Confirm a pending enrollment: the lead becomes a student and gets the fee invoice. */
 export function useConfirmEnrollment() {
   const qc = useQueryClient();
@@ -728,6 +728,7 @@ export function useSeatAction(leadId?: number) {
   });
 }
 
+/** Cancel or reinstate an enrollment. Both need a reason and add a history row. */
 export function useEnrollmentStatusAction(leadId?: number) {
   const qc = useQueryClient();
   return useMutation({
@@ -753,6 +754,22 @@ export function useEnrollmentStatusAction(leadId?: number) {
       void qc.invalidateQueries({ queryKey: ["teams"] });
     },
     onError: (e) => toast.error(apiErrorMessage(e, "Could not update the enrollment")),
+  });
+}
+
+/** Change status: active, completed, dropped out… Dropping out or transferring frees the seat. */
+export function useChangeEnrollmentStatus(leadId?: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, status, reason }: { id: number; status: ApiEnrollmentStatus; reason: string }) =>
+      leadsService.changeEnrollmentStatus(leadId as number, id, status, reason),
+    onSuccess: () => {
+      toast.success("Status changed");
+      for (const key of ["lead", "leads", "enrollments", "course-batches", "teams", "students"]) {
+        void qc.invalidateQueries({ queryKey: [key] });
+      }
+    },
+    onError: (e) => toast.error(apiErrorMessage(e, "Could not change the status")),
   });
 }
 
