@@ -90,7 +90,7 @@ function Register({
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div className="flex flex-wrap items-end gap-3">
           <div className="grid gap-1.5">
-            <Label htmlFor="register-date">Date</Label>
+            <Label htmlFor="register-date" required>Date</Label>
             <Input
               id="register-date"
               type="date"

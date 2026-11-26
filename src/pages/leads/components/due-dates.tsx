@@ -160,7 +160,7 @@ export function DuePartsEditor({
   return (
     <div className="grid gap-2">
       <div className="flex items-center justify-between gap-3">
-        <Label>Due dates</Label>
+        <Label required>Due dates</Label>
         <div className="flex items-center gap-2">
           <span className="text-muted-foreground text-xs">Parts</span>
           <Select

@@ -74,7 +74,7 @@ export default function LoginPage() {
           {mode === "login" && (
             <form onSubmit={handleLogin} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="email" required>Email</Label>
                 <Input
                   id="email"
                   type="email"
@@ -86,7 +86,7 @@ export default function LoginPage() {
               </div>
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <Label htmlFor="password">Password</Label>
+                  <Label htmlFor="password" required>Password</Label>
                   <button
                     type="button"
                     className="text-brand text-xs hover:underline"
@@ -124,7 +124,7 @@ export default function LoginPage() {
           {mode === "forgot-email" && (
             <form onSubmit={handleForgotEmail} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="fp-email">Email</Label>
+                <Label htmlFor="fp-email" required>Email</Label>
                 <Input
                   id="fp-email"
                   type="email"

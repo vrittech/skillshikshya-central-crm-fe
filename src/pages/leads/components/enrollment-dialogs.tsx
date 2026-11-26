@@ -201,8 +201,21 @@ export function EnrollmentDialog({
       toast.error("Pick a lead first.");
       return;
     }
-    if (!f.course) return;
-    const payload = { ...f, agreed_amount: agreedEdited && f.agreed_amount ? f.agreed_amount : agreedAuto };
+    if (!f.course) {
+      toast.error("Pick a course.");
+      return;
+    }
+    if (!f.enrollment_date) {
+      toast.error("Pick the enrollment date.");
+      return;
+    }
+    const payload = {
+      ...f,
+      // A cleared discount box means no discount; the API refuses an empty number.
+      standard_discount: f.standard_discount || "0",
+      additional_discount: f.additional_discount || "0",
+      agreed_amount: agreedEdited && f.agreed_amount ? f.agreed_amount : agreedAuto,
+    };
     if (enrollment) {
       updateEnrollment.mutate({ id: enrollment.id, payload }, { onSuccess: () => onClose() });
       return;
@@ -306,7 +319,7 @@ export function EnrollmentDialog({
               )}
             </div>
             <div className="grid gap-2">
-              <Label>Enrollment date</Label>
+              <Label required>Enrollment date</Label>
               <Input type="date" value={f.enrollment_date ?? ""} onChange={(e) => set("enrollment_date", e.target.value)} />
             </div>
             {/* The price is fixed once confirmed or paid; later changes are money entries with a reason. */}
@@ -454,7 +467,7 @@ export function ConfirmEnrollmentDialog({
                 <FieldError>{firstError}</FieldError>
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="first-payment-method">Method</Label>
+                <Label htmlFor="first-payment-method" required>Method</Label>
                 <Select value={method} onValueChange={(v) => setMethod(v as ApiPaymentMethod)}>
                   <SelectTrigger id="first-payment-method">
                     <SelectValue />
@@ -568,7 +581,14 @@ export function PaymentDialog({
       toast.error("Pick a lead and its enrollment first.");
       return;
     }
-    if (!f.amount) return;
+    if (!f.amount) {
+      toast.error("Enter the amount.");
+      return;
+    }
+    if (!f.payment_date) {
+      toast.error("Pick the payment date.");
+      return;
+    }
     addPayment.mutate(f, { onSuccess: () => onClose() });
   }
 
@@ -659,7 +679,7 @@ export function PaymentDialog({
             )}
           </div>
           <div className="grid gap-2">
-            <Label>Date</Label>
+            <Label required>Date</Label>
             <Input
               type="datetime-local"
               value={f.payment_date ? f.payment_date.slice(0, 16) : ""}

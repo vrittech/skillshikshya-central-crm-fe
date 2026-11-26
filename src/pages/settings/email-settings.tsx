@@ -203,7 +203,7 @@ function EmailForm({ settings }: { settings: EmailSettings }) {
               <FieldError text={errors.username} />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="smtp-pass">Password</Label>
+              <Label htmlFor="smtp-pass" required={!!form.username.trim() && !settings.password_set}>Password</Label>
               <Input
                 id="smtp-pass"
                 type="password"
@@ -244,7 +244,7 @@ function EmailForm({ settings }: { settings: EmailSettings }) {
           <div className="space-y-3 border-t pt-4">
             <div className="flex flex-wrap items-end gap-2">
               <div className="grid min-w-[220px] flex-1 gap-2">
-                <Label htmlFor="smtp-test-to">Send a test email to</Label>
+                <Label htmlFor="smtp-test-to" required>Send a test email to</Label>
                 <Input
                   id="smtp-test-to"
                   type="email"

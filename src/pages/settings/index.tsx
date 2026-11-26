@@ -85,6 +85,8 @@ interface FieldDef {
   label: string;
   type: FieldType;
   required?: boolean;
+  /** Sent as null when left blank (unique fields that allow empty). */
+  nullable?: boolean;
   default?: unknown;
 }
 
@@ -128,7 +130,7 @@ const ENTITY: Partial<Record<Section, EntityConfig>> = {
     hasColor: true,
     fields: [
       { key: "name", label: "Name", type: "text", required: true },
-      { key: "color", label: "Color", type: "color", default: "#2563eb" },
+      { key: "color", label: "Color", type: "color", required: true, default: "#2563eb" },
       { key: "sort_order", label: "Sort order", type: "number", default: 0 },
       { key: "is_final", label: "Final (terminal)", type: "bool", default: false },
       { key: "is_active", label: "Active", type: "bool", default: true },
@@ -140,7 +142,7 @@ const ENTITY: Partial<Record<Section, EntityConfig>> = {
     hasColor: true,
     fields: [
       { key: "name", label: "Name", type: "text", required: true },
-      { key: "color", label: "Color", type: "color", default: "#f59e0b" },
+      { key: "color", label: "Color", type: "color", required: true, default: "#f59e0b" },
       { key: "sort_order", label: "Sort order", type: "number", default: 0 },
       { key: "is_active", label: "Active", type: "bool", default: true },
     ],
@@ -151,7 +153,7 @@ const ENTITY: Partial<Record<Section, EntityConfig>> = {
     hasColor: true,
     fields: [
       { key: "name", label: "Name", type: "text", required: true },
-      { key: "color", label: "Color", type: "color", default: "#64748b" },
+      { key: "color", label: "Color", type: "color", required: true, default: "#64748b" },
       { key: "is_active", label: "Active", type: "bool", default: true },
     ],
     hooks: tagHooks as never,
@@ -160,7 +162,7 @@ const ENTITY: Partial<Record<Section, EntityConfig>> = {
     label: "Learning mode",
     fields: [
       { key: "name", label: "Name", type: "text", required: true },
-      { key: "code", label: "Code", type: "text", required: true },
+      { key: "code", label: "Code", type: "text", nullable: true },
       { key: "is_active", label: "Active", type: "bool", default: true },
     ],
     hooks: learningModeHooks as never,
@@ -169,7 +171,7 @@ const ENTITY: Partial<Record<Section, EntityConfig>> = {
     label: "Institution",
     fields: [
       { key: "name", label: "Name", type: "text", required: true },
-      { key: "code", label: "Code", type: "text", required: true },
+      { key: "code", label: "Code", type: "text", nullable: true },
       { key: "address", label: "Address", type: "text" },
       { key: "phone", label: "Phone", type: "text" },
       { key: "is_active", label: "Active", type: "bool", default: true },
@@ -221,9 +223,13 @@ function EditorDialog({
         return;
       }
     }
+    const payload = { ...values };
+    for (const f of cfg!.fields) {
+      if (f.nullable && !String(payload[f.key] ?? "").trim()) payload[f.key] = null;
+    }
     const onSuccess = () => onClose();
-    if (row) update?.mutate({ id: row.id, payload: values } as never, { onSuccess });
-    else create?.mutate(values as never, { onSuccess });
+    if (row) update?.mutate({ id: row.id, payload } as never, { onSuccess });
+    else create?.mutate(payload as never, { onSuccess });
   }
 
   return (
@@ -243,10 +249,7 @@ function EditorDialog({
         <div className="grid gap-4 py-2">
           {cfg.fields.map((f) => (
             <div key={f.key} className="grid gap-2">
-              <Label>
-                {f.label}
-                {f.required && <span className="text-destructive ml-0.5">*</span>}
-              </Label>
+              <Label required={f.required}>{f.label}</Label>
               {f.type === "bool" ? (
                 <Switch
                   checked={Boolean(values[f.key])}

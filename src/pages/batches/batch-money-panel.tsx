@@ -152,7 +152,7 @@ function AddCostDialog({
         </DialogHeader>
         <div className="grid gap-4 py-2">
           <div className="grid gap-2">
-            <Label>Kind</Label>
+            <Label required>Kind</Label>
             <Select value={kind} onValueChange={(v) => setKind(v as BatchCostKind)}>
               <SelectTrigger>
                 <SelectValue />

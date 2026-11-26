@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -68,7 +69,10 @@ export function StudentFormDialog({ open, onClose }: { open: boolean; onClose: (
     setForm((f) => ({ ...f, [k]: v }));
 
   function submit() {
-    if (!form.full_name?.trim() || !form.phone?.trim()) return;
+    if (!form.full_name?.trim() || !form.phone?.trim()) {
+      toast.error("Full name and phone are required.");
+      return;
+    }
     create.mutate(form, { onSuccess: () => onClose() });
   }
 

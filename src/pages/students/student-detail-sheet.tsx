@@ -245,11 +245,11 @@ function AttendanceTab({ studentId }: { studentId: number }) {
         <p className="text-sm font-semibold">Mark attendance</p>
         <div className="grid gap-2 sm:grid-cols-3">
           <div className="grid gap-1.5">
-            <Label className="text-xs">Date</Label>
+            <Label className="text-xs" required>Date</Label>
             <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
           </div>
           <div className="grid gap-1.5">
-            <Label className="text-xs">Status</Label>
+            <Label className="text-xs" required>Status</Label>
             <Select value={status} onValueChange={(v) => setStatus(v as ApiAttendanceStatus)}>
               <SelectTrigger>
                 <SelectValue />

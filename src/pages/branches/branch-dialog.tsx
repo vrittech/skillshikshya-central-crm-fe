@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -56,7 +57,10 @@ export function BranchDialog({
     setForm((f) => ({ ...f, [k]: v }));
 
   function submit() {
-    if (!form.name?.trim() || !form.code?.trim()) return;
+    if (!form.name?.trim() || !form.code?.trim()) {
+      toast.error("Name and code are required.");
+      return;
+    }
     if (branch) {
       update.mutate({ id: branch.id, payload: form }, { onSuccess: () => onClose() });
     } else {

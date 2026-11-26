@@ -141,7 +141,7 @@ export function ScheduleFollowUpDialog({
           )}
           <div className="grid grid-cols-2 gap-4">
             <div className="grid gap-2">
-              <Label>Date &amp; time</Label>
+              <Label required>Date &amp; time</Label>
               <Input
                 type="datetime-local"
                 value={fu.scheduledAt}

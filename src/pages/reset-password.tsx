@@ -64,7 +64,7 @@ export default function ResetPasswordPage() {
         <CardContent>
           <form onSubmit={handleReset} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="np">New password</Label>
+              <Label htmlFor="np" required>New password</Label>
               <Input
                 id="np"
                 type="password"
@@ -75,7 +75,7 @@ export default function ResetPasswordPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="cp">Confirm new password</Label>
+              <Label htmlFor="cp" required>Confirm new password</Label>
               <Input
                 id="cp"
                 type="password"

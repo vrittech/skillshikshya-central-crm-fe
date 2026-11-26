@@ -417,7 +417,7 @@ export default function LeadsPage() {
             <DialogDescription>Choose the counselor to own the selected leads.</DialogDescription>
           </DialogHeader>
           <div className="grid gap-2 py-2">
-            <Label>Counselor</Label>
+            <Label required>Counselor</Label>
             <Select value={bulkAssignTo} onValueChange={setBulkAssignTo}>
               <SelectTrigger>
                 <SelectValue placeholder="Select counselor" />
