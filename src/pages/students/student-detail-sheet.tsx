@@ -271,21 +271,18 @@ function AttendanceTab({ studentId }: { studentId: number }) {
         <Button
           size="sm"
           variant="brand"
-          disabled={mark.isPending || !date}
+          disabled={mark.isPending || !date || course == null}
           onClick={() =>
+            course != null &&
             mark.mutate(
-              { date, status, course: course ?? null, remarks: remarks || null },
+              { date, status, course, remarks: remarks || null },
               { onSuccess: () => setRemarks("") },
             )
           }
         >
           <CalendarCheck /> {mark.isPending ? "Saving…" : "Mark"}
         </Button>
-        {courseFilter === "all" && (
-          <p className="text-muted-foreground text-xs">
-            Pick a course above to attach the record to a specific course.
-          </p>
-        )}
+        {course == null && <p className="text-muted-foreground text-xs">Pick a course.</p>}
       </div>
 
       <div>
