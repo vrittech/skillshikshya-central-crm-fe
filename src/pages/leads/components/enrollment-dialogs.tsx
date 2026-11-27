@@ -43,6 +43,7 @@ import { partsAreValid, splitEvenly } from "@/lib/due-dates";
 import { formatNPR, toNepalIso } from "@/lib/leads-format";
 import { batchOption, localToday, takesNoOne } from "@/lib/seats";
 import { DuePartsEditor } from "./due-dates";
+import { useRole } from "@/context/role";
 
 const PAY_METHODS: ApiPaymentMethod[] = ["cash", "esewa", "khalti", "bank_transfer", "card", "connectips"];
 /** A new payment is pending or successful; Confirm and Void change it later. */
@@ -393,8 +394,9 @@ export function EnrollmentDialog({
 
 /**
  * Confirm a pending enrollment: the lead becomes a student. Something must be
- * paid first, so when nothing is paid the first payment is taken here, in the
- * same step as the confirm.
+ * paid first (unless discounts leave nothing to pay), so when nothing is paid
+ * the first payment is taken here, in the same step as the confirm. Taking it
+ * needs the payment right; without it, someone who has it records the payment.
  */
 export function ConfirmEnrollmentDialog({
   leadId,
@@ -406,6 +408,7 @@ export function ConfirmEnrollmentDialog({
   onClose: () => void;
 }) {
   const confirm = useConfirmEnrollment();
+  const canTakePayment = useRole().can("payment.record");
   const [parts, setParts] = useState<ApiDuePart[]>([]);
   const [amount, setAmount] = useState("");
   const [method, setMethod] = useState<ApiPaymentMethod>("esewa");
@@ -413,7 +416,9 @@ export function ConfirmEnrollmentDialog({
   const open = enrollment != null;
   const agreed = Number(enrollment?.agreed_amount ?? 0);
   const paid = Number(enrollment?.total_paid ?? 0) - Number(enrollment?.refunds_total ?? 0);
-  const needsPayment = agreed > 0 && paid <= 0;
+  const toPay = agreed - Number(enrollment?.discounts_total ?? 0);
+  const needsPayment = toPay > 0 && paid <= 0;
+  const takesPayment = needsPayment && canTakePayment;
 
   useEffect(() => {
     if (!open) return;
@@ -424,8 +429,8 @@ export function ConfirmEnrollmentDialog({
   }, [open, agreed]);
 
   const left = Number(enrollment?.remaining_amount ?? 0);
-  const firstError = needsPayment && amount ? paymentAmountError(amount, left) : null;
-  const amountOk = !needsPayment || (Number(amount) > 0 && !firstError);
+  const firstError = takesPayment && amount ? paymentAmountError(amount, left) : null;
+  const amountOk = needsPayment ? takesPayment && Number(amount) > 0 && !firstError : true;
   const valid = amountOk && (agreed <= 0 || partsAreValid(parts, agreed));
 
   function submit() {
@@ -435,7 +440,7 @@ export function ConfirmEnrollmentDialog({
         leadId,
         id: enrollment.id,
         dueDates: agreed > 0 ? parts : undefined,
-        firstPayment: needsPayment
+        firstPayment: takesPayment
           ? { amount, payment_method: method, transaction_reference: reference.trim() || undefined }
           : undefined,
       },
@@ -457,7 +462,15 @@ export function ConfirmEnrollmentDialog({
           )}
         </DialogHeader>
         <div className="grid gap-4 py-2">
-          {needsPayment ? (
+          {needsPayment && !takesPayment ? (
+            <div className="grid gap-1 rounded-xl border px-3 py-2 text-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Paid</span>
+                <span className="font-semibold tabular-nums">{formatNPR(0)}</span>
+              </div>
+              <FieldError>Record a payment first.</FieldError>
+            </div>
+          ) : takesPayment ? (
             <div className="grid gap-3 rounded-xl border p-3 sm:grid-cols-2">
               <p className="text-sm font-semibold sm:col-span-2">First payment</p>
               <div className="grid gap-2">
