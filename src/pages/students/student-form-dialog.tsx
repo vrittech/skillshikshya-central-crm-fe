@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -18,10 +19,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { useAuth } from "@/context/auth";
+import { useBranchScope } from "@/context/branch-scope";
 import { useBranches } from "@/hooks/use-branches";
 import { useCreateStudent } from "@/hooks/use-students";
 import type { ApiGender, ApiStudentPayload, ApiStudentStatus } from "@/types/leads-api";
-import type { Lead } from "@/types/leads";
 
 const STATUSES: { value: ApiStudentStatus; label: string }[] = [
   { value: "active", label: "Active" },
@@ -38,19 +40,15 @@ const GENDERS: { value: ApiGender; label: string }[] = [
 ];
 
 /**
- * Create a student, optionally converting from a lead (prefills identity and
- * links the `lead` FK — the BE's real "enrollment" path).
+ * Create a student who did not come through a lead. A lead becomes a student
+ * only when one of their enrollments is confirmed (Confirm on the enrollment card).
  */
-export function StudentFormDialog({
-  open,
-  onClose,
-  fromLead,
-}: {
-  open: boolean;
-  onClose: () => void;
-  fromLead?: Lead | null;
-}) {
-  const branchesQ = useBranches(1, 100, "", open);
+export function StudentFormDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const { user } = useAuth();
+  // Branch users' students always join their own branch; staff pick one.
+  const pickBranch = !!user?.is_staff;
+  const scoped = useBranchScope().branchId;
+  const branchesQ = useBranches(1, 100, "", open && pickBranch);
   const branches = useMemo(() => branchesQ.data?.results ?? [], [branchesQ.data]);
   const create = useCreateStudent();
 
@@ -59,26 +57,32 @@ export function StudentFormDialog({
   useEffect(() => {
     if (!open) return;
     setForm({
-      full_name: fromLead?.fullName ?? "",
-      phone: fromLead?.primaryPhone ?? "",
-      email: fromLead?.email ?? null,
+      full_name: "",
+      phone: "",
+      email: null,
       gender: null,
       status: "active",
-      branch: fromLead?.branchId ?? null,
-      source: fromLead?.sourceId ?? null,
-      assigned_counselor:
-        fromLead?.assignedTo && /^\d+$/.test(fromLead.assignedTo) ? Number(fromLead.assignedTo) : null,
-      lead: fromLead?.apiId ?? null,
+      branch: scoped,
+      source: null,
+      assigned_counselor: null,
+      lead: null,
       enrolled_at: null,
-      notes: fromLead ? `Converted from lead ${fromLead.referenceNumber}` : null,
+      notes: null,
     });
-  }, [open, fromLead]);
+  }, [open, scoped]);
 
   const set = <K extends keyof ApiStudentPayload>(k: K, v: ApiStudentPayload[K]) =>
     setForm((f) => ({ ...f, [k]: v }));
 
   function submit() {
-    if (!form.full_name?.trim() || !form.phone?.trim()) return;
+    if (!form.full_name?.trim() || !form.phone?.trim()) {
+      toast.error("Full name and phone are required.");
+      return;
+    }
+    if (pickBranch && form.branch == null) {
+      toast.error("Pick a branch.");
+      return;
+    }
     create.mutate(form, { onSuccess: () => onClose() });
   }
 
@@ -86,12 +90,8 @@ export function StudentFormDialog({
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{fromLead ? "Convert to student" : "New student"}</DialogTitle>
-          <DialogDescription>
-            {fromLead
-              ? `Create a student record from ${fromLead.fullName} and link it to this lead.`
-              : "Create a student record."}
-          </DialogDescription>
+          <DialogTitle>New student</DialogTitle>
+          <DialogDescription>Create a student record.</DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-2 sm:grid-cols-2">
           <div className="grid gap-2">
@@ -121,8 +121,9 @@ export function StudentFormDialog({
               </SelectContent>
             </Select>
           </div>
+          {pickBranch && (
           <div className="grid gap-2">
-            <Label>Branch</Label>
+            <Label required>Branch</Label>
             <Select
               value={form.branch != null ? String(form.branch) : undefined}
               onValueChange={(v) => set("branch", Number(v))}
@@ -131,14 +132,17 @@ export function StudentFormDialog({
                 <SelectValue placeholder="Select branch" />
               </SelectTrigger>
               <SelectContent>
-                {branches.map((b) => (
-                  <SelectItem key={b.id} value={String(b.id)}>
-                    {b.name}
-                  </SelectItem>
-                ))}
+                {branches
+                  .filter((b) => b.is_active)
+                  .map((b) => (
+                    <SelectItem key={b.id} value={String(b.id)}>
+                      {b.name}
+                    </SelectItem>
+                  ))}
               </SelectContent>
             </Select>
           </div>
+          )}
           <div className="grid gap-2">
             <Label>Status</Label>
             <Select value={form.status ?? "active"} onValueChange={(v) => set("status", v as ApiStudentStatus)}>
@@ -172,7 +176,7 @@ export function StudentFormDialog({
             Cancel
           </Button>
           <Button variant="brand" onClick={submit} disabled={create.isPending}>
-            {create.isPending ? "Saving…" : fromLead ? "Convert" : "Create"}
+            {create.isPending ? "Saving…" : "Create"}
           </Button>
         </DialogFooter>
       </DialogContent>

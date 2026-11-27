@@ -1,6 +1,6 @@
 import { GraduationCap, Plus, Search } from "lucide-react";
-import { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,14 +11,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { ListPager } from "@/components/list-pager";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { useDataSource } from "@/context/data-source";
 import { useRole } from "@/context/role";
 import { useEnrollments } from "@/hooks/use-billing";
 import { formatDate, formatNPR } from "@/lib/leads-format";
 import { cn } from "@/lib/utils";
 import { EnrollmentDialog } from "@/pages/leads/components/enrollment-dialogs";
+import type { ApiEnrollmentStatus, ApiSeatState } from "@/types/leads-api";
 
 const STATUS_TONE: Record<string, string> = {
   active: "bg-brand-fixed-dim/20 text-brand-container",
@@ -30,28 +31,32 @@ const STATUS_TONE: Record<string, string> = {
   transferred: "bg-muted text-muted-foreground",
 };
 
+const STATUSES: ApiEnrollmentStatus[] = [
+  "pending",
+  "confirmed",
+  "active",
+  "completed",
+  "cancelled",
+  "dropped_out",
+  "transferred",
+];
+
 export default function EnrollmentsPage() {
   const navigate = useNavigate();
-  const { isMock, source } = useDataSource();
   const { can } = useRole();
-  const { rows, isLoading } = useEnrollments();
   const [search, setSearch] = useState("");
-  const [status, setStatus] = useState("all");
+  const [status, setStatus] = useState<ApiEnrollmentStatus | "all">("all");
+  const [seat, setSeat] = useState<ApiSeatState | "all">("all");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
   const [createOpen, setCreateOpen] = useState(false);
-
-  const statuses = useMemo(
-    () => [...new Set(rows.map((r) => r.status))].sort(),
-    [rows],
-  );
-
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return rows.filter((r) => {
-      if (status !== "all" && r.status !== status) return false;
-      if (q && !`${r.leadName} ${r.courseName} ${r.batch ?? ""}`.toLowerCase().includes(q)) return false;
-      return true;
-    });
-  }, [rows, search, status]);
+  const { rows, count, isLoading } = useEnrollments({
+    page,
+    pageSize,
+    search,
+    status: status === "all" ? undefined : status,
+    seat: seat === "all" ? undefined : seat,
+  });
 
   return (
     <div className="space-y-6">
@@ -59,7 +64,7 @@ export default function EnrollmentsPage() {
         <p className="text-brand font-mono text-[11px] font-bold tracking-wider uppercase">CRM Workspace</p>
         <h1 className="font-headline mt-1 text-3xl font-semibold tracking-tight">Enrollments</h1>
         <p className="text-muted-foreground mt-1 text-sm">
-          Enrollments across all leads.{isMock && " Previewing mock data."}
+          Enrollments across all leads.
         </p>
       </div>
 
@@ -70,23 +75,49 @@ export default function EnrollmentsPage() {
             placeholder="Search by lead, course, or batch"
             className="rounded-full pl-9"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setPage(1);
+            }}
           />
         </div>
-        <Select value={status} onValueChange={setStatus}>
+        <Select
+          value={status}
+          onValueChange={(v) => {
+            setStatus(v as ApiEnrollmentStatus | "all");
+            setPage(1);
+          }}
+        >
           <SelectTrigger className="w-44">
             <SelectValue placeholder="All statuses" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All statuses</SelectItem>
-            {statuses.map((s) => (
+            {STATUSES.map((s) => (
               <SelectItem key={s} value={s} className="capitalize">
                 {s.replace(/_/g, " ")}
               </SelectItem>
             ))}
           </SelectContent>
         </Select>
-        {source === "api" && can("enrollment.manage") && (
+        <Select
+            value={seat}
+            onValueChange={(v) => {
+              setSeat(v as ApiSeatState | "all");
+              setPage(1);
+            }}
+          >
+            <SelectTrigger className="w-40">
+              <SelectValue placeholder="All seats" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All seats</SelectItem>
+              <SelectItem value="seated">In a batch</SelectItem>
+              <SelectItem value="paused">Paused</SelectItem>
+              <SelectItem value="none">No batch</SelectItem>
+            </SelectContent>
+          </Select>
+        {can("enrollment.create") && (
           <Button variant="brand" onClick={() => setCreateOpen(true)}>
             <Plus /> New Enrollment
           </Button>
@@ -117,7 +148,7 @@ export default function EnrollmentsPage() {
                     </TableCell>
                   </TableRow>
                 ))}
-              {!isLoading && filtered.length === 0 && (
+              {!isLoading && rows.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={8} className="py-14 text-center">
                     <GraduationCap className="text-muted-foreground mx-auto size-8 opacity-40" />
@@ -125,15 +156,35 @@ export default function EnrollmentsPage() {
                   </TableCell>
                 </TableRow>
               )}
-              {filtered.map((e) => (
+              {rows.map((e) => (
                 <TableRow
                   key={e.id}
-                  className={cn(e.leadId && "cursor-pointer")}
-                  onClick={() => e.leadId && navigate(`/leads/${e.leadId}`)}
+                  className={cn("cursor-pointer")}
+                  onClick={() => navigate(`/enrollments/${e.id}`)}
                 >
-                  <TableCell className="font-semibold">{e.leadName}</TableCell>
+                  <TableCell className="font-semibold">
+                    {e.leadId ? (
+                      <Link
+                        to={`/leads/${e.leadId}`}
+                        className="hover:underline"
+                        onClick={(ev) => ev.stopPropagation()}
+                      >
+                        {e.leadName}
+                      </Link>
+                    ) : (
+                      e.leadName
+                    )}
+                  </TableCell>
                   <TableCell>{e.courseName}</TableCell>
-                  <TableCell className="text-muted-foreground">{e.batch || "—"}</TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {e.batch || "—"}
+                    {e.seatState === "paused" && (
+                      <div className="mt-1 flex items-center gap-1.5">
+                        <Badge variant="outline">Paused</Badge>
+                        {e.pausedOn && <span className="text-xs">{formatDate(e.pausedOn)}</span>}
+                      </div>
+                    )}
+                  </TableCell>
                   <TableCell>
                     <Badge
                       variant="secondary"
@@ -160,6 +211,17 @@ export default function EnrollmentsPage() {
             </TableBody>
           </Table>
         </div>
+        <ListPager
+          page={page}
+          pageSize={pageSize}
+          count={count}
+          noun="enrollments"
+          onPage={setPage}
+          onPageSize={(n) => {
+            setPageSize(n);
+            setPage(1);
+          }}
+        />
       </div>
 
       <EnrollmentDialog

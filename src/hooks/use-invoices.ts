@@ -1,32 +1,27 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { useDataSource } from "@/context/data-source";
 import { apiErrorMessage } from "@/lib/api";
 import { invoicesService } from "@/services/invoices.service";
 import type { InvoiceEmailConfigPayload, InvoiceListParams } from "@/types/invoices";
 
-/** Flat invoice register — live backend only (invoices have no mock fixtures). */
+/** Flat invoice register. */
 export function useInvoices(params: InvoiceListParams = {}) {
-  const { source } = useDataSource();
-  const enabled = source === "api";
   const query = useQuery({
     queryKey: ["invoices", "list", params],
-    enabled,
     queryFn: () => invoicesService.list({ ordering: "-created_at", page_size: 50, ...params }),
     placeholderData: keepPreviousData,
   });
   return {
     invoices: query.data?.results ?? [],
     count: query.data?.count ?? 0,
-    isLoading: enabled && query.isLoading,
-    isFetching: enabled && query.isFetching,
+    isLoading: query.isLoading,
+    isFetching: query.isFetching,
   };
 }
 
 /** One student's invoice history. */
 export function useStudentInvoices(studentId?: number | null) {
-  const { source } = useDataSource();
-  const enabled = source === "api" && studentId != null;
+  const enabled = studentId != null;
   const query = useQuery({
     queryKey: ["invoices", "student", studentId],
     enabled,
@@ -52,6 +47,21 @@ export function useResendInvoice() {
   });
 }
 
+/** Admin only — cancel an invoice with a reason (it also shows in the enrollment history). */
+export function useCancelInvoice() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, reason }: { id: number; reason: string }) =>
+      invoicesService.cancel(id, reason),
+    onSuccess: (data) => {
+      toast.success(`${data.invoice_number} cancelled`);
+      void qc.invalidateQueries({ queryKey: ["invoices"] });
+      void qc.invalidateQueries({ queryKey: ["lead"] });
+    },
+    onError: (e) => toast.error(apiErrorMessage(e, "Could not cancel the invoice")),
+  });
+}
+
 /** Admin only — global invoice-email CC config. */
 export function useInvoiceEmailConfig(enabled = true) {
   return useQuery({
@@ -71,4 +81,9 @@ export function useUpdateInvoiceEmailConfig() {
     },
     onError: (e) => toast.error(apiErrorMessage(e, "Could not save the email settings")),
   });
+}
+
+/** Opens an invoice or receipt PDF in a new tab; shows a message when it can't. */
+export function openInvoicePdf(id: number) {
+  invoicesService.openPdf(id).catch((e) => toast.error(apiErrorMessage(e, "Couldn't open the PDF")));
 }

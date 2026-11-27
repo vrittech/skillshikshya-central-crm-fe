@@ -1,9 +1,9 @@
 import { KeyRound, LogOut, Menu, Moon, Plus, Search, Sun } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { BranchSwitcher } from "@/components/layout/branch-switcher";
 import { ChangePasswordDialog } from "@/components/layout/change-password-dialog";
 import { NotificationBell } from "@/components/layout/notification-bell";
-import { RoleSwitcher } from "@/components/layout/role-switcher";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -14,15 +14,14 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/context/auth";
-import { useDataSource } from "@/context/data-source";
-import { cn } from "@/lib/utils";
+import { useRole } from "@/context/role";
 import { useTheme } from "@/lib/use-theme";
 
 export function AppHeader({ onMenuClick }: { onMenuClick: () => void }) {
   const { user, logout } = useAuth();
+  const { can } = useRole();
   const navigate = useNavigate();
   const { theme, toggle } = useTheme();
-  const { source, setSource } = useDataSource();
   const [changePwOpen, setChangePwOpen] = useState(false);
 
   const initials =
@@ -59,32 +58,14 @@ export function AppHeader({ onMenuClick }: { onMenuClick: () => void }) {
       </div>
 
       <div className="flex items-center gap-2 md:gap-3">
-        {/* Data-source toggle (dev) — live API vs mock preview */}
-        <div className="hidden items-center rounded-full border p-0.5 lg:inline-flex" title="Data source">
-          {(["api", "mock"] as const).map((s) => (
-            <button
-              key={s}
-              type="button"
-              onClick={() => setSource(s)}
-              className={cn(
-                "cursor-pointer rounded-full px-2.5 py-1 text-xs font-semibold transition-colors",
-                source === s
-                  ? "bg-brand-fixed-dim/30 text-brand-container"
-                  : "text-muted-foreground hover:bg-surface-container-low",
-              )}
-            >
-              {s === "api" ? "Live" : "Mock"}
-            </button>
-          ))}
-        </div>
+        <BranchSwitcher />
 
         {/* Quick Create */}
-        <Button variant="brand" size="sm" className="hidden sm:inline-flex" onClick={() => navigate("/leads/new")}>
-          <Plus /> Quick Create
-        </Button>
-
-        {/* Dev-only role switcher for previewing permission-scoped UI */}
-        <RoleSwitcher />
+        {can("leads.create") && (
+          <Button variant="brand" size="sm" className="hidden sm:inline-flex" onClick={() => navigate("/leads/new")}>
+            <Plus /> Quick Create
+          </Button>
+        )}
 
         {/* Notifications */}
         <NotificationBell />
@@ -117,7 +98,7 @@ export function AppHeader({ onMenuClick }: { onMenuClick: () => void }) {
                   {roleLabel}
                 </span>
               </span>
-              <span className="border-brand-container text-brand-container bg-brand-fixed-dim/30 flex size-9 items-center justify-center rounded-full border-2 text-xs font-bold">
+              <span className="border-brand-container text-brand-container dark:text-brand-fixed bg-brand-fixed-dim/30 flex size-9 items-center justify-center rounded-full border-2 text-xs font-bold">
                 {initials}
               </span>
             </button>

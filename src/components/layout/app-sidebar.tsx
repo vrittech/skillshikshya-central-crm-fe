@@ -6,14 +6,19 @@ import {
   CreditCard,
   FileText,
   GraduationCap,
+  Laptop,
+  Layers,
   LayoutDashboard,
   PhoneCall,
+  PiggyBank,
+  Funnel,
   Settings,
   ShieldCheck,
   Timer,
   TrendingUp,
   UserRound,
   Users,
+  Wallet,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { NavLink } from "react-router-dom";
@@ -26,20 +31,25 @@ interface NavItem {
   label: string;
   icon: React.ComponentType<{ className?: string }>;
   end?: boolean;
-  /** When set, the item is hidden unless the previewed role has this capability. */
-  cap?: Capability;
+  /** When set, the item is hidden unless the user has this capability (or all of a list). */
+  cap?: Capability | Capability[];
 }
 
 const navItems: NavItem[] = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, end: true },
-  { to: "/leads", label: "Leads", icon: UserRound },
-  { to: "/follow-ups", label: "Follow-ups", icon: CalendarClock },
-  { to: "/enrollments", label: "Enrollments", icon: GraduationCap, cap: "enrollment.manage" },
-  { to: "/payments", label: "Payments", icon: CreditCard, cap: "payment.manage" },
-  { to: "/invoices", label: "Invoices", icon: FileText, cap: "payment.manage" },
-  { to: "/students", label: "Students", icon: GraduationCap },
-  { to: "/reports", label: "Reports", icon: TrendingUp, cap: "reports.view" },
-  { to: "/calls", label: "Calls", icon: PhoneCall },
+  { to: "/leads", label: "Leads", icon: UserRound, cap: "leads.view" },
+  { to: "/follow-ups", label: "Follow-ups", icon: CalendarClock, cap: "followups.view" },
+  { to: "/enrollments", label: "Enrollments", icon: GraduationCap, cap: ["enrollment.manage", "enrollment.view"] },
+  { to: "/batches", label: "Batches", icon: Layers },
+  { to: "/payments", label: "Payments", icon: CreditCard, cap: ["payment.record", "payment.view"] },
+  { to: "/invoices", label: "Invoices", icon: FileText, cap: ["payment.record", "invoices.view"] },
+  { to: "/dues", label: "Dues", icon: Wallet, cap: "reports.view" },
+  { to: "/batch-profit", label: "Batch profit", icon: PiggyBank, cap: "reports.view" },
+  { to: "/enquiries", label: "Enquiries", icon: Funnel, cap: ["reports.view", "leads.view"] },
+  { to: "/students", label: "Students", icon: GraduationCap, cap: "students.view" },
+  { to: "/teams", label: "Teams licences", icon: Laptop, cap: "teams.view" },
+  { to: "/reports", label: "Reports", icon: TrendingUp, cap: ["reports.view", "leads.view"] },
+  { to: "/calls", label: "Calls", icon: PhoneCall, cap: "calls.view" },
   { to: "/call-minutes", label: "Call Minutes", icon: Timer },
   { to: "/courses", label: "Courses", icon: BookOpen },
   { to: "/branches", label: "Branches", icon: Building2 },
@@ -48,14 +58,16 @@ const navItems: NavItem[] = [
 
 const adminItems: NavItem[] = [
   { to: "/roles", label: "Roles & Permissions", icon: ShieldCheck, cap: "users.manage" },
-  { to: "/settings", label: "Settings", icon: Settings, cap: "settings.view" },
 ];
+
+/** Pinned to the bottom of the sidebar, below the scrolling list. */
+const settingsItem: NavItem = { to: "/settings", label: "Settings", icon: Settings, cap: "settings.view" };
 
 const COLLAPSE_KEY = "scc.sidebar.collapsed";
 
 export function AppSidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { user } = useAuth();
-  const { can } = useRole();
+  const { canAll } = useRole();
   const [collapsed, setCollapsed] = useState<boolean>(
     () => typeof window !== "undefined" && window.localStorage.getItem(COLLAPSE_KEY) === "1",
   );
@@ -64,10 +76,10 @@ export function AppSidebar({ open, onClose }: { open: boolean; onClose: () => vo
     window.localStorage.setItem(COLLAPSE_KEY, collapsed ? "1" : "0");
   }, [collapsed]);
 
-  // Nav visibility is driven by the previewed mock role (and real staff flag for
-  // the admin section), demonstrating permission-aware navigation before RBAC ships.
-  const visible = (item: NavItem) => !item.cap || can(item.cap);
+  // Nav items follow the user's permissions; the admin section is staff only.
+  const visible = (item: NavItem) => !item.cap || canAll(item.cap);
   const items = [...navItems, ...(user?.is_staff ? adminItems : [])].filter(visible);
+  const showSettings = !!user?.is_staff && visible(settingsItem);
 
   // `md:hidden` when collapsed keeps the mobile slide-over full-width regardless.
   const hideWhenCollapsed = collapsed ? "md:hidden" : "";
@@ -104,30 +116,26 @@ export function AppSidebar({ open, onClose }: { open: boolean; onClose: () => vo
         {/* Navigation */}
         <nav className="flex-1 space-y-1 overflow-y-auto px-4">
           {items.map((item) => (
-            <NavLink
+            <SidebarLink
               key={item.to}
-              to={item.to}
-              end={item.end}
+              item={item}
+              collapsed={collapsed}
+              hideWhenCollapsed={hideWhenCollapsed}
               onClick={onClose}
-              title={collapsed ? item.label : undefined}
-              className={({ isActive }) =>
-                cn(
-                  "flex items-center gap-3 rounded-lg border-l-4 px-4 py-3 text-sm transition-colors",
-                  collapsed && "md:justify-center md:gap-0 md:px-0",
-                  isActive
-                    ? "border-brand-fixed bg-white/15 text-white font-semibold"
-                    : "text-sidebar-foreground/75 hover:bg-white/10 hover:text-white border-transparent font-normal",
-                )
-              }
-            >
-              <item.icon className="size-5 shrink-0" />
-              <span className={hideWhenCollapsed}>{item.label}</span>
-            </NavLink>
+            />
           ))}
         </nav>
 
-        {/* Footer: collapse toggle (desktop) + org info */}
+        {/* Footer: settings, collapse toggle (desktop) + org info */}
         <div className="border-sidebar-border/30 mt-auto space-y-3 border-t px-4 pt-4 pb-6">
+          {showSettings && (
+            <SidebarLink
+              item={settingsItem}
+              collapsed={collapsed}
+              hideWhenCollapsed={hideWhenCollapsed}
+              onClick={onClose}
+            />
+          )}
           <button
             type="button"
             onClick={() => setCollapsed((c) => !c)}
@@ -149,11 +157,44 @@ export function AppSidebar({ open, onClose }: { open: boolean; onClose: () => vo
               Sankhamul, Kathmandu
             </p>
             <p className="text-sidebar-foreground/45 font-mono text-[10px] font-medium tracking-wider">
-              CRM v0.1.0 · Static Preview
+              CRM v0.1.0
             </p>
           </div>
         </div>
       </aside>
     </>
+  );
+}
+
+function SidebarLink({
+  item,
+  collapsed,
+  hideWhenCollapsed,
+  onClick,
+}: {
+  item: NavItem;
+  collapsed: boolean;
+  hideWhenCollapsed: string;
+  onClick: () => void;
+}) {
+  return (
+    <NavLink
+      to={item.to}
+      end={item.end}
+      onClick={onClick}
+      title={collapsed ? item.label : undefined}
+      className={({ isActive }) =>
+        cn(
+          "flex items-center gap-3 rounded-lg border-l-4 px-4 py-3 text-sm transition-colors",
+          collapsed && "md:justify-center md:gap-0 md:px-0",
+          isActive
+            ? "border-brand-fixed bg-white/15 text-white font-semibold"
+            : "text-sidebar-foreground/75 hover:bg-white/10 hover:text-white border-transparent font-normal",
+        )
+      }
+    >
+      <item.icon className="size-5 shrink-0" />
+      <span className={hideWhenCollapsed}>{item.label}</span>
+    </NavLink>
   );
 }

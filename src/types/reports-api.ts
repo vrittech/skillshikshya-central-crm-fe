@@ -23,7 +23,6 @@ export interface LeadDimensionFilters {
   status?: number;
   source?: number;
   campaign?: number;
-  lead_type?: number;
   priority?: number;
   assigned_counselor?: number;
   primary_course?: number;
@@ -210,3 +209,185 @@ export interface CounselorPerformanceReport {
 export interface CounselorPerformanceParams extends ReportBaseParams {
   sort_by?: CounselorSortBy;
 }
+
+/* ------------------------------------------------------------ money owed */
+
+/** Who a dues row is about — shared by Who owes and Due in month. */
+export interface DuesPerson {
+  enrollment: number;
+  lead: number;
+  name: string;
+  phone: string | null;
+  student_id: string | null;
+  course_name: string;
+  /** The money batch. */
+  batch?: number | null;
+  batch_name: string | null;
+  branch_name: string | null;
+  /** The lead's counselor: the person who chases the money. */
+  counselor?: number | null;
+  counselor_name?: string | null;
+  seat_state?: "seated" | "paused" | "none";
+  paused_on?: string | null;
+}
+
+export interface WhoOwesRow extends DuesPerson {
+  owed: string;
+  late: string;
+  /** Days since the oldest late part was due; 0 when nothing is late. */
+  days_late: number;
+  next_due_on: string | null;
+  next_due_amount: string | null;
+}
+
+export interface WhoOwesReport {
+  as_of: string;
+  summary: {
+    students: number;
+    total_owed: string;
+    total_late: string;
+    not_late: string;
+    days_1_30: string;
+    days_31_60: string;
+    days_61_90: string;
+    over_90: string;
+  };
+  /** Rows added up per counselor; counselor null = nobody assigned. */
+  by_counselor?: (OwedGroup & { counselor: number | null; counselor_name: string | null })[];
+  /** Rows added up per money batch; batch null = no batch. */
+  by_batch?: (OwedGroup & { batch: number | null; batch_name: string | null })[];
+  results: WhoOwesRow[];
+  error?: string;
+}
+
+/** Who owes, added up for one counselor or one batch. */
+export interface OwedGroup {
+  students: number;
+  owed: string;
+  late: string;
+  /** The longest any of them is late, in days. */
+  days_late: number;
+}
+
+export interface WhoOwesParams {
+  branch_id?: number;
+  course?: number;
+  batch?: number;
+  /** A counselor id, or "none" for students with nobody assigned. */
+  counselor?: number | "none";
+  seat?: "seated" | "paused" | "none";
+  late_only?: boolean;
+}
+
+export interface DueInMonthRow extends DuesPerson {
+  kind: "part" | "extra_charge";
+  due_on: string;
+  amount: string;
+  paid: string;
+  left: string;
+}
+
+export interface DueInMonthReport {
+  month: string;
+  start_date: string;
+  end_date: string;
+  summary: { total_due: string; parts: number; students: number };
+  results: DueInMonthRow[];
+  error?: string;
+}
+
+export interface DueInMonthParams {
+  branch_id?: number;
+  /** YYYY-MM; next month when left out. */
+  month?: string;
+  course?: number;
+  batch?: number;
+}
+
+/* ------------------------------------------------------------ batch profit */
+
+/** Money of a batch, counted on the batch the student first joined. */
+export interface BatchProfitFigures {
+  students: number;
+  fees: string;
+  collected: string;
+  owed: string;
+  costs: string;
+  profit: string;
+}
+
+export interface BatchProfitRow extends BatchProfitFigures {
+  batch: number;
+  coursebatch_id: string;
+  name: string;
+  course_name: string;
+  status: "upcoming" | "running" | "closed";
+  status_display: string;
+  start_date: string | null;
+  end_date: string | null;
+  /** Closed batches only. */
+  closed_at: string | null;
+  at_close: BatchProfitFigures | null;
+}
+
+export interface BatchProfitReport {
+  summary: BatchProfitFigures & { batches: number };
+  results: BatchProfitRow[];
+  error?: string;
+}
+
+export interface BatchProfitParams {
+  branch_id?: number;
+  course?: number;
+  status?: "upcoming" | "running" | "closed";
+  /** Batches that start on or after this day, YYYY-MM-DD. */
+  start_date?: string;
+  /** Batches that start on or before this day, YYYY-MM-DD. */
+  end_date?: string;
+}
+
+export interface EnquiryFunnelParams extends ReportBaseParams {
+  course?: number;
+  source?: number;
+  counselor?: number;
+}
+
+export interface EnquiryFunnelStage {
+  stage: "new" | "contacted" | "interested" | "won";
+  label: string;
+  reached: number;
+  reached_rate: number;
+  open: number;
+  lost: number;
+  lost_rate: number;
+}
+
+export interface EnquiryBreakdownRow {
+  id: number | null;
+  name: string;
+  enquiries: number;
+  won: number;
+  lost: number;
+  open: number;
+  win_rate: number;
+}
+
+/** Where enquiries die: reached per stage, where the lost ones stopped and why. */
+export interface EnquiryFunnelReport {
+  summary: {
+    enquiries: number;
+    won: number;
+    lost: number;
+    open: number;
+    stale: number;
+    stale_days: number;
+    win_rate: number;
+  };
+  funnel: EnquiryFunnelStage[];
+  lost_by_reason: { reason: string; label: string; count: number; rate: number }[];
+  by_course: EnquiryBreakdownRow[];
+  by_source: EnquiryBreakdownRow[];
+  by_counselor: EnquiryBreakdownRow[];
+  error?: string;
+}
+

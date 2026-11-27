@@ -190,7 +190,7 @@ export function CallMinutesDialog({
 
         <form onSubmit={handleSubmit} className="flex items-end gap-3">
           <div className="w-32 space-y-1.5">
-            <Label htmlFor="cm-amount">Amount</Label>
+            <Label htmlFor="cm-amount" required>Amount</Label>
             <Input
               id="cm-amount"
               type="number"
@@ -203,7 +203,7 @@ export function CallMinutesDialog({
             />
           </div>
           <div className="flex-1 space-y-1.5">
-            <Label htmlFor="cm-note">Note (optional)</Label>
+            <Label htmlFor="cm-note">Note</Label>
             <Input
               id="cm-note"
               placeholder="August quota"

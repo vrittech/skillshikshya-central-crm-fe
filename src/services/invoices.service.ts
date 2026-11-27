@@ -23,9 +23,33 @@ export const invoicesService = {
     return data;
   },
 
-  /** Admin only — queues the invoice email task again (styled HTML email). */
+  /**
+   * Opens the invoice or receipt PDF in a new tab. The tab is opened first,
+   * while the click still counts, so the browser doesn't block it.
+   */
+  async openPdf(id: number) {
+    const tab = window.open("", "_blank");
+    try {
+      const { data } = await api.get<Blob>(`/invoices/${id}/pdf/`, { responseType: "blob" });
+      const url = URL.createObjectURL(data);
+      if (tab) tab.location.href = url;
+      else window.location.assign(url);
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch (e) {
+      tab?.close();
+      throw e;
+    }
+  },
+
+  /** Admin only — emails the invoice or receipt again, with its PDF. */
   async resend(id: number) {
     const { data } = await api.post<InvoiceResendResponse>(`/invoices/${id}/resend/`, {});
+    return data;
+  },
+
+  /** Admin only — cancel a wrong invoice. The reason is required and kept. */
+  async cancel(id: number, reason: string) {
+    const { data } = await api.post<ApiInvoice>(`/invoices/${id}/cancel/`, { reason });
     return data;
   },
 

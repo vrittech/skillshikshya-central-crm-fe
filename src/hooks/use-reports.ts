@@ -1,10 +1,14 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { reportsService } from "@/services/reports.service";
 import type {
+  BatchProfitParams,
   CounselorPerformanceParams,
+  DueInMonthParams,
+  EnquiryFunnelParams,
   EnrollmentsReportParams,
   LeadTrendParams,
   ReportBaseParams,
+  WhoOwesParams,
 } from "@/types/reports-api";
 
 /** Shared staleTime — report aggregates don't need to be real-time. */
@@ -34,15 +38,7 @@ export function useLeadsBySource(params: ReportBaseParams, enabled = true) {
     queryFn: () => reportsService.bySource(params),
     enabled,
     staleTime: STALE,
-  });
-}
-
-export function useLeadsByType(params: ReportBaseParams, enabled = true) {
-  return useQuery({
-    queryKey: ["reports", "by-type", params],
-    queryFn: () => reportsService.byType(params),
-    enabled,
-    staleTime: STALE,
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -52,6 +48,7 @@ export function useLeadTrend(params: LeadTrendParams, enabled = true) {
     queryFn: () => reportsService.leadTrend(params),
     enabled,
     staleTime: STALE,
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -61,6 +58,7 @@ export function useConversionReport(params: ReportBaseParams, enabled = true) {
     queryFn: () => reportsService.conversion(params),
     enabled,
     staleTime: STALE,
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -70,6 +68,7 @@ export function useRevenueReport(params: ReportBaseParams, enabled = true) {
     queryFn: () => reportsService.revenue(params),
     enabled,
     staleTime: STALE,
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -91,3 +90,40 @@ export function useCounselorPerformance(params: CounselorPerformanceParams, enab
     staleTime: STALE,
   });
 }
+
+export function useWhoOwes(params: WhoOwesParams, enabled = true) {
+  return useQuery({
+    queryKey: ["reports", "who-owes", params],
+    queryFn: () => reportsService.whoOwes(params),
+    enabled,
+    placeholderData: keepPreviousData,
+  });
+}
+
+export function useDueInMonth(params: DueInMonthParams, enabled = true) {
+  return useQuery({
+    queryKey: ["reports", "due-in-month", params],
+    queryFn: () => reportsService.dueInMonth(params),
+    enabled,
+    placeholderData: keepPreviousData,
+  });
+}
+
+export function useBatchProfit(params: BatchProfitParams, enabled = true) {
+  return useQuery({
+    queryKey: ["reports", "batch-profit", params],
+    queryFn: () => reportsService.batchProfit(params),
+    enabled,
+    placeholderData: keepPreviousData,
+  });
+}
+
+export function useEnquiryFunnel(params: EnquiryFunnelParams, enabled = true) {
+  return useQuery({
+    queryKey: ["reports", "enquiry-funnel", params],
+    queryFn: () => reportsService.enquiryFunnel(params),
+    enabled,
+    placeholderData: keepPreviousData,
+  });
+}
+

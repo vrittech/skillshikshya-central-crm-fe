@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Combobox } from "@/components/ui/combobox";
@@ -24,7 +25,7 @@ import { useBranches } from "@/hooks/use-branches";
 import { useGroups } from "@/hooks/use-groups";
 import { useRegisterUser, useUpdateUser } from "@/hooks/use-users";
 import { useAuth } from "@/context/auth";
-import { useDataSource } from "@/context/data-source";
+import { useBranchScope } from "@/context/branch-scope";
 import type { RegisterPayload, User } from "@/types";
 
 const WEEKDAYS = [
@@ -128,13 +129,16 @@ export function UserFormDialog({
 }) {
   const isEdit = user != null;
   const { user: currentUser } = useAuth();
-  const { source } = useDataSource();
   const isStaff = !!currentUser?.is_staff;
+  // Everyone but staff works inside one branch. A staff user adding someone
+  // must pick it; others' new users join their own branch.
+  const needsBranch = isStaff && !(user?.is_staff || user?.is_superuser);
+  const scope = useBranchScope();
   const [form, setForm] = useState<FormState>(emptyForm);
   const [branchSearch, setBranchSearch] = useState("");
   const [branchLabel, setBranchLabel] = useState("");
   const groups = useGroups(open && isStaff);
-  const branchesQ = useBranches(1, 100, branchSearch, open && isStaff && source === "api");
+  const branchesQ = useBranches(1, 100, branchSearch, open && isStaff);
   const register = useRegisterUser();
   const update = useUpdateUser();
   const busy = register.isPending || update.isPending;
@@ -146,11 +150,13 @@ export function UserFormDialog({
 
   useEffect(() => {
     if (open) {
-      setForm(user ? toForm(user) : emptyForm);
-      setBranchLabel(user?.branch_name ?? "");
+      // A new login starts on the branch an admin is looking at.
+      const scoped = scope.branchId != null ? String(scope.branchId) : "";
+      setForm(user ? toForm(user) : { ...emptyForm, branch: scoped });
+      setBranchLabel(user ? (user.branch_name ?? "") : (scope.branch?.name ?? ""));
       setBranchSearch("");
     }
-  }, [open, user]);
+  }, [open, user, scope.branchId, scope.branch]);
 
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) =>
     setForm((f) => ({ ...f, [key]: value }));
@@ -185,6 +191,10 @@ export function UserFormDialog({
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
+    if (needsBranch && !form.branch) {
+      toast.error("Pick a branch.");
+      return;
+    }
     if (isEdit) {
       // Only staff manage groups/active status. For a non-staff self-edit the role
       // select is hidden, so sending groups here would wipe existing membership.
@@ -214,17 +224,11 @@ export function UserFormDialog({
         email: form.email,
         password: form.password,
         ...buildCommon(),
+        ...(isStaff
+          ? { branch: form.branch ? Number(form.branch) : null, groups: form.group ? [Number(form.group)] : [] }
+          : {}),
       };
-      register.mutate(payload, {
-        onSuccess: (data) => {
-          // groups and branch can't be set at registration — patch right after if chosen
-          const post: Record<string, unknown> = {};
-          if (form.group) post.groups = [Number(form.group)];
-          if (form.branch) post.branch = Number(form.branch);
-          if (Object.keys(post).length) update.mutate({ id: data.user.id, payload: post });
-          onOpenChange(false);
-        },
-      });
+      register.mutate(payload, { onSuccess: () => onOpenChange(false) });
     }
   }
 
@@ -233,11 +237,7 @@ export function UserFormDialog({
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>{isEdit ? `Edit ${user.name}` : "Register new user"}</DialogTitle>
-          <DialogDescription>
-            {isEdit
-              ? "Update profile, role, targets, and schedule."
-              : "Creates the account via /auth/register — name, email, and password are required."}
-          </DialogDescription>
+          <DialogDescription className="sr-only">User details</DialogDescription>
         </DialogHeader>
         <form onSubmit={submit} className="space-y-5">
           <div className="grid gap-4 sm:grid-cols-2">
@@ -311,14 +311,14 @@ export function UserFormDialog({
                 </Select>
               </div>
             )}
-            {isStaff && source === "api" && (
+            {isStaff && (
               <div className="space-y-2">
-                <Label>Branch</Label>
+                <Label required={needsBranch}>Branch</Label>
                 <Combobox
                   value={form.branch}
                   onChange={onPickBranch}
                   options={branchOptions}
-                  placeholder="Unassigned"
+                  placeholder={needsBranch ? "Select branch" : "No branch"}
                   searchPlaceholder="Search branches…"
                   emptyText="No branches found."
                   onSearchChange={setBranchSearch}

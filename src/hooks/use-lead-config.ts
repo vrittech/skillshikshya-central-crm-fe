@@ -8,7 +8,6 @@ import {
   leadSourcesService,
   leadStatusesService,
   leadTagsService,
-  leadTypesService,
   learningModesService,
 } from "@/services/lead-config.service";
 import type {
@@ -18,7 +17,6 @@ import type {
   ApiLeadSource,
   ApiLeadStatus,
   ApiLeadTag,
-  ApiLeadTypeConfig,
   ApiLearningMode,
 } from "@/types/leads-api";
 
@@ -65,15 +63,6 @@ export function useLeadPriorities(enabled = true) {
       data.results = [...data.results].sort((a, b) => a.sort_order - b.sort_order);
       return data;
     },
-    enabled,
-    staleTime: 5 * 60 * 1000,
-  });
-}
-
-export function useLeadTypes(enabled = true) {
-  return useQuery({
-    queryKey: ["lead-types"],
-    queryFn: () => leadTypesService.list(BIG),
     enabled,
     staleTime: 5 * 60 * 1000,
   });
@@ -175,11 +164,6 @@ export const tagHooks = makeCrudHooks<ApiLeadTag, Omit<ApiLeadTag, "id">>(
   leadTagsService,
   "lead-tags",
   "Tag",
-);
-export const typeHooks = makeCrudHooks<ApiLeadTypeConfig, Omit<ApiLeadTypeConfig, "id">>(
-  leadTypesService,
-  "lead-types",
-  "Lead type",
 );
 export const learningModeHooks = makeCrudHooks<ApiLearningMode, Omit<ApiLearningMode, "id">>(
   learningModesService,

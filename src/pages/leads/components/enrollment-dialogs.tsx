@@ -27,33 +27,40 @@ import { useLeadOptions } from "@/hooks/use-lead-options";
 import {
   useAddEnrollment,
   useAddPayment,
-  usePayment,
+  useConfirmEnrollment,
   useUpdateEnrollment,
-  useUpdatePayment,
   useLeadEnrollments,
 } from "@/hooks/use-leads";
 import type {
+  ApiDuePart,
   ApiEnrollment,
   ApiEnrollmentPayload,
-  ApiEnrollmentStatus,
-  ApiPayment,
   ApiPaymentMethod,
   ApiPaymentPayload,
   ApiPaymentStatus,
 } from "@/types/leads-api";
-import { toNepalIso } from "@/lib/leads-format";
+import { partsAreValid, splitEvenly } from "@/lib/due-dates";
+import { formatNPR, toNepalIso } from "@/lib/leads-format";
+import { batchOption, localToday, takesNoOne } from "@/lib/seats";
+import { DuePartsEditor } from "./due-dates";
 
-const ENR_STATUS: ApiEnrollmentStatus[] = [
-  "pending",
-  "confirmed",
-  "active",
-  "completed",
-  "cancelled",
-  "dropped_out",
-  "transferred",
-];
 const PAY_METHODS: ApiPaymentMethod[] = ["cash", "esewa", "khalti", "bank_transfer", "card", "connectips"];
-const PAY_STATUS: ApiPaymentStatus[] = ["pending", "successful", "failed", "refunded", "voided"];
+/** A new payment is pending or successful; Confirm and Void change it later. */
+const PAY_STATUS: ApiPaymentStatus[] = ["successful", "pending"];
+
+/** A short error under a money field. */
+function FieldError({ children }: { children?: string | null }) {
+  if (!children) return null;
+  return <p className="text-destructive text-xs">{children}</p>;
+}
+
+/** Why a payment amount can't be taken, checked against what is left to pay. */
+function paymentAmountError(amount: string | undefined, left: number | null) {
+  if (left == null) return null;
+  if (left <= 0) return "Nothing left to pay";
+  if (Number(amount) > left) return `More than left to pay (${formatNPR(left)})`;
+  return null;
+}
 
 function num(a: string, b: string) {
   return String((Number(a || "0") - Number(b || "0") - 0).toFixed(2));
@@ -81,34 +88,65 @@ export function EnrollmentDialog({
 }) {
   const [f, setF] = useState<ApiEnrollmentPayload>({});
   const isEdit = !!enrollment;
+  const wasPending = enrollment?.status === "pending";
+  // The price can change until the enrollment is confirmed or something is paid.
+  const priceLocked = isEdit && !(wasPending && Number(enrollment?.total_paid ?? 0) === 0);
+  // Once confirmed, the course and the money batch are fixed.
+  const seatLocked = isEdit && !wasPending;
   const needsLead = allowLeadPick && !isEdit;
   const [pickedLeadId, setPickedLeadId] = useState<string>("");
   const [leadSearch, setLeadSearch] = useState("");
+  // The listed fee is the course price. The agreed amount follows it until
+  // the user types their own value.
+  const [agreedEdited, setAgreedEdited] = useState(false);
   const effectiveLeadId = leadId ?? (pickedLeadId ? Number(pickedLeadId) : undefined);
 
   const leadOptionsQ = useLeadOptions(open && needsLead ? leadSearch : "");
   const coursesQ = useCourses(1, 100, "");
   const courses = useMemo(() => coursesQ.data?.results ?? [], [coursesQ.data]);
+  // Closed batches take no one new, so they are not offered.
+  // An enrollment can only plan a batch of its own branch.
   const batchesQ = useCourseBatches(
-    { course: f.course, page_size: 100, is_active: true },
+    {
+      course: f.course,
+      page_size: 100,
+      is_active: true,
+      status: ["upcoming", "running"],
+      branch_id: enrollment?.branch ?? undefined,
+    },
     !!f.course,
   );
   const batches = useMemo(() => batchesQ.data?.results ?? [], [batchesQ.data]);
+  const chosenBatch = batches.find((b) => b.id === f.batch);
+  // The saved batch may be closed or inactive now; still show its name.
+  const savedBatchMissing =
+    enrollment?.batch != null && !batches.some((b) => b.id === enrollment.batch);
   const addEnrollment = useAddEnrollment(effectiveLeadId);
   const updateEnrollment = useUpdateEnrollment(leadId);
+  // "Save and confirm" opens Confirm (with the first payment) for the new enrollment.
+  const [confirming, setConfirming] = useState<{ leadId: number; enrollment: ApiEnrollment } | null>(
+    null,
+  );
   const saving = addEnrollment.isPending || updateEnrollment.isPending;
 
   useEffect(() => {
     if (!open) return;
     setPickedLeadId("");
     setLeadSearch("");
+    // On edit, the agreed amount keeps following the fee if it still equals fee minus discounts.
+    const agreedFollowsFee =
+      enrollment != null &&
+      Number(enrollment.agreed_amount) ===
+        Number(enrollment.listed_fee) -
+          Number(enrollment.standard_discount) -
+          Number(enrollment.additional_discount);
+    setAgreedEdited(!!enrollment && !agreedFollowsFee);
     if (enrollment) {
       setF({
         course: enrollment.course,
         batch: enrollment.batch,
         student: enrollment.student,
-        enrollment_date: enrollment.enrollment_date ?? new Date().toISOString().slice(0, 10),
-        status: enrollment.status,
+        enrollment_date: enrollment.enrollment_date ?? localToday(),
         listed_fee: enrollment.listed_fee,
         standard_discount: enrollment.standard_discount,
         additional_discount: enrollment.additional_discount,
@@ -120,29 +158,71 @@ export function EnrollmentDialog({
     setF({
       course: primaryCourseId ?? undefined,
       batch: undefined,
-      enrollment_date: new Date().toISOString().slice(0, 10),
-      status: "active",
+      enrollment_date: localToday(),
+      // A new enrollment is pending until it is confirmed (that makes the lead a student).
+      status: "pending",
       listed_fee: "0",
       standard_discount: "0",
       additional_discount: "0",
-      agreed_amount: "0",
+      agreed_amount: "",
       remarks: "",
     });
   }, [open, primaryCourseId, enrollment]);
+
+  // The listed fee is the price set on the course (also for a preselected
+  // course, once the course list has loaded). The server sets it the same way.
+  const courseChanged = f.course != null && f.course !== enrollment?.course;
+  useEffect(() => {
+    if (!open || f.course == null || (isEdit && !courseChanged)) return;
+    const course = courses.find((c) => c.id === f.course);
+    if (course) setF((p) => ({ ...p, listed_fee: String(Number(course.full_amount || 0)) }));
+  }, [open, isEdit, courseChanged, f.course, courses]);
 
   const set = <K extends keyof ApiEnrollmentPayload>(k: K, v: ApiEnrollmentPayload[K]) =>
     setF((p) => ({ ...p, [k]: v }));
 
   // Keep agreed = listed - standard - additional as a helpful default.
   const agreedAuto = num(num(f.listed_fee ?? "0", f.standard_discount ?? "0"), f.additional_discount ?? "0");
+  // The same limits the server checks: a typo (100000 for 10000) is caught here first.
+  const listed = Number(f.listed_fee ?? 0);
+  const discountTotal = Number(f.standard_discount || 0) + Number(f.additional_discount || 0);
+  const agreedValue = Number(agreedEdited ? f.agreed_amount || 0 : agreedAuto);
+  const discountError =
+    Number(f.standard_discount || 0) < 0 || Number(f.additional_discount || 0) < 0
+      ? "Can't be below 0"
+      : discountTotal > listed
+        ? `More than the listed fee (${formatNPR(listed)})`
+        : null;
+  const agreedError =
+    discountError || priceLocked
+      ? null
+      : agreedValue < 0
+        ? "Can't be below 0"
+        : agreedValue > listed - discountTotal
+          ? `More than ${formatNPR(listed - discountTotal)}`
+          : null;
+  const priceInvalid = !priceLocked && (!!discountError || !!agreedError);
 
-  function submit() {
+  function submit(confirmAfter = false) {
     if (needsLead && !effectiveLeadId) {
       toast.error("Pick a lead first.");
       return;
     }
-    if (!f.course) return;
-    const payload = { ...f, agreed_amount: f.agreed_amount || agreedAuto };
+    if (!f.course) {
+      toast.error("Pick a course.");
+      return;
+    }
+    if (!f.enrollment_date) {
+      toast.error("Pick the enrollment date.");
+      return;
+    }
+    const payload = {
+      ...f,
+      // A cleared discount box means no discount; the API refuses an empty number.
+      standard_discount: f.standard_discount || "0",
+      additional_discount: f.additional_discount || "0",
+      agreed_amount: agreedEdited && f.agreed_amount ? f.agreed_amount : agreedAuto,
+    };
     if (enrollment) {
       updateEnrollment.mutate({ id: enrollment.id, payload }, { onSuccess: () => onClose() });
       return;
@@ -151,132 +231,288 @@ export function EnrollmentDialog({
       onSuccess: (created) => {
         onCreated?.(created);
         onClose();
+        // "Save and confirm": take the first payment and confirm right away.
+        if (confirmAfter && effectiveLeadId != null) {
+          setConfirming({ leadId: effectiveLeadId, enrollment: created });
+        }
       },
     });
+  }
+
+  return (
+    <>
+      <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{isEdit ? "Edit enrollment" : "Create enrollment"}</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-2 sm:grid-cols-2">
+            {needsLead && (
+              <div className="grid gap-2 sm:col-span-2">
+                <Label required>Lead</Label>
+                <Combobox
+                  value={pickedLeadId}
+                  onChange={setPickedLeadId}
+                  onSearchChange={setLeadSearch}
+                  options={leadOptionsQ.options}
+                  loading={leadOptionsQ.isLoading && !!leadSearch}
+                  placeholder="Search leads by name or phone…"
+                  searchPlaceholder="Type to search…"
+                  emptyText="No leads match."
+                />
+              </div>
+            )}
+            <div className="grid gap-2 sm:col-span-2">
+              <Label required>Course</Label>
+              <Select
+                disabled={seatLocked}
+                value={f.course != null ? String(f.course) : undefined}
+                onValueChange={(v) => {
+                  setF((p) => ({
+                    ...p,
+                    course: Number(v),
+                    batch: undefined,
+                  }));
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select course" />
+                </SelectTrigger>
+                <SelectContent>
+                  {courses.map((c) => (
+                    <SelectItem key={c.id} value={String(c.id)}>
+                      {c.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid min-w-0 gap-2 sm:col-span-2">
+              <Label>Course Batch</Label>
+              <Select
+                value={f.batch != null ? String(f.batch) : undefined}
+                onValueChange={(v) => {
+                  setF((p) => ({
+                    ...p,
+                    batch: Number(v),
+                  }));
+                }}
+                disabled={seatLocked || !f.course || batchesQ.isLoading}
+              >
+                <SelectTrigger className="min-w-0 [&>span]:text-ellipsis">
+                  <SelectValue placeholder={f.course ? "Select course batch" : "Select a course first"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {savedBatchMissing && enrollment?.batch != null && (
+                    <SelectItem value={String(enrollment.batch)}>
+                      {enrollment.batch_name ?? `Batch #${enrollment.batch}`}
+                    </SelectItem>
+                  )}
+                  {batches.map((b) => (
+                    <SelectItem
+                      key={b.id}
+                      value={String(b.id)}
+                      disabled={takesNoOne(b) && b.id !== enrollment?.batch}
+                    >
+                      {batchOption(b)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {!seatLocked && chosenBatch && takesNoOne(chosenBatch) && (
+                <p className="text-xs text-amber-600 dark:text-amber-400">
+                  {chosenBatch.capacity == null ? "This batch has no seats set." : "This batch is full."}
+                </p>
+              )}
+            </div>
+            <div className="grid gap-2">
+              <Label required>Enrollment date</Label>
+              <Input type="date" value={f.enrollment_date ?? ""} onChange={(e) => set("enrollment_date", e.target.value)} />
+            </div>
+            {/* The price is fixed once confirmed or paid; later changes are money entries with a reason. */}
+            <div className="grid gap-2">
+              <Label htmlFor="enrollment-listed-fee">Listed fee</Label>
+              <Input id="enrollment-listed-fee" type="number" value={f.listed_fee ?? ""} readOnly disabled />
+            </div>
+            <div className="grid gap-2">
+              <Label>Standard discount</Label>
+              <Input type="number" value={f.standard_discount ?? ""} disabled={priceLocked} onChange={(e) => set("standard_discount", e.target.value)} />
+            </div>
+            <div className="grid gap-2">
+              <Label>Additional discount</Label>
+              <Input type="number" value={f.additional_discount ?? ""} disabled={priceLocked} onChange={(e) => set("additional_discount", e.target.value)} />
+              {!priceLocked && <FieldError>{discountError}</FieldError>}
+            </div>
+            <div className="grid gap-2">
+              <Label>Agreed amount</Label>
+              <Input
+                type="number"
+                value={agreedEdited ? (f.agreed_amount ?? "") : agreedAuto}
+                disabled={priceLocked}
+                onChange={(e) => {
+                  setAgreedEdited(true);
+                  set("agreed_amount", e.target.value);
+                }}
+              />
+              <FieldError>{agreedError}</FieldError>
+            </div>
+            <div className="grid gap-2 sm:col-span-2">
+              <Label>Remarks</Label>
+              <Textarea rows={2} value={f.remarks ?? ""} onChange={(e) => set("remarks", e.target.value)} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={onClose}>
+              Cancel
+            </Button>
+            {isEdit ? (
+              <Button variant="brand" onClick={() => submit()} disabled={saving || priceInvalid}>
+                {saving ? "Saving…" : "Save Changes"}
+              </Button>
+            ) : (
+              <>
+                <Button variant="outline" onClick={() => submit()} disabled={saving || priceInvalid}>
+                  Save as pending
+                </Button>
+                <Button variant="brand" onClick={() => submit(true)} disabled={saving || priceInvalid}>
+                  {saving ? "Saving…" : "Save and confirm"}
+                </Button>
+              </>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <ConfirmEnrollmentDialog
+        leadId={confirming?.leadId}
+        enrollment={confirming?.enrollment ?? null}
+        onClose={() => setConfirming(null)}
+      />
+    </>
+  );
+}
+
+/**
+ * Confirm a pending enrollment: the lead becomes a student. Something must be
+ * paid first, so when nothing is paid the first payment is taken here, in the
+ * same step as the confirm.
+ */
+export function ConfirmEnrollmentDialog({
+  leadId,
+  enrollment,
+  onClose,
+}: {
+  leadId?: number;
+  enrollment: ApiEnrollment | null;
+  onClose: () => void;
+}) {
+  const confirm = useConfirmEnrollment();
+  const [parts, setParts] = useState<ApiDuePart[]>([]);
+  const [amount, setAmount] = useState("");
+  const [method, setMethod] = useState<ApiPaymentMethod>("esewa");
+  const [reference, setReference] = useState("");
+  const open = enrollment != null;
+  const agreed = Number(enrollment?.agreed_amount ?? 0);
+  const paid = Number(enrollment?.total_paid ?? 0) - Number(enrollment?.refunds_total ?? 0);
+  const needsPayment = agreed > 0 && paid <= 0;
+
+  useEffect(() => {
+    if (!open) return;
+    setParts(splitEvenly(agreed, 1, localToday()));
+    setAmount("");
+    setMethod("esewa");
+    setReference("");
+  }, [open, agreed]);
+
+  const left = Number(enrollment?.remaining_amount ?? 0);
+  const firstError = needsPayment && amount ? paymentAmountError(amount, left) : null;
+  const amountOk = !needsPayment || (Number(amount) > 0 && !firstError);
+  const valid = amountOk && (agreed <= 0 || partsAreValid(parts, agreed));
+
+  function submit() {
+    if (!enrollment || leadId == null) return;
+    confirm.mutate(
+      {
+        leadId,
+        id: enrollment.id,
+        dueDates: agreed > 0 ? parts : undefined,
+        firstPayment: needsPayment
+          ? { amount, payment_method: method, transaction_reference: reference.trim() || undefined }
+          : undefined,
+      },
+      { onSuccess: onClose },
+    );
   }
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{isEdit ? "Edit enrollment" : "Create enrollment"}</DialogTitle>
-          <DialogDescription>Record the lead, course, batch, and agreed fee.</DialogDescription>
-        </DialogHeader>
-        <div className="grid gap-4 py-2 sm:grid-cols-2">
-          {needsLead && (
-            <div className="grid gap-2 sm:col-span-2">
-              <Label required>Lead</Label>
-              <Combobox
-                value={pickedLeadId}
-                onChange={setPickedLeadId}
-                onSearchChange={setLeadSearch}
-                options={leadOptionsQ.options}
-                loading={leadOptionsQ.isLoading && !!leadSearch}
-                placeholder="Search leads by name or phone…"
-                searchPlaceholder="Type to search…"
-                emptyText="No leads match."
-              />
-            </div>
+          <DialogTitle>Confirm enrollment</DialogTitle>
+          {enrollment && (
+            <DialogDescription>
+              {[enrollment.lead_name, enrollment.course_name, enrollment.batch_name, formatNPR(agreed)]
+                .filter(Boolean)
+                .join(" · ")}
+            </DialogDescription>
           )}
-          <div className="grid gap-2 sm:col-span-2">
-            <Label required>Course</Label>
-            <Select
-              value={f.course != null ? String(f.course) : undefined}
-              onValueChange={(v) =>
-                setF((p) => ({
-                  ...p,
-                  course: Number(v),
-                  batch: undefined,
-                }))
-              }
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select course" />
-              </SelectTrigger>
-              <SelectContent>
-                {courses.map((c) => (
-                  <SelectItem key={c.id} value={String(c.id)}>
-                    {c.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="grid gap-2 sm:col-span-2">
-            <Label>Course Batch</Label>
-            <Select
-              value={f.batch != null ? String(f.batch) : undefined}
-              onValueChange={(v) => {
-                setF((p) => ({
-                  ...p,
-                  batch: Number(v),
-                }));
-              }}
-              disabled={!f.course || batchesQ.isLoading}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder={f.course ? "Select course batch" : "Select a course first"} />
-              </SelectTrigger>
-              <SelectContent>
-                {batches.map((b) => (
-                  <SelectItem key={b.id} value={String(b.id)}>
-                    {b.coursebatch_id} — {b.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="grid gap-2">
-            <Label>Enrollment date</Label>
-            <Input type="date" value={f.enrollment_date ?? ""} onChange={(e) => set("enrollment_date", e.target.value)} />
-          </div>
-          <div className="grid gap-2">
-            <Label>Status</Label>
-            <Select value={f.status ?? "active"} onValueChange={(v) => set("status", v as ApiEnrollmentStatus)}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {ENR_STATUS.map((s) => (
-                  <SelectItem key={s} value={s} className="capitalize">
-                    {s.replace(/_/g, " ")}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="grid gap-2">
-            <Label>Listed fee</Label>
-            <Input type="number" value={f.listed_fee ?? ""} onChange={(e) => set("listed_fee", e.target.value)} />
-          </div>
-          <div className="grid gap-2">
-            <Label>Standard discount</Label>
-            <Input type="number" value={f.standard_discount ?? ""} onChange={(e) => set("standard_discount", e.target.value)} />
-          </div>
-          <div className="grid gap-2">
-            <Label>Additional discount</Label>
-            <Input type="number" value={f.additional_discount ?? ""} onChange={(e) => set("additional_discount", e.target.value)} />
-          </div>
-          <div className="grid gap-2">
-            <Label>Agreed amount</Label>
-            <Input
-              type="number"
-              value={f.agreed_amount ?? ""}
-              onChange={(e) => set("agreed_amount", e.target.value)}
-              placeholder={agreedAuto}
-            />
-          </div>
-          <div className="grid gap-2 sm:col-span-2">
-            <Label>Remarks</Label>
-            <Textarea rows={2} value={f.remarks ?? ""} onChange={(e) => set("remarks", e.target.value)} />
-          </div>
+        </DialogHeader>
+        <div className="grid gap-4 py-2">
+          {needsPayment ? (
+            <div className="grid gap-3 rounded-xl border p-3 sm:grid-cols-2">
+              <p className="text-sm font-semibold sm:col-span-2">First payment</p>
+              <div className="grid gap-2">
+                <Label htmlFor="first-payment-amount" required>
+                  Amount
+                </Label>
+                <Input
+                  id="first-payment-amount"
+                  type="number"
+                  min={0}
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                />
+                <FieldError>{firstError}</FieldError>
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="first-payment-method" required>Method</Label>
+                <Select value={method} onValueChange={(v) => setMethod(v as ApiPaymentMethod)}>
+                  <SelectTrigger id="first-payment-method">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PAY_METHODS.map((m) => (
+                      <SelectItem key={m} value={m} className="capitalize">
+                        {m.replace(/_/g, " ")}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2 sm:col-span-2">
+                <Label htmlFor="first-payment-reference">Transaction reference</Label>
+                <Input
+                  id="first-payment-reference"
+                  value={reference}
+                  onChange={(e) => setReference(e.target.value)}
+                />
+              </div>
+            </div>
+          ) : (
+            paid > 0 && (
+              <div className="flex items-center justify-between rounded-xl border px-3 py-2 text-sm">
+                <span className="text-muted-foreground">Paid</span>
+                <span className="font-semibold tabular-nums">{formatNPR(paid)}</span>
+              </div>
+            )
+          )}
+          {agreed > 0 && <DuePartsEditor total={agreed} parts={parts} onChange={setParts} />}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>
-            Cancel
+            Back
           </Button>
-          <Button variant="brand" onClick={submit} disabled={saving}>
-            {saving ? "Saving…" : isEdit ? "Save Changes" : "Create Enrollment"}
+          <Button variant="brand" disabled={!valid || confirm.isPending} onClick={submit}>
+            {confirm.isPending ? "Confirming…" : "Confirm enrollment"}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -284,26 +520,26 @@ export function EnrollmentDialog({
   );
 }
 
+/**
+ * Record a payment. Payments are never edited: a wrong one is voided (with a
+ * reason) from its row, and the right one recorded again here.
+ */
 export function PaymentDialog({
   open,
   onClose,
   leadId,
   enrollmentApiId,
-  payment,
   allowLeadPick = false,
 }: {
   open: boolean;
   onClose: () => void;
   leadId?: number;
   enrollmentApiId?: number;
-  /** Pass an existing payment to correct it (PATCH) instead of recording a new one. */
-  payment?: ApiPayment | null;
   /** Inline Lead + Enrollment pickers (global flow) when not preset from context. */
   allowLeadPick?: boolean;
 }) {
   const [f, setF] = useState<ApiPaymentPayload>({});
-  const isEdit = !!payment;
-  const needsPickers = allowLeadPick && !isEdit;
+  const needsPickers = allowLeadPick;
   const [pickedLeadId, setPickedLeadId] = useState("");
   const [pickedEnrollmentId, setPickedEnrollmentId] = useState("");
   const [leadSearch, setLeadSearch] = useState("");
@@ -314,11 +550,13 @@ export function PaymentDialog({
     enrollmentApiId ?? (pickedEnrollmentId ? Number(pickedEnrollmentId) : undefined);
 
   const leadOptionsQ = useLeadOptions(open && needsPickers ? leadSearch : "");
-  const enrollmentsQ = useLeadEnrollments(needsPickers ? effectiveLeadId : undefined);
+  const enrollmentsQ = useLeadEnrollments(open ? effectiveLeadId : undefined);
   const enrollments = enrollmentsQ.enrollments;
+  const target = enrollments.find((e) => e.id === effectiveEnrollmentId);
+  const left = target ? Number(target.remaining_amount) : null;
+  const amountError = f.amount ? paymentAmountError(f.amount, left) : left != null && left <= 0 ? "Nothing left to pay" : null;
   const addPayment = useAddPayment(effectiveLeadId, effectiveEnrollmentId);
-  const updatePayment = useUpdatePayment(effectiveLeadId, effectiveEnrollmentId);
-  const saving = addPayment.isPending || updatePayment.isPending;
+  const saving = addPayment.isPending;
 
   useEffect(() => {
     if (!open) return;
@@ -326,17 +564,6 @@ export function PaymentDialog({
     setPickedEnrollmentId("");
     setLeadSearch("");
     setEnrollOpen(false);
-    if (payment) {
-      setF({
-        amount: payment.amount,
-        payment_date: payment.payment_date,
-        payment_method: payment.payment_method,
-        status: payment.status,
-        transaction_reference: payment.transaction_reference ?? "",
-        notes: payment.notes ?? "",
-      });
-      return;
-    }
     setF({
       amount: "",
       payment_date: new Date().toISOString(),
@@ -345,7 +572,7 @@ export function PaymentDialog({
       transaction_reference: "",
       notes: "",
     });
-  }, [open, payment]);
+  }, [open]);
 
   // Pre-select when the chosen lead has exactly one enrollment.
   useEffect(() => {
@@ -361,9 +588,12 @@ export function PaymentDialog({
       toast.error("Pick a lead and its enrollment first.");
       return;
     }
-    if (!f.amount) return;
-    if (payment) {
-      updatePayment.mutate({ id: payment.id, payload: f }, { onSuccess: () => onClose() });
+    if (!f.amount) {
+      toast.error("Enter the amount.");
+      return;
+    }
+    if (!f.payment_date) {
+      toast.error("Pick the payment date.");
       return;
     }
     addPayment.mutate(f, { onSuccess: () => onClose() });
@@ -373,12 +603,7 @@ export function PaymentDialog({
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{isEdit ? "Correct payment" : "Record payment"}</DialogTitle>
-          <DialogDescription>
-            {isEdit
-              ? "Marking a pending payment successful issues its receipt now. Editing an already-successful payment does not reissue one."
-              : "Totals recalculate from successful payments."}
-          </DialogDescription>
+          <DialogTitle>Record payment</DialogTitle>
         </DialogHeader>
         <div className="grid gap-4 py-2 sm:grid-cols-2">
           {needsPickers && (
@@ -454,9 +679,14 @@ export function PaymentDialog({
           <div className="grid gap-2">
             <Label required>Amount</Label>
             <Input type="number" value={f.amount ?? ""} onChange={(e) => set("amount", e.target.value)} />
+            {amountError ? (
+              <FieldError>{amountError}</FieldError>
+            ) : (
+              left != null && <p className="text-muted-foreground text-xs">Left to pay {formatNPR(left)}</p>
+            )}
           </div>
           <div className="grid gap-2">
-            <Label>Date</Label>
+            <Label required>Date</Label>
             <Input
               type="datetime-local"
               value={f.payment_date ? f.payment_date.slice(0, 16) : ""}
@@ -506,8 +736,8 @@ export function PaymentDialog({
           <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>
-          <Button variant="brand" onClick={submit} disabled={saving}>
-            {saving ? "Saving…" : isEdit ? "Save Changes" : "Record Payment"}
+          <Button variant="brand" onClick={submit} disabled={saving || !!amountError}>
+            {saving ? "Saving…" : "Record Payment"}
           </Button>
         </DialogFooter>
 
@@ -520,40 +750,5 @@ export function PaymentDialog({
         />
       </DialogContent>
     </Dialog>
-  );
-}
-
-/**
- * Correct a payment when only its ids are known (the flat `/api/payments/`
- * register). Fetches the full record first so `notes` survives the PATCH.
- */
-export function EditPaymentDialog({
-  open,
-  onClose,
-  leadId,
-  enrollmentId,
-  paymentId,
-}: {
-  open: boolean;
-  onClose: () => void;
-  leadId?: number;
-  enrollmentId?: number;
-  paymentId?: number;
-}) {
-  const { payment } = usePayment(
-    open ? leadId : undefined,
-    open ? enrollmentId : undefined,
-    open ? paymentId : undefined,
-  );
-  if (!open || !payment) return null;
-  return (
-    <PaymentDialog
-      key={payment.id}
-      open
-      onClose={onClose}
-      leadId={leadId}
-      enrollmentApiId={enrollmentId}
-      payment={payment}
-    />
   );
 }

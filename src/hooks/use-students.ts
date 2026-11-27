@@ -24,6 +24,29 @@ export function useStudent(id: number | null) {
   });
 }
 
+export function useStudentBranchMoves(id: number | null) {
+  return useQuery({
+    queryKey: ["student", id, "branch-moves"],
+    queryFn: () => studentsService.branchMoves(id as number),
+    enabled: id != null,
+  });
+}
+
+export function useMoveStudentBranch() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, branch, reason }: { id: number; branch: number; reason: string }) =>
+      studentsService.moveBranch(id, { branch, reason }),
+    onSuccess: (s) => {
+      toast.success(`${s.full_name} moved to ${s.branch_name ?? "the new branch"}`);
+      for (const key of ["students", "student", "enrollments", "enrollment", "lead", "leads"]) {
+        void qc.invalidateQueries({ queryKey: [key] });
+      }
+    },
+    onError: (e) => toast.error(apiErrorMessage(e, "Could not move the student")),
+  });
+}
+
 export function useCreateStudent() {
   const qc = useQueryClient();
   return useMutation({

@@ -10,7 +10,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { counselorName, leadTypeLabel, sourceLabel } from "@/data/lead-lookups";
 import { formatDate, formatPhone, initialsOf, isOverdue, relativeToToday } from "@/lib/leads-format";
 import { cn } from "@/lib/utils";
 import type { LeadListItem } from "@/types/leads";
@@ -44,7 +43,7 @@ export function LeadTable({ leads, selected, onToggle, onToggleAll, onAction, ca
             </TableHead>
             <TableHead>Lead ID</TableHead>
             <TableHead>Lead</TableHead>
-            <TableHead>Course / Type</TableHead>
+            <TableHead>Course</TableHead>
             <TableHead>Source</TableHead>
             <TableHead>Status</TableHead>
             <TableHead>Priority</TableHead>
@@ -95,7 +94,7 @@ export function LeadTable({ leads, selected, onToggle, onToggleAll, onAction, ca
 
                 <TableCell>
                   <div className="flex items-center gap-3">
-                    <span className="bg-brand-fixed-dim/30 text-brand-container flex size-9 shrink-0 items-center justify-center rounded-full text-xs font-bold">
+                    <span className="bg-brand-fixed-dim/30 text-brand-container dark:text-brand-fixed flex size-9 shrink-0 items-center justify-center rounded-full text-xs font-bold">
                       {initialsOf(lead.fullName)}
                     </span>
                     <div className="min-w-0">
@@ -107,11 +106,10 @@ export function LeadTable({ leads, selected, onToggle, onToggleAll, onAction, ca
 
                 <TableCell>
                   <p className="line-clamp-1 max-w-[15rem] text-sm">{lead.primaryCourse ?? "—"}</p>
-                  <p className="text-muted-foreground text-xs">{lead.leadTypeName ?? leadTypeLabel(lead.leadType)}</p>
                 </TableCell>
 
                 <TableCell>
-                  <span className="text-sm">{lead.sourceName ?? sourceLabel(lead.source)}</span>
+                  <span className="text-sm">{lead.sourceName ?? "—"}</span>
                   {lead.campaign && (
                     <p className="text-muted-foreground line-clamp-1 max-w-[10rem] text-xs">
                       {lead.campaign}
@@ -120,11 +118,11 @@ export function LeadTable({ leads, selected, onToggle, onToggleAll, onAction, ca
                 </TableCell>
 
                 <TableCell>
-                  <StatusBadge status={lead.status} name={lead.statusName} color={lead.statusColor} />
+                  <StatusBadge name={lead.statusName} color={lead.statusColor} />
                 </TableCell>
 
                 <TableCell>
-                  <PriorityBadge priority={lead.priority} name={lead.priorityName} color={lead.priorityColor} />
+                  <PriorityBadge name={lead.priorityName} color={lead.priorityColor} />
                 </TableCell>
 
                 <TableCell>
@@ -133,7 +131,7 @@ export function LeadTable({ leads, selected, onToggle, onToggleAll, onAction, ca
 
                 <TableCell>
                   {lead.assignedTo ? (
-                    <span className="text-sm">{lead.assignedToName ?? counselorName(lead.assignedTo)}</span>
+                    <span className="text-sm">{lead.assignedToName ?? "Not yet assigned"}</span>
                   ) : (
                     <Badge variant="warning" className="text-[10px]">
                       Not yet assigned

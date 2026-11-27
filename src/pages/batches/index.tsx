@@ -1,5 +1,6 @@
 import { ChevronLeft, ChevronRight, MoreHorizontal, Plus, Search } from "lucide-react";
 import { useEffect, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -37,7 +38,6 @@ import {
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/context/auth";
-import { useDataSource } from "@/context/data-source";
 import {
   useBatches,
   useCourseBatches,
@@ -45,51 +45,41 @@ import {
   useDeleteCourseBatch,
 } from "@/hooks/use-batches";
 import { formatDate } from "@/lib/leads-format";
-import type { Batch, CourseBatch } from "@/types";
+import type { Batch, CourseBatch, CourseBatchStatus } from "@/types";
+import { durationText, slotTimes, timeLabel } from "@/lib/time-slots";
 import { BatchDialog } from "./batch-dialog";
 import { CourseBatchDialog } from "./course-batch-dialog";
+import { STATUS_BADGE, STATUS_LABEL } from "./status";
 
 const PAGE_SIZE = 20;
 const ALL_SLOTS = "all";
+const ALL_STATUSES = "all";
 
 export default function BatchesPage({ defaultTab = "course-batches" }: { defaultTab?: "course-batches" | "slots" }) {
   const { hasPerm } = useAuth();
-  const { source } = useDataSource();
-  const isApi = source === "api";
-
-  const [tab, setTab] = useState(defaultTab);
-
-  useEffect(() => {
-    setTab(defaultTab);
-  }, [defaultTab]);
-
-  if (!isApi) {
-    return (
-      <div className="space-y-6">
-        <PageHeading />
-        <div className="text-muted-foreground rounded-2xl border border-dashed py-16 text-center text-sm">
-          Batches are a live-backend feature. Toggle to <span className="font-semibold">Live</span>{" "}
-          in the header.
-        </div>
-      </div>
-    );
-  }
+  const navigate = useNavigate();
+  const seesBatches = hasPerm("course.view_coursebatch");
+  const tab = seesBatches ? defaultTab : "slots";
+  const setTab = (next: "course-batches" | "slots") =>
+    navigate(next === "slots" ? "/batches/shifts" : "/batches");
 
   return (
     <div className="space-y-6">
       <PageHeading />
       <Tabs value={tab} onValueChange={(v) => setTab(v as "course-batches" | "slots")}>
         <TabsList>
-          <TabsTrigger value="course-batches">Course Batches</TabsTrigger>
-          <TabsTrigger value="slots">Time slots</TabsTrigger>
+          {seesBatches && <TabsTrigger value="course-batches">Batches</TabsTrigger>}
+          <TabsTrigger value="slots">Shifts</TabsTrigger>
         </TabsList>
-        <TabsContent value="course-batches" className="mt-6">
-          <CourseBatchesTab
-            canAdd={hasPerm("course.add_coursebatch")}
-            canChange={hasPerm("course.change_coursebatch")}
-            canDelete={hasPerm("course.delete_coursebatch")}
-          />
-        </TabsContent>
+        {seesBatches && (
+          <TabsContent value="course-batches" className="mt-6">
+            <CourseBatchesTab
+              canAdd={hasPerm("course.add_coursebatch")}
+              canChange={hasPerm("course.change_coursebatch")}
+              canDelete={hasPerm("course.delete_coursebatch")}
+            />
+          </TabsContent>
+        )}
         <TabsContent value="slots" className="mt-6">
           <SlotsTab
             canAdd={hasPerm("course.add_batch")}
@@ -109,9 +99,6 @@ function PageHeading() {
         Institute
       </p>
       <h1 className="font-headline mt-1 text-3xl font-semibold tracking-tight">Batches</h1>
-      <p className="text-muted-foreground mt-1 text-sm">
-        Course batches and the recurring time slots they run in.
-      </p>
     </div>
   );
 }
@@ -125,10 +112,14 @@ interface TabPerms {
 }
 
 function CourseBatchesTab({ canAdd, canChange, canDelete }: TabPerms) {
+  const navigate = useNavigate();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [debounced, setDebounced] = useState("");
   const [slot, setSlot] = useState(ALL_SLOTS);
+  const [batchStatus, setBatchStatus] = useState<CourseBatchStatus | typeof ALL_STATUSES>(
+    ALL_STATUSES,
+  );
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<CourseBatch | null>(null);
   const [deleting, setDeleting] = useState<CourseBatch | null>(null);
@@ -147,6 +138,7 @@ function CourseBatchesTab({ canAdd, canChange, canDelete }: TabPerms) {
     page_size: PAGE_SIZE,
     search: debounced || undefined,
     batch: slot === ALL_SLOTS ? undefined : Number(slot),
+    status: batchStatus === ALL_STATUSES ? undefined : batchStatus,
     ordering: "-start_date",
   });
   const del = useDeleteCourseBatch();
@@ -160,7 +152,7 @@ function CourseBatchesTab({ canAdd, canChange, canDelete }: TabPerms) {
           <div className="relative max-w-sm min-w-[16rem]">
             <Search className="text-muted-foreground absolute top-2.5 left-3 size-4" />
             <Input
-              placeholder="Search name or cohort ID…"
+              placeholder="Search name or batch ID…"
               className="rounded-full pl-9"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -177,12 +169,29 @@ function CourseBatchesTab({ canAdd, canChange, canDelete }: TabPerms) {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value={ALL_SLOTS}>All time slots</SelectItem>
+              <SelectItem value={ALL_SLOTS}>All shifts</SelectItem>
               {(slotsQ.data?.results ?? []).map((b) => (
                 <SelectItem key={b.id} value={String(b.id)}>
                   {b.name}
                 </SelectItem>
               ))}
+            </SelectContent>
+          </Select>
+          <Select
+            value={batchStatus}
+            onValueChange={(v) => {
+              setBatchStatus(v as CourseBatchStatus | typeof ALL_STATUSES);
+              setPage(1);
+            }}
+          >
+            <SelectTrigger className="w-[10rem]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL_STATUSES}>All statuses</SelectItem>
+              <SelectItem value="upcoming">Upcoming</SelectItem>
+              <SelectItem value="running">Running</SelectItem>
+              <SelectItem value="closed">Closed</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -194,7 +203,7 @@ function CourseBatchesTab({ canAdd, canChange, canDelete }: TabPerms) {
               setFormOpen(true);
             }}
           >
-            <Plus /> New Course Batch
+            <Plus /> New batch
           </Button>
         )}
       </div>
@@ -203,11 +212,12 @@ function CourseBatchesTab({ canAdd, canChange, canDelete }: TabPerms) {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Cohort</TableHead>
-              <TableHead>Cohort ID</TableHead>
+              <TableHead>Batch</TableHead>
+              <TableHead>Batch ID</TableHead>
               <TableHead>Course</TableHead>
-              <TableHead>Time slot</TableHead>
+              <TableHead>Shift</TableHead>
               <TableHead>Runs</TableHead>
+              <TableHead>Seats</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="w-10" />
             </TableRow>
@@ -216,47 +226,75 @@ function CourseBatchesTab({ canAdd, canChange, canDelete }: TabPerms) {
             {isLoading &&
               Array.from({ length: 5 }).map((_, i) => (
                 <TableRow key={i}>
-                  <TableCell colSpan={7}>
+                  <TableCell colSpan={8}>
                     <Skeleton className="h-6 w-full" />
                   </TableCell>
                 </TableRow>
               ))}
             {!isLoading && rows.length === 0 && (
               <TableRow>
-                <TableCell colSpan={7} className="text-muted-foreground py-10 text-center">
-                  No course batches found.
+                <TableCell colSpan={8} className="text-muted-foreground py-10 text-center">
+                  No batches found.
                 </TableCell>
               </TableRow>
             )}
             {rows.map((cb) => (
-              <TableRow key={cb.id}>
-                <TableCell className="font-semibold">{cb.name}</TableCell>
+              <TableRow
+                key={cb.id}
+                className="cursor-pointer"
+                onClick={(e) => {
+                  // The name link opens it on its own.
+                  if ((e.target as HTMLElement).closest("a")) return;
+                  navigate(`/batches/${cb.id}`);
+                }}
+              >
+                <TableCell>
+                  <Link to={`/batches/${cb.id}`} className="font-semibold hover:underline">
+                    {cb.name}
+                  </Link>
+                  <div className="text-muted-foreground text-xs">
+                    {cb.mode === "online" ? "Online" : "Physical"}
+                    {cb.trainer ? ` · ${cb.trainer}` : ""}
+                  </div>
+                </TableCell>
                 <TableCell className="font-mono text-sm">{cb.coursebatch_id}</TableCell>
                 <TableCell>{cb.course_name ?? "—"}</TableCell>
-                <TableCell className="text-muted-foreground">{cb.batch_name || "—"}</TableCell>
+                <TableCell className="text-sm">
+                  {cb.batch_name || "—"}
+                  {cb.batch_start_time && cb.batch_end_time && (
+                    <div className="text-muted-foreground text-xs">
+                      {timeLabel(cb.batch_start_time)} – {timeLabel(cb.batch_end_time)}
+                    </div>
+                  )}
+                </TableCell>
                 <TableCell className="text-muted-foreground text-sm">
                   {cb.start_date ? formatDate(cb.start_date) : "—"}
                   {cb.end_date ? ` → ${formatDate(cb.end_date)}` : ""}
                 </TableCell>
                 <TableCell>
-                  <Badge variant={cb.is_active ? "brand" : "secondary"}>
-                    {cb.is_active ? "Active" : "Inactive"}
-                  </Badge>
+                  <SeatsCell batch={cb} />
                 </TableCell>
                 <TableCell>
-                  {(canChange || canDelete) && (
-                    <RowMenu
-                      onEdit={
-                        canChange
-                          ? () => {
-                              setEditing(cb);
-                              setFormOpen(true);
-                            }
-                          : undefined
-                      }
-                      onDelete={canDelete ? () => setDeleting(cb) : undefined}
-                    />
-                  )}
+                  <div className="flex flex-wrap gap-1">
+                    <Badge variant={STATUS_BADGE[cb.status] ?? "outline"}>
+                      {STATUS_LABEL[cb.status] ?? cb.status}
+                    </Badge>
+                    {!cb.is_active && <Badge variant="secondary">Inactive</Badge>}
+                  </div>
+                </TableCell>
+                {/* Menu clicks stay in the menu (they reach the row through the portal otherwise). */}
+                <TableCell onClick={(e) => e.stopPropagation()}>
+                  <RowMenu
+                    onEdit={
+                      canChange
+                        ? () => {
+                            setEditing(cb);
+                            setFormOpen(true);
+                          }
+                        : undefined
+                    }
+                    onDelete={canDelete ? () => setDeleting(cb) : undefined}
+                  />
                 </TableCell>
               </TableRow>
             ))}
@@ -267,7 +305,7 @@ function CourseBatchesTab({ canAdd, canChange, canDelete }: TabPerms) {
           page={page}
           count={data?.count ?? 0}
           shown={rows.length}
-          noun="course batches"
+          noun="batches"
           onPage={setPage}
         />
       </div>
@@ -280,7 +318,7 @@ function CourseBatchesTab({ canAdd, canChange, canDelete }: TabPerms) {
 
       <ConfirmDelete
         name={deleting?.name}
-        description="This permanently removes the course batch. Enrollments that reference it are not changed."
+        description="This cannot be undone."
         onCancel={() => setDeleting(null)}
         onConfirm={() => {
           if (deleting) del.mutate(deleting.id);
@@ -291,7 +329,7 @@ function CourseBatchesTab({ canAdd, canChange, canDelete }: TabPerms) {
   );
 }
 
-/* ---------------------------------------------------------------- time slots */
+/* -------------------------------------------------------------------- shifts */
 
 function SlotsTab({ canAdd, canChange, canDelete }: TabPerms) {
   const [page, setPage] = useState(1);
@@ -313,7 +351,6 @@ function SlotsTab({ canAdd, canChange, canDelete }: TabPerms) {
     page,
     page_size: PAGE_SIZE,
     search: debounced || undefined,
-    ordering: "name",
   });
   const del = useDeleteBatch();
 
@@ -325,7 +362,7 @@ function SlotsTab({ canAdd, canChange, canDelete }: TabPerms) {
         <div className="relative max-w-sm min-w-[16rem]">
           <Search className="text-muted-foreground absolute top-2.5 left-3 size-4" />
           <Input
-            placeholder="Search time slots…"
+            placeholder="Search shifts…"
             className="rounded-full pl-9"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -339,7 +376,7 @@ function SlotsTab({ canAdd, canChange, canDelete }: TabPerms) {
               setFormOpen(true);
             }}
           >
-            <Plus /> New Time Slot
+            <Plus /> New Shift
           </Button>
         )}
       </div>
@@ -349,7 +386,8 @@ function SlotsTab({ canAdd, canChange, canDelete }: TabPerms) {
           <TableHeader>
             <TableRow>
               <TableHead>Name</TableHead>
-              <TableHead>Description</TableHead>
+              <TableHead>Time</TableHead>
+              <TableHead>Duration</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="w-10" />
             </TableRow>
@@ -358,22 +396,23 @@ function SlotsTab({ canAdd, canChange, canDelete }: TabPerms) {
             {isLoading &&
               Array.from({ length: 4 }).map((_, i) => (
                 <TableRow key={i}>
-                  <TableCell colSpan={4}>
+                  <TableCell colSpan={5}>
                     <Skeleton className="h-6 w-full" />
                   </TableCell>
                 </TableRow>
               ))}
             {!isLoading && rows.length === 0 && (
               <TableRow>
-                <TableCell colSpan={4} className="text-muted-foreground py-10 text-center">
-                  No time slots found.
+                <TableCell colSpan={5} className="text-muted-foreground py-10 text-center">
+                  No shifts found.
                 </TableCell>
               </TableRow>
             )}
             {rows.map((b) => (
               <TableRow key={b.id}>
                 <TableCell className="font-semibold">{b.name}</TableCell>
-                <TableCell className="text-muted-foreground">{b.description || "—"}</TableCell>
+                <TableCell className="text-muted-foreground">{slotTimes(b) ?? "—"}</TableCell>
+                <TableCell className="text-muted-foreground">{durationText(b.duration_minutes)}</TableCell>
                 <TableCell>
                   <Badge variant={b.is_active ? "brand" : "secondary"}>
                     {b.is_active ? "Active" : "Inactive"}
@@ -403,7 +442,7 @@ function SlotsTab({ canAdd, canChange, canDelete }: TabPerms) {
           page={page}
           count={data?.count ?? 0}
           shown={rows.length}
-          noun="time slots"
+          noun="shifts"
           onPage={setPage}
         />
       </div>
@@ -412,7 +451,7 @@ function SlotsTab({ canAdd, canChange, canDelete }: TabPerms) {
 
       <ConfirmDelete
         name={deleting?.name}
-        description="Course batches using this time slot keep running but lose the slot reference."
+        description="This cannot be undone."
         onCancel={() => setDeleting(null)}
         onConfirm={() => {
           if (deleting) del.mutate(deleting.id);
@@ -423,9 +462,36 @@ function SlotsTab({ canAdd, canChange, canDelete }: TabPerms) {
   );
 }
 
+/** "12 / 30" with a Full badge, or "No seats set" on an older batch, and the pending count. */
+function SeatsCell({ batch }: { batch: CourseBatch }) {
+  const taken = batch.seats_taken ?? 0;
+  const full = batch.capacity != null && batch.seats_left === 0;
+  return (
+    <div className="text-sm">
+      <div className="flex items-center gap-1.5">
+        <span className="font-medium tabular-nums">
+          {batch.capacity == null ? taken : `${taken} / ${batch.capacity}`}
+        </span>
+        {batch.capacity == null && <Badge variant="warning">No seats set</Badge>}
+        {full && <Badge variant="warning">Full</Badge>}
+      </div>
+      {!!batch.waiting_count && (
+        <div className="text-muted-foreground text-xs">{batch.waiting_count} pending</div>
+      )}
+    </div>
+  );
+}
+
 /* ------------------------------------------------------------------- shared */
 
-function RowMenu({ onEdit, onDelete }: { onEdit?: () => void; onDelete?: () => void }) {
+function RowMenu({
+  onEdit,
+  onDelete,
+}: {
+  onEdit?: () => void;
+  onDelete?: () => void;
+}) {
+  if (!onEdit && !onDelete) return null;
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>

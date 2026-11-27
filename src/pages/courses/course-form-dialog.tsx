@@ -111,11 +111,7 @@ export function CourseFormDialog({
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>{isEdit ? `Edit ${course.name}` : "Create course"}</DialogTitle>
-          <DialogDescription>
-            {isEdit
-              ? "Update pricing, syllabus, or remarks."
-              : "Name, type, and full amount are required."}
-          </DialogDescription>
+          {isEdit && <DialogDescription>Update pricing, syllabus, or remarks.</DialogDescription>}
         </DialogHeader>
         <form onSubmit={submit} className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
@@ -130,7 +126,7 @@ export function CourseFormDialog({
               />
             </div>
             <div className="space-y-2">
-              <Label required>Type</Label>
+              <Label>Type</Label>
               <Select
                 value={form.course_type}
                 onValueChange={(v) => set("course_type", v as CourseType)}

@@ -1,11 +1,19 @@
 import { CalendarClock, Check, Plus, Search } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { ListPager } from "@/components/list-pager";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useDataSource } from "@/context/data-source";
 import { type FollowUpRow, useCompleteFollowup, useFollowUps } from "@/hooks/use-followups";
 import { useRole } from "@/context/role";
 import { formatDateTime, formatPhone, initialsOf, relativeToToday } from "@/lib/leads-format";
@@ -25,11 +33,14 @@ function FollowUpItem({ row, canComplete }: { row: FollowUpRow; canComplete: boo
   return (
     <div className="hover:bg-accent/50 flex items-center gap-3 px-4 py-3 transition-colors">
       <Link to={`/leads/${row.leadId}`} className="flex min-w-0 flex-1 items-center gap-3">
-        <span className="bg-brand-fixed-dim/30 text-brand-container flex size-9 shrink-0 items-center justify-center rounded-full text-xs font-bold">
+        <span className="bg-brand-fixed-dim/30 text-brand-container dark:text-brand-fixed flex size-9 shrink-0 items-center justify-center rounded-full text-xs font-bold">
           {initialsOf(row.leadName)}
         </span>
         <div className="min-w-0 flex-1">
-          <p className="font-semibold">{row.leadName}</p>
+          <p className="flex items-center gap-2 font-semibold">
+            {row.leadName}
+            {row.payment && <Badge variant="warning">Payment</Badge>}
+          </p>
           <p className="text-muted-foreground truncate text-xs">
             {row.purpose ?? "Follow-up"}
             {row.phone && <> · {formatPhone(row.phone)}</>}
@@ -64,33 +75,29 @@ function FollowUpItem({ row, canComplete }: { row: FollowUpRow; canComplete: boo
 }
 
 export default function FollowUpsPage() {
-  const { isMock } = useDataSource();
   const { can } = useRole();
-  const canComplete = can("leads.log_activity");
-  const { rows, isLoading } = useFollowUps();
+  const canComplete = can("followups.complete");
   const [search, setSearch] = useState("");
   const [view, setView] = useState<"all" | "overdue" | "today" | "upcoming">("all");
+  const [kind, setKind] = useState<"all" | "payment" | "other">("all");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const { rows, count, counts, isLoading } = useFollowUps({
+    page,
+    pageSize,
+    search,
+    due: view === "all" ? undefined : view,
+    kind: kind === "all" ? undefined : kind,
+  });
 
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return rows;
-    return rows.filter((r) =>
-      `${r.leadName} ${r.phone} ${r.purpose ?? ""} ${r.assignedToName ?? ""}`.toLowerCase().includes(q),
-    );
-  }, [rows, search]);
-
-  const grouped = useMemo(
-    () => ({
-      overdue: filtered.filter((r) => r.bucket === "overdue"),
-      today: filtered.filter((r) => r.bucket === "today"),
-      upcoming: filtered.filter((r) => r.bucket === "upcoming"),
-    }),
-    [filtered],
-  );
-
+  // This page's rows, grouped; the section counts are for every page.
+  const grouped = {
+    overdue: rows.filter((r) => r.bucket === "overdue"),
+    today: rows.filter((r) => r.bucket === "today"),
+    upcoming: rows.filter((r) => r.bucket === "upcoming"),
+  };
   const sections = BUCKETS.filter((b) => view === "all" || b.key === view);
-  const visibleCount = sections.reduce((n, b) => n + grouped[b.key].length, 0);
 
   return (
     <div className="space-y-6">
@@ -99,21 +106,42 @@ export default function FollowUpsPage() {
         <h1 className="font-headline mt-1 text-3xl font-semibold tracking-tight">Follow-ups</h1>
         <p className="text-muted-foreground mt-1 text-sm">
           Scheduled touchpoints across all leads, soonest first.
-          {isMock && " Previewing mock data."}
         </p>
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-3">
-          <Tabs value={view} onValueChange={(v) => setView(v as typeof view)}>
+          <Tabs
+            value={view}
+            onValueChange={(v) => {
+              setView(v as typeof view);
+              setPage(1);
+            }}
+          >
             <TabsList>
-              <TabsTrigger value="all">All ({filtered.length})</TabsTrigger>
-              <TabsTrigger value="overdue">Overdue ({grouped.overdue.length})</TabsTrigger>
-              <TabsTrigger value="today">Today ({grouped.today.length})</TabsTrigger>
-              <TabsTrigger value="upcoming">Upcoming ({grouped.upcoming.length})</TabsTrigger>
+              <TabsTrigger value="all">All ({counts.total})</TabsTrigger>
+              <TabsTrigger value="overdue">Overdue ({counts.overdue})</TabsTrigger>
+              <TabsTrigger value="today">Today ({counts.today})</TabsTrigger>
+              <TabsTrigger value="upcoming">Upcoming ({counts.upcoming})</TabsTrigger>
             </TabsList>
           </Tabs>
-          {!isMock && canComplete && (
+          <Select
+              value={kind}
+              onValueChange={(v) => {
+                setKind(v as typeof kind);
+                setPage(1);
+              }}
+            >
+              <SelectTrigger className="h-9 w-36">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All types</SelectItem>
+                <SelectItem value="payment">Payment</SelectItem>
+                <SelectItem value="other">Other</SelectItem>
+              </SelectContent>
+            </Select>
+          {canComplete && (
             <Button size="sm" variant="outline" onClick={() => setPickerOpen(true)}>
               <Plus /> Add Follow-up
             </Button>
@@ -125,7 +153,10 @@ export default function FollowUpsPage() {
             placeholder="Search by lead, phone, purpose, or counselor"
             className="rounded-full pl-9"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setPage(1);
+            }}
           />
         </div>
       </div>
@@ -136,7 +167,7 @@ export default function FollowUpsPage() {
             <Skeleton key={i} className="h-16 w-full rounded-xl" />
           ))}
         </div>
-      ) : visibleCount === 0 ? (
+      ) : count === 0 ? (
         <div className="text-muted-foreground rounded-2xl border border-dashed py-16 text-center">
           <CalendarClock className="mx-auto size-8 opacity-40" />
           <p className="mt-2 text-sm">
@@ -155,7 +186,7 @@ export default function FollowUpsPage() {
               >
                 <div className="flex items-center justify-between border-b px-4 py-2.5">
                   <h2 className={cn("text-sm font-semibold", tone)}>{label}</h2>
-                  <span className="text-muted-foreground text-xs font-medium">{items.length}</span>
+                  <span className="text-muted-foreground text-xs font-medium">{counts[key]}</span>
                 </div>
                 <div className="divide-border divide-y">
                   {items.map((row) => (
@@ -165,6 +196,17 @@ export default function FollowUpsPage() {
               </section>
             );
           })}
+          <ListPager
+            page={page}
+            pageSize={pageSize}
+            count={count}
+            noun="follow-ups"
+            onPage={setPage}
+            onPageSize={(n) => {
+              setPageSize(n);
+              setPage(1);
+            }}
+          />
         </div>
       )}
 

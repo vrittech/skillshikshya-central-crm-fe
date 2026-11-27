@@ -1,17 +1,10 @@
-import { Download, Filter } from "lucide-react";
+import { Download } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import { DonutChart, FunnelChart, HBarList, MiniBars } from "@/components/charts";
+import { MeterList, type MeterRow } from "@/components/charts";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
@@ -21,31 +14,39 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { useAuth } from "@/context/auth";
-import { useDataSource } from "@/context/data-source";
-import { useBranches } from "@/hooks/use-branches";
+import { useBranchScope } from "@/context/branch-scope";
 import {
   useConversionReport,
   useCounselorPerformance,
   useEnrollmentsReport,
   useLeadsBySource,
   useLeadsByStatus,
-  useLeadsByType,
   useReportsOverview,
   useRevenueReport,
 } from "@/hooks/use-reports";
-import {
-  counselorLeaderboard,
-  courseDemand,
-  KPIS,
-  leadFunnel,
-  priorityMix,
-  sourceBreakdown,
-} from "@/data/lead-analytics";
 import { formatNPR } from "@/lib/leads-format";
 import type { ReportBaseParams } from "@/types/reports-api";
 
-const DONUT_COLORS = ["#00694c", "#008561", "#67dbae", "#f59e0b", "#64748b", "#0ea5e9", "#a855f7"];
+function pct(part: number, whole: number) {
+  return whole ? Math.round((part / whole) * 100) : 0;
+}
+
+/** Rows with each value's share of the total, largest first unless `keepOrder`. */
+function meterRows(items: { label: string; value: number }[], keepOrder = false): MeterRow[] {
+  const total = items.reduce((sum, r) => sum + r.value, 0);
+  const rows = keepOrder ? items : [...items].sort((a, b) => b.value - a.value);
+  return rows.map((r) => ({ ...r, share: pct(r.value, total) }));
+}
+
+/** Top `n` rows, the rest folded into "Other". */
+function topRows(items: { label: string; value: number }[], n: number) {
+  const sorted = [...items].filter((r) => r.value > 0).sort((a, b) => b.value - a.value);
+  const rest = sorted.slice(n).reduce((sum, r) => sum + r.value, 0);
+  return rest > 0 ? [...sorted.slice(0, n), { label: "Other", value: rest }] : sorted;
+}
+
+const npr = (v: number) => `NPR ${v.toLocaleString("en-IN")}`;
+const label = (v: string) => v.replace(/_/g, " ").replace(/^\w/, (c) => c.toUpperCase());
 
 function Kpi({
   label,
@@ -74,20 +75,17 @@ function Kpi({
   );
 }
 
-function LiveReports() {
-  const { user } = useAuth();
-  const isStaff = !!user?.is_staff;
-  const branches = useBranches(1, 100, "", isStaff);
+export default function ReportsPage() {
 
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
-  const [branchId, setBranchId] = useState("all");
+  const branchId = useBranchScope().branchId ?? undefined;
 
   const params = useMemo<ReportBaseParams>(
     () => ({
       start_date: startDate || undefined,
       end_date: endDate || undefined,
-      branch_id: branchId === "all" ? undefined : Number(branchId),
+      branch_id: branchId,
     }),
     [startDate, endDate, branchId],
   );
@@ -98,7 +96,6 @@ function LiveReports() {
   const enrollments = useEnrollmentsReport(params);
   const byStatus = useLeadsByStatus(params);
   const bySource = useLeadsBySource(params);
-  const byType = useLeadsByType(params);
   const counselors = useCounselorPerformance(params);
 
   const loadingAny =
@@ -108,49 +105,26 @@ function LiveReports() {
     enrollments.isLoading ||
     byStatus.isLoading;
 
-  const totalLeads = byStatus.data?.total ?? 0;
-  const statusBars = (byStatus.data?.results ?? []).map((r) => ({
-    label: r.status__name,
-    value: r.count,
-  }));
-  const sourceSlices = (bySource.data?.results ?? [])
-    .filter((r) => r.count > 0)
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 6)
-    .map((r, i) => ({
-      label: String(r.source__name ?? "—"),
-      count: r.count,
-      pct: Math.round((r.count / Math.max(1, totalLeads)) * 100),
-      color: DONUT_COLORS[i % DONUT_COLORS.length],
-    }));
-  const typeBars = (byType.data?.results ?? []).map((r) => ({
-    label: String(r.lead_type__name ?? "—"),
-    value: r.count,
-  }));
+  const statusRows = meterRows(
+    (byStatus.data?.results ?? []).map((r) => ({ label: r.status__name, value: r.count })),
+  );
+  const sourceRows = meterRows(
+    topRows(
+      (bySource.data?.results ?? []).map((r) => ({ label: String(r.source__name ?? "No source"), value: r.count })),
+      5,
+    ),
+    true,
+  );
 
-  const funnel = conversion.data
+  const f = conversion.data?.funnel;
+  const funnelRows: MeterRow[] = f
     ? [
-        { label: "Total", count: conversion.data.funnel.total_leads, pct: 100 },
-        {
-          label: "Contacted",
-          count: conversion.data.funnel.contacted,
-          pct: Math.round(conversion.data.rates.contacted_rate),
-        },
-        {
-          label: "Interested",
-          count: conversion.data.funnel.interested,
-          pct: Math.round(conversion.data.rates.interested_rate),
-        },
-        {
-          label: "Enrolled",
-          count: conversion.data.funnel.enrolled,
-          pct: Math.round(conversion.data.rates.enrolled_rate),
-        },
-        {
-          label: "Converted",
-          count: conversion.data.funnel.converted,
-          pct: Math.round(conversion.data.rates.converted_rate),
-        },
+        { label: "Leads", value: f.total_leads, share: 100 },
+        { label: "Contacted", value: f.contacted, share: pct(f.contacted, f.total_leads) },
+        { label: "Interested", value: f.interested, share: pct(f.interested, f.total_leads) },
+        { label: "Enrolled", value: f.enrolled, share: pct(f.enrolled, f.total_leads) },
+        { label: "Converted", value: f.converted, share: pct(f.converted, f.total_leads) },
+        { label: "Lost", value: f.lost, share: pct(f.lost, f.total_leads), muted: true },
       ]
     : [];
 
@@ -187,21 +161,6 @@ function LiveReports() {
             onChange={(e) => setEndDate(e.target.value)}
             aria-label="End date"
           />
-          {isStaff && (
-            <Select value={branchId} onValueChange={setBranchId}>
-              <SelectTrigger className="w-44">
-                <SelectValue placeholder="All branches" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All branches</SelectItem>
-                {branches.data?.results.map((b) => (
-                  <SelectItem key={b.id} value={String(b.id)}>
-                    {b.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
           <Button variant="outline" onClick={() => toast.info("PDF export — coming soon")}>
             <Download /> Export PDF
           </Button>
@@ -262,22 +221,24 @@ function LiveReports() {
               </CardHeader>
               <CardContent>
                 {conversion.isLoading ? (
-                  <Skeleton className="h-28 w-full" />
-                ) : funnel.length ? (
-                  <FunnelChart stages={funnel} />
-                ) : null}
+                  <Skeleton className="h-48 w-full" />
+                ) : f && f.total_leads > 0 ? (
+                  <MeterList rows={funnelRows} />
+                ) : (
+                  <p className="text-muted-foreground text-sm">No leads in range.</p>
+                )}
               </CardContent>
             </Card>
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">Lead sources</CardTitle>
-                <CardDescription>Share of all leads</CardDescription>
+                <CardDescription>Share of leads</CardDescription>
               </CardHeader>
               <CardContent>
                 {bySource.isLoading ? (
                   <Skeleton className="h-40 w-full" />
-                ) : sourceSlices.length ? (
-                  <DonutChart slices={sourceSlices} />
+                ) : sourceRows.length ? (
+                  <MeterList rows={sourceRows} />
                 ) : (
                   <p className="text-muted-foreground text-sm">No data.</p>
                 )}
@@ -285,7 +246,7 @@ function LiveReports() {
             </Card>
           </div>
 
-          <div className="grid gap-4 lg:grid-cols-3">
+          <div className="grid gap-4 lg:grid-cols-2">
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">By status</CardTitle>
@@ -293,22 +254,8 @@ function LiveReports() {
               <CardContent>
                 {byStatus.isLoading ? (
                   <Skeleton className="h-32 w-full" />
-                ) : statusBars.length ? (
-                  <HBarList data={statusBars} />
-                ) : (
-                  <p className="text-muted-foreground text-sm">No data.</p>
-                )}
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">By lead type</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {byType.isLoading ? (
-                  <Skeleton className="h-32 w-full" />
-                ) : typeBars.length ? (
-                  <HBarList data={typeBars} />
+                ) : statusRows.length ? (
+                  <MeterList rows={statusRows} />
                 ) : (
                   <p className="text-muted-foreground text-sm">No data.</p>
                 )}
@@ -323,12 +270,14 @@ function LiveReports() {
                 {revenue.isLoading ? (
                   <Skeleton className="h-32 w-full" />
                 ) : revenue.data?.by_payment_method.length ? (
-                  <HBarList
-                    data={revenue.data.by_payment_method.map((m) => ({
-                      label: m.payment_method.replace("_", " "),
-                      value: Number(m.amount),
-                    }))}
-                    max={Math.max(...revenue.data.by_payment_method.map((m) => Number(m.amount)))}
+                  <MeterList
+                    format={npr}
+                    rows={meterRows(
+                      revenue.data.by_payment_method.map((m) => ({
+                        label: label(m.payment_method),
+                        value: Number(m.amount),
+                      })),
+                    )}
                   />
                 ) : (
                   <p className="text-muted-foreground text-sm">No payments in range.</p>
@@ -348,11 +297,14 @@ function LiveReports() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <HBarList
-                  data={revenue.data.by_branch.map((b) => ({
-                    label: b.branch__name ?? "—",
-                    value: Number(b.amount),
-                  }))}
+                <MeterList
+                  format={npr}
+                  rows={meterRows(
+                    revenue.data.by_branch.map((b) => ({
+                      label: b.branch__name ?? "No branch",
+                      value: Number(b.amount),
+                    })),
+                  )}
                 />
               </CardContent>
             </Card>
@@ -373,11 +325,10 @@ function LiveReports() {
                 {enrollments.isLoading ? (
                   <Skeleton className="h-32 w-full" />
                 ) : enrollments.data?.by_course.length ? (
-                  <HBarList
-                    data={enrollments.data.by_course.map((c) => ({
-                      label: c.course__name ?? "—",
-                      value: c.count,
-                    }))}
+                  <MeterList
+                    rows={meterRows(
+                      enrollments.data.by_course.map((c) => ({ label: c.course__name ?? "No course", value: c.count })),
+                    )}
                   />
                 ) : (
                   <p className="text-muted-foreground text-sm">No enrollments in range.</p>
@@ -390,19 +341,16 @@ function LiveReports() {
               </CardHeader>
               <CardContent>
                 {enrollments.isLoading ? (
-                  <Skeleton className="h-24 w-full" />
+                  <Skeleton className="h-32 w-full" />
                 ) : enrollments.data?.by_status.length ? (
-                  <MiniBars values={enrollments.data.by_status.map((s) => s.count)} />
+                  <MeterList
+                    rows={meterRows(
+                      enrollments.data.by_status.map((st) => ({ label: label(st.status), value: st.count })),
+                    )}
+                  />
                 ) : (
                   <p className="text-muted-foreground text-sm">No data.</p>
                 )}
-                <div className="text-muted-foreground mt-2 flex flex-wrap gap-x-3 text-xs capitalize">
-                  {enrollments.data?.by_status.map((s) => (
-                    <span key={s.status}>
-                      {s.status.replace("_", " ")} ({s.count})
-                    </span>
-                  ))}
-                </div>
               </CardContent>
             </Card>
             <Card>
@@ -498,141 +446,6 @@ function LiveReports() {
           </Card>
         </>
       )}
-    </div>
-  );
-}
-
-export default function ReportsPage() {
-  const { source } = useDataSource();
-  if (source === "api") return <LiveReports />;
-
-  return <MockReports />;
-}
-
-function MockReports() {
-  const funnel = leadFunnel();
-  const sources = sourceBreakdown();
-  const leaders = counselorLeaderboard();
-  const courses = courseDemand();
-  const priorities = priorityMix();
-
-  return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <p className="text-brand font-mono text-[11px] font-bold tracking-wider uppercase">
-            Modern analytics
-          </p>
-          <h1 className="font-headline mt-1 text-3xl font-semibold tracking-tight">Reports</h1>
-          <p className="text-muted-foreground mt-1 text-sm">
-            Source performance, conversion, course demand, counselor output, and revenue.
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={() => toast.info("Filters — prototype")}>
-            <Filter /> Filters
-          </Button>
-          <Button variant="outline" onClick={() => toast.info("Export — prototype")}>
-            <Download /> Export PDF
-          </Button>
-        </div>
-      </div>
-
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Lead sources</CardTitle>
-            <CardDescription>Share of leads by acquisition channel</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <DonutChart slices={sources} />
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Conversion funnel</CardTitle>
-            <CardDescription>Leads reaching each stage</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <HBarList data={funnel.map((f) => ({ label: f.label, value: f.count }))} />
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid gap-4 lg:grid-cols-3">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Course demand</CardTitle>
-            <CardDescription>Top primary course interests</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <HBarList data={courses} />
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Priority mix</CardTitle>
-            <CardDescription>Hot / Warm / Cool / Cold</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <MiniBars values={priorities.map((p) => p.value)} />
-            <div className="text-muted-foreground mt-2 flex justify-between text-xs">
-              {priorities.map((p) => (
-                <span key={p.label}>{p.label}</span>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Counselor output</CardTitle>
-            <CardDescription>Admissions closed</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <HBarList
-              data={leaders.map((l) => ({ label: l.name.split(" ")[0], value: l.admissions }))}
-            />
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid gap-4 lg:grid-cols-3">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Revenue trend</CardTitle>
-            <CardDescription>Collected fees (last 7 weeks)</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <MiniBars values={[73, 56, 67, 49, 76, 62, 84]} />
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Campaign quality</CardTitle>
-            <CardDescription>Avg. lead score by campaign</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <MiniBars values={[66, 74, 46, 81, 53]} />
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Enrollment</CardTitle>
-            <CardDescription>Batch fill rate</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <MiniBars values={[58, 64, 79, 51, 69]} />
-          </CardContent>
-        </Card>
-      </div>
-
-      <p className="text-muted-foreground text-center text-xs">
-        Static preview — figures derive from the mock lead dataset. Enrolled revenue booked to date:{" "}
-        <span className="text-foreground font-semibold">{formatNPR(KPIS.revenue)}</span>.
-      </p>
     </div>
   );
 }

@@ -1,7 +1,7 @@
 /** Formatting helpers for the lead CRM. Locale: Nepal (NPR, en-IN grouping). */
 
 /** Nepal timezone offset */
-const NEPAL_OFFSET = "+05:45";
+export const NEPAL_OFFSET = "+05:45";
 
 export function formatDateToNepalIso(d: Date): string {
   const y = d.getFullYear();
@@ -24,7 +24,7 @@ export function toNepalIso(local: string): string {
   return formatDateToNepalIso(d);
 }
 
-/** "Today" for the running app. The mock dataset will shift relative to the real date. */
+/** "Today" when the app loaded. */
 export const TODAY = new Date();
 
 export function formatNPR(amount: number | null | undefined): string {
@@ -104,6 +104,12 @@ export function formatDuration(seconds: number | undefined): string {
   const s = seconds % 60;
   if (m === 0) return `${s} sec`;
   return `${m} min ${s.toString().padStart(2, "0")} sec`;
+}
+
+/** 42 -> "0:42", 125 -> "2:05". */
+export function formatClock(seconds: number): string {
+  const s = Math.max(0, Math.round(seconds));
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 }
 
 export function initialsOf(name: string | null | undefined): string {

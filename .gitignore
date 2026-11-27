@@ -22,3 +22,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Claude Code settings: kept on each machine, they can hold local sign-ins
+.claude/settings.json
+.claude/settings.local.json

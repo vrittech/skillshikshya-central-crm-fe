@@ -23,10 +23,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { useDataSource } from "@/context/data-source";
 import { useRole } from "@/context/role";
 import { useAuth } from "@/context/auth";
-import { LEAD_PRIORITIES, LEAD_SOURCES, LEAD_STATUSES, LEAD_TYPES } from "@/data/lead-lookups";
 import {
   campaignHooks,
   institutionHooks,
@@ -46,6 +44,9 @@ import {
 import { cn } from "@/lib/utils";
 import { formatDateTime } from "@/lib/leads-format";
 import { useOrbitChatSyncState, useUpdateOrbitChatSync } from "@/hooks/use-orbitchat";
+import { EmailSettingsPanel } from "./email-settings";
+import { OrganisationSettingsPanel } from "./organisation-settings";
+import { StorageSettingsPanel } from "./storage-settings";
 
 type Section =
   | "sources"
@@ -53,10 +54,12 @@ type Section =
   | "statuses"
   | "priorities"
   | "tags"
-  | "types"
   | "learning_modes"
   | "institutions"
-  | "integrations";
+  | "integrations"
+  | "storage"
+  | "email"
+  | "organisation";
 
 const SECTIONS: { key: Section; label: string }[] = [
   { key: "sources", label: "Lead Sources" },
@@ -64,10 +67,12 @@ const SECTIONS: { key: Section; label: string }[] = [
   { key: "statuses", label: "Statuses" },
   { key: "priorities", label: "Priorities" },
   { key: "tags", label: "Tags" },
-  { key: "types", label: "Lead Types" },
   { key: "learning_modes", label: "Learning Modes" },
   { key: "institutions", label: "Institutions" },
   { key: "integrations", label: "Integrations" },
+  { key: "storage", label: "Cloud storage" },
+  { key: "email", label: "Email" },
+  { key: "organisation", label: "Organisation" },
 ];
 
 /* ------------------------------------------------------------ field schema */
@@ -78,6 +83,8 @@ interface FieldDef {
   label: string;
   type: FieldType;
   required?: boolean;
+  /** Sent as null when left blank (unique fields that allow empty). */
+  nullable?: boolean;
   default?: unknown;
 }
 
@@ -121,7 +128,7 @@ const ENTITY: Partial<Record<Section, EntityConfig>> = {
     hasColor: true,
     fields: [
       { key: "name", label: "Name", type: "text", required: true },
-      { key: "color", label: "Color", type: "color", default: "#2563eb" },
+      { key: "color", label: "Color", type: "color", required: true, default: "#2563eb" },
       { key: "sort_order", label: "Sort order", type: "number", default: 0 },
       { key: "is_final", label: "Final (terminal)", type: "bool", default: false },
       { key: "is_active", label: "Active", type: "bool", default: true },
@@ -133,7 +140,7 @@ const ENTITY: Partial<Record<Section, EntityConfig>> = {
     hasColor: true,
     fields: [
       { key: "name", label: "Name", type: "text", required: true },
-      { key: "color", label: "Color", type: "color", default: "#f59e0b" },
+      { key: "color", label: "Color", type: "color", required: true, default: "#f59e0b" },
       { key: "sort_order", label: "Sort order", type: "number", default: 0 },
       { key: "is_active", label: "Active", type: "bool", default: true },
     ],
@@ -144,7 +151,7 @@ const ENTITY: Partial<Record<Section, EntityConfig>> = {
     hasColor: true,
     fields: [
       { key: "name", label: "Name", type: "text", required: true },
-      { key: "color", label: "Color", type: "color", default: "#64748b" },
+      { key: "color", label: "Color", type: "color", required: true, default: "#64748b" },
       { key: "is_active", label: "Active", type: "bool", default: true },
     ],
     hooks: tagHooks as never,
@@ -153,7 +160,7 @@ const ENTITY: Partial<Record<Section, EntityConfig>> = {
     label: "Learning mode",
     fields: [
       { key: "name", label: "Name", type: "text", required: true },
-      { key: "code", label: "Code", type: "text", required: true },
+      { key: "code", label: "Code", type: "text", nullable: true },
       { key: "is_active", label: "Active", type: "bool", default: true },
     ],
     hooks: learningModeHooks as never,
@@ -162,7 +169,7 @@ const ENTITY: Partial<Record<Section, EntityConfig>> = {
     label: "Institution",
     fields: [
       { key: "name", label: "Name", type: "text", required: true },
-      { key: "code", label: "Code", type: "text", required: true },
+      { key: "code", label: "Code", type: "text", nullable: true },
       { key: "address", label: "Address", type: "text" },
       { key: "phone", label: "Phone", type: "text" },
       { key: "is_active", label: "Active", type: "bool", default: true },
@@ -214,9 +221,13 @@ function EditorDialog({
         return;
       }
     }
+    const payload = { ...values };
+    for (const f of cfg!.fields) {
+      if (f.nullable && !String(payload[f.key] ?? "").trim()) payload[f.key] = null;
+    }
     const onSuccess = () => onClose();
-    if (row) update?.mutate({ id: row.id, payload: values } as never, { onSuccess });
-    else create?.mutate(values as never, { onSuccess });
+    if (row) update?.mutate({ id: row.id, payload } as never, { onSuccess });
+    else create?.mutate(payload as never, { onSuccess });
   }
 
   return (
@@ -236,10 +247,7 @@ function EditorDialog({
         <div className="grid gap-4 py-2">
           {cfg.fields.map((f) => (
             <div key={f.key} className="grid gap-2">
-              <Label>
-                {f.label}
-                {f.required && <span className="text-destructive ml-0.5">*</span>}
-              </Label>
+              <Label required={f.required}>{f.label}</Label>
               {f.type === "bool" ? (
                 <Switch
                   checked={Boolean(values[f.key])}
@@ -386,23 +394,20 @@ function RowItem({
 
 export default function SettingsPage() {
   const [section, setSection] = useState<Section>("sources");
-  const { source: dataSource } = useDataSource();
   const { can } = useRole();
-  const isApi = dataSource === "api";
-  const canManage = isApi && can("settings.view");
+  const canManage = can("settings.view");
 
   const [editorOpen, setEditorOpen] = useState(false);
   const [editing, setEditing] = useState<Row | null>(null);
   const [deleting, setDeleting] = useState<Row | null>(null);
 
-  // Live lists (API path only).
-  const sourcesQ = useLeadSources(isApi);
-  const campaignsQ = useCampaigns(isApi);
-  const statusesQ = useLeadStatuses(isApi);
-  const prioritiesQ = useLeadPriorities(isApi);
-  const tagsQ = useLeadTags(isApi);
-  const learningModesQ = useLearningModes(isApi);
-  const institutionsQ = useInstitutions(isApi);
+  const sourcesQ = useLeadSources();
+  const campaignsQ = useCampaigns();
+  const statusesQ = useLeadStatuses();
+  const prioritiesQ = useLeadPriorities();
+  const tagsQ = useLeadTags();
+  const learningModesQ = useLearningModes();
+  const institutionsQ = useInstitutions();
 
   // Call every remove hook unconditionally (rules of hooks), then select one.
   const removeSource = sourceHooks.useRemove();
@@ -446,26 +451,12 @@ export default function SettingsPage() {
     }
   }
 
-  function mockRows(): { name: string; meta?: string }[] {
-    switch (section) {
-      case "sources":
-        return LEAD_SOURCES.map((s) => ({ name: s.label, meta: s.value }));
-      case "statuses":
-        return LEAD_STATUSES.map((s) => ({ name: s.label, meta: `${s.category}${s.isTerminal ? " · terminal" : ""}` }));
-      case "priorities":
-        return LEAD_PRIORITIES.map((p) => ({ name: p.label, meta: p.description }));
-      case "types":
-        return LEAD_TYPES.map((t) => ({ name: t.label, meta: t.value }));
-      default:
-        return [];
-    }
-  }
-
-  const isTypes = section === "types";
   const isIntegrations = section === "integrations";
+  // Cloud storage, Email and Organisation have their own panels, not the list + editor.
+  const isSystem = section === "storage" || section === "email" || section === "organisation";
   const { user } = useAuth();
   // OrbitChat sync-state is staff-only per the API guide.
-  const canManageIntegrations = isApi && !!user?.is_staff;
+  const canManageIntegrations = !!user?.is_staff;
 
   return (
     <div className="space-y-6">
@@ -478,7 +469,6 @@ export default function SettingsPage() {
           <p className="text-muted-foreground mt-1 text-sm">
             Configure the CRM vocabulary — sources, campaigns, statuses, priorities, tags,
             learning modes, and institutions.
-            {!isApi && " Switch the data source to Live to edit."}
           </p>
         </div>
       </div>
@@ -504,7 +494,23 @@ export default function SettingsPage() {
           </div>
         </Card>
 
-        {isIntegrations ? (
+        {isSystem ? (
+          canManageIntegrations ? (
+            section === "storage" ? (
+              <StorageSettingsPanel />
+            ) : section === "organisation" ? (
+              <OrganisationSettingsPanel />
+            ) : (
+              <EmailSettingsPanel />
+            )
+          ) : (
+            <Card>
+              <CardContent className="text-muted-foreground py-10 text-center text-sm">
+                Only administrators can manage this.
+              </CardContent>
+            </Card>
+          )
+        ) : isIntegrations ? (
           <Card>
             <CardHeader>
               <div>
@@ -529,13 +535,8 @@ export default function SettingsPage() {
             <CardHeader className="flex-row items-center justify-between">
               <div>
                 <CardTitle className="text-base">{heading}</CardTitle>
-                <p className="text-muted-foreground mt-1 text-xs">
-                  {isTypes
-                    ? "Fixed system enum — not editable."
-                    : "Controlled values reused across attribution, filtering, and reports."}
-                </p>
               </div>
-              {canManage && !isTypes && !isIntegrations && (
+              {canManage && !isIntegrations && (
                 <Button
                   variant="outline"
                   size="sm"
@@ -549,8 +550,7 @@ export default function SettingsPage() {
               )}
             </CardHeader>
             <CardContent className="space-y-2">
-              {isApi && !isTypes ? (
-                liveRows().length > 0 ? (
+              {liveRows().length > 0 ? (
                   liveRows().map((r) => (
                     <RowItem
                       key={r.id}
@@ -568,18 +568,13 @@ export default function SettingsPage() {
                   <p className="text-muted-foreground py-8 text-center text-sm">
                     No {heading.toLowerCase()} yet.
                   </p>
-                )
-              ) : (
-                mockRows().map((r, i) => (
-                  <RowItem key={i} row={{ id: i, name: r.name, is_active: true }} meta={r.meta} canManage={false} />
-                ))
-              )}
+                )}
             </CardContent>
           </Card>
         )}
       </div>
 
-      {!isTypes && !isIntegrations && (
+      {!isIntegrations && !isSystem && (
         <EditorDialog
           open={editorOpen}
           onClose={() => {

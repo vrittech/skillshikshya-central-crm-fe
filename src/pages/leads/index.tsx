@@ -1,5 +1,5 @@
-import { ChevronLeft, ChevronRight, Download, Plus, Trash2, Upload } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { ChevronDown, ChevronLeft, ChevronRight, Download, Plus, Trash2, Upload } from "lucide-react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import {
@@ -21,6 +21,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -30,33 +36,25 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useDataSource } from "@/context/data-source";
 import { useRole } from "@/context/role";
-import {
-  COURSE_CATALOG,
-  COUNSELORS,
-  LEAD_PRIORITIES,
-  LEAD_SOURCES,
-  LEAD_STATUSES,
-  LEAD_TYPES,
-} from "@/data/lead-lookups";
-import { LEAD_LIST } from "@/data/mock-leads";
 import { useCourses } from "@/hooks/use-courses";
 import {
   useLeadPriorities,
   useLeadSources,
   useLeadStatuses,
-  useLeadTypes,
 } from "@/hooks/use-lead-config";
 import {
   buildApiParams,
   useBulkAssignLeads,
   useBulkDeleteLeads,
+  useLeadSummary,
   useLeadsList,
 } from "@/hooks/use-leads";
 import { useUsers } from "@/hooks/use-users";
+import { apiErrorMessage } from "@/lib/api";
 import { leadsService } from "@/services/leads.service";
 import type { LeadListItem } from "@/types/leads";
+import type { ApiLeadFileType } from "@/types/leads-api";
 import { LeadActionDialogs, type LeadAction } from "./components/lead-action-dialogs";
 import {
   DEFAULT_FILTERS,
@@ -64,18 +62,13 @@ import {
   type LeadFilterOptions,
   type LeadFilterState,
 } from "./components/lead-filters";
+import { LeadImportDialog } from "./components/lead-import-dialog";
 import { LeadSummaryCards } from "./components/lead-summary-cards";
 import { LeadTable } from "./components/lead-table";
-
-/** In the mock preview, the "logged-in counselor" for the Counselor role. */
-const CURRENT_COUNSELOR_ID = "u-sangita";
 
 export default function LeadsPage() {
   const navigate = useNavigate();
   const { can } = useRole();
-  const { source, isMock } = useDataSource();
-  const apiEnabled = source === "api";
-  const canViewAll = can("leads.view.all");
 
   const [filters, setFilters] = useState<LeadFilterState>(DEFAULT_FILTERS);
   const [page, setPage] = useState(1);
@@ -86,48 +79,31 @@ export default function LeadsPage() {
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const [bulkAssignOpen, setBulkAssignOpen] = useState(false);
   const [bulkAssignTo, setBulkAssignTo] = useState("");
+  const [importOpen, setImportOpen] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
-  // Codes (mock) and numeric IDs (api) aren't interchangeable — reset on switch.
-  useEffect(() => {
-    setFilters(DEFAULT_FILTERS);
-    setPage(1);
-    setSelected(new Set());
-  }, [source]);
-
-  // Live config for the filter dropdowns (only fetched on the API path).
-  const statusesQ = useLeadStatuses(apiEnabled);
-  const sourcesQ = useLeadSources(apiEnabled);
-  const prioritiesQ = useLeadPriorities(apiEnabled);
-  const typesQ = useLeadTypes(apiEnabled);
+  // Options for the filter dropdowns.
+  const statusesQ = useLeadStatuses();
+  const sourcesQ = useLeadSources();
+  const prioritiesQ = useLeadPriorities();
   const coursesQ = useCourses(1, 100, "");
   const usersQ = useUsers(1, 100);
 
-  const options: LeadFilterOptions = useMemo(() => {
-    if (apiEnabled) {
-      return {
-        statuses: (statusesQ.data?.results ?? []).map((s) => ({ value: String(s.id), label: s.name })),
-        sources: (sourcesQ.data?.results ?? []).map((s) => ({ value: String(s.id), label: s.name })),
-        priorities: (prioritiesQ.data?.results ?? []).map((p) => ({ value: String(p.id), label: p.name })),
-        courses: (coursesQ.data?.results ?? []).map((c) => ({ value: String(c.id), label: c.name })),
-        counselors: (usersQ.data?.results ?? []).map((u) => ({ value: String(u.id), label: u.name })),
-        types: (typesQ.data?.results ?? []).map((t) => ({ value: String(t.id), label: t.name })),
-      };
-    }
-    return {
-      statuses: LEAD_STATUSES.map((s) => ({ value: s.value, label: s.label })),
-      sources: LEAD_SOURCES.map((s) => ({ value: s.value, label: s.label })),
-      priorities: LEAD_PRIORITIES.map((p) => ({ value: p.value, label: p.label })),
-      courses: COURSE_CATALOG.map((c) => ({ value: c.id, label: c.name })),
-      counselors: COUNSELORS.map((c) => ({ value: c.id, label: c.name })),
-      types: LEAD_TYPES.map((t) => ({ value: t.value, label: t.label })),
-    };
-  }, [apiEnabled, statusesQ.data, sourcesQ.data, prioritiesQ.data, typesQ.data, coursesQ.data, usersQ.data]);
+  const options: LeadFilterOptions = useMemo(
+    () => ({
+      statuses: (statusesQ.data?.results ?? []).map((s) => ({ value: String(s.id), label: s.name })),
+      sources: (sourcesQ.data?.results ?? []).map((s) => ({ value: String(s.id), label: s.name })),
+      priorities: (prioritiesQ.data?.results ?? []).map((p) => ({ value: String(p.id), label: p.name })),
+      courses: (coursesQ.data?.results ?? []).map((c) => ({ value: String(c.id), label: c.name })),
+      counselors: (usersQ.data?.results ?? []).map((u) => ({ value: String(u.id), label: u.name })),
+    }),
+    [statusesQ.data, sourcesQ.data, prioritiesQ.data, coursesQ.data, usersQ.data],
+  );
 
-  // Counselors (mock role preview) see only their own book; API is governed by the backend.
-  const effectiveFilters =
-    isMock && !canViewAll ? { ...filters, assignedTo: CURRENT_COUNSELOR_ID } : filters;
-
-  const { items, count, isLoading } = useLeadsList(effectiveFilters, page, pageSize);
+  // What each person sees is decided by the backend.
+  const { items, count, isLoading } = useLeadsList(filters, page, pageSize);
+  const summaryQ = useLeadSummary();
+  const pendingActive = filters.enrollment === "pending";
   const bulkDelete = useBulkDeleteLeads();
   const bulkAssign = useBulkAssignLeads();
 
@@ -164,14 +140,6 @@ export default function LeadsPage() {
   const currentPage = Math.min(page, totalPages);
   const start = (currentPage - 1) * pageSize;
 
-  const summaryLeads = useMemo(
-    () =>
-      isMock
-        ? LEAD_LIST.filter((l) => canViewAll || l.assignedTo === CURRENT_COUNSELOR_ID)
-        : items,
-    [isMock, canViewAll, items],
-  );
-
   function updateFilters(next: LeadFilterState) {
     setFilters(next);
     setPage(1);
@@ -197,12 +165,20 @@ export default function LeadsPage() {
     });
   }
 
-  function exportCsv() {
-    if (isMock) {
-      toast.info("Export CSV", { description: "Switch to the live data source to export." });
-      return;
+  /** Downloads the leads the filters show, or only the selected ones (`ids`). */
+  async function exportLeads(fileType: ApiLeadFileType, ids?: number[]) {
+    setExporting(true);
+    try {
+      await leadsService.exportLeads(buildApiParams(filters, 1, pageSize, "-created_at"), fileType, ids);
+    } catch (e) {
+      toast.error(apiErrorMessage(e, "Could not export the leads"));
+    } finally {
+      setExporting(false);
     }
-    window.open(leadsService.exportCsvUrl(buildApiParams(effectiveFilters, 1, 100, "-created_at")), "_blank");
+  }
+
+  function startImport() {
+    setImportOpen(true);
   }
 
   const activeLead: LeadListItem | null = actionId
@@ -219,17 +195,25 @@ export default function LeadsPage() {
           <h1 className="font-headline mt-1 text-3xl font-semibold tracking-tight">Leads</h1>
           <p className="text-muted-foreground mt-1 text-sm">
             Manage inquiries, assignments, follow-ups, and enrollment progress.
-            {isMock && " Previewing mock data."}
-            {!canViewAll && isMock && " Showing leads assigned to you."}
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={() => toast.info("Import Leads", { description: "Bulk import ships with the backend importer." })}>
-            <Upload /> Import
-          </Button>
-          <Button variant="outline" onClick={exportCsv}>
-            <Download /> Export
-          </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          {can("leads.import") && (
+            <Button variant="outline" onClick={startImport}>
+              <Upload /> Import
+            </Button>
+          )}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" disabled={exporting}>
+                <Download /> {exporting ? "Exporting…" : "Export"} <ChevronDown className="opacity-60" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onSelect={() => void exportLeads("csv")}>CSV</DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => void exportLeads("xlsx")}>Excel</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           {can("recycle_bin.view") && (
             <Button variant="outline" onClick={() => navigate("/leads/recycle-bin")}>
               <Trash2 /> Recycle bin
@@ -243,11 +227,15 @@ export default function LeadsPage() {
         </div>
       </div>
 
-      <LeadSummaryCards leads={summaryLeads} />
+      <LeadSummaryCards
+        summary={summaryQ.data}
+        pendingActive={pendingActive}
+        onPendingClick={() => updateFilters({ ...filters, enrollment: pendingActive ? "all" : "pending" })}
+      />
 
       <div className="bg-card overflow-hidden rounded-2xl border shadow-[0_1px_3px_0_rgba(0,0,0,0.05),0_1px_2px_-1px_rgba(0,0,0,0.05)]">
         <div className="border-b p-4">
-          <LeadFilters value={filters} onChange={updateFilters} options={options} showScopeToggles={isMock} />
+          <LeadFilters value={filters} onChange={updateFilters} options={options} />
         </div>
 
         {selected.size > 0 && (
@@ -275,6 +263,17 @@ export default function LeadsPage() {
                   {bulkDelete.isPending ? "Deleting…" : "Delete"}
                 </Button>
               )}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button size="sm" variant="outline" disabled={selectedApiIds.length === 0 || exporting}>
+                    <Download /> Export <ChevronDown className="opacity-60" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onSelect={() => void exportLeads("csv", selectedApiIds)}>CSV</DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => void exportLeads("xlsx", selectedApiIds)}>Excel</DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
               <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())}>
                 Clear
               </Button>
@@ -365,7 +364,7 @@ export default function LeadsPage() {
             <DialogDescription>Choose the counselor to own the selected leads.</DialogDescription>
           </DialogHeader>
           <div className="grid gap-2 py-2">
-            <Label>Counselor</Label>
+            <Label required>Counselor</Label>
             <Select value={bulkAssignTo} onValueChange={setBulkAssignTo}>
               <SelectTrigger>
                 <SelectValue placeholder="Select counselor" />
@@ -432,6 +431,7 @@ export default function LeadsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      <LeadImportDialog open={importOpen} onClose={() => setImportOpen(false)} options={options} />
     </div>
   );
 }

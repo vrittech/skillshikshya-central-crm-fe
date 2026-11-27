@@ -1,10 +1,10 @@
 /**
  * Maps backend wire types (`types/leads-api.ts`) to the rich UI model
- * (`types/leads.ts`) so the existing components render live data unchanged.
+ * (`types/leads.ts`) that the components render.
  *
- * Live leads carry admin-defined status/priority as `*Name`/`*Color` display
+ * Leads carry admin-defined status/priority as `*Name`/`*Color` display
  * fields (the badges read those); the fixed-code fields are placeholders and
- * unused on the API path. Fields the BE doesn't provide yet (custom data,
+ * unused. Fields the BE doesn't provide yet (custom data,
  * multi-course, enrollment, payments) come back empty — see lead-additional.md.
  */
 
@@ -17,7 +17,6 @@ import type {
   Lead,
   LeadCustomData,
   LeadListItem,
-  LeadTypeCode,
   Payment,
 } from "@/types/leads";
 import type {
@@ -27,32 +26,10 @@ import type {
   ApiLead,
   ApiLeadActivity,
   ApiLeadCall,
-  ApiLeadType,
   ApiPayment,
 } from "@/types/leads-api";
 
 /* ------------------------------------------------------------ enum mapping */
-
-const API_TO_UI_TYPE: Record<ApiLeadType, LeadTypeCode> = {
-  course_inquiry: "course_inquiry",
-  master_class: "master_class_inquiry",
-  corporate: "corporate_inquiry",
-  general_inquiry: "general_inquiry",
-};
-
-const UI_TO_API_TYPE: Record<LeadTypeCode, ApiLeadType> = {
-  course_inquiry: "course_inquiry",
-  master_class_inquiry: "master_class",
-  corporate_inquiry: "corporate",
-  general_inquiry: "general_inquiry",
-};
-
-export const uiLeadTypeToApi = (t: LeadTypeCode): ApiLeadType => UI_TO_API_TYPE[t];
-
-/** BE `lead_type` may be a numeric FK id (live) or a string enum (legacy). */
-function uiLeadTypeFromApi(v: ApiLead["lead_type"]): LeadTypeCode {
-  return typeof v === "string" ? (API_TO_UI_TYPE[v] ?? "general_inquiry") : "general_inquiry";
-}
 
 const ACTIVITY_TYPE_MAP: Record<string, ActivityType> = {
   call: "call",
@@ -183,13 +160,11 @@ export function adaptApiLeadToListItem(api: ApiLead): LeadListItem {
     fullName: api.full_name,
     primaryPhone: api.phone,
     email: api.email ?? undefined,
-    leadType: uiLeadTypeFromApi(api.lead_type),
-    leadTypeName: api.lead_type_name,
     source: "manual_entry",
     sourceName: api.source_name,
     campaign: api.campaign_name ?? undefined,
-    primaryCourse: api.primary_course_name ?? undefined,
-    primaryCourseId: api.primary_course != null ? String(api.primary_course) : undefined,
+    primaryCourse: api.primary_course?.name,
+    primaryCourseId: api.primary_course ? String(api.primary_course.id) : undefined,
     status: "new",
     statusName: api.status_name,
     statusColor: api.status_color,
@@ -223,8 +198,6 @@ export function adaptApiLead(api: ApiLead): Lead {
     provinceName: api.province_name,
     cityId: api.city ?? null,
     cityName: api.city_name,
-    leadType: uiLeadTypeFromApi(api.lead_type),
-    leadTypeName: api.lead_type_name,
     source: "manual_entry",
     sourceName: api.source_name,
     campaign: api.campaign_name ?? undefined,
@@ -238,11 +211,11 @@ export function adaptApiLead(api: ApiLead): Lead {
     assignedToName: api.assigned_counselor_name,
     branchName: api.branch_name,
     courseInterests:
-      api.primary_course != null
+      api.primary_course
         ? [
             {
-              courseId: String(api.primary_course),
-              courseName: api.primary_course_name ?? "Course",
+              courseId: String(api.primary_course.id),
+              courseName: api.primary_course.name,
               isPrimary: true,
               interestLevel: "high",
             },
@@ -263,8 +236,7 @@ export function adaptApiLead(api: ApiLead): Lead {
     sourceId: api.source,
     campaignId: api.campaign,
     branchId: api.branch,
-    primaryCourseId: api.primary_course,
-    leadTypeId: typeof api.lead_type === "number" ? api.lead_type : null,
+    primaryCourseId: api.primary_course?.id ?? null,
     tagIds: api.tags ?? [],
     sourceSheet: "API",
     activities: [],

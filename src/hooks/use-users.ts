@@ -27,16 +27,21 @@ export function useUsers(page: number, pageSize: number, search = "", branchId?:
  */
 export function useCounselors(search = "", branchId?: number, enabled = true) {
   const groups = useGroups(enabled);
-  const counselorGroupId = groups.data?.results.find((g) => /counsel/i.test(g.name))?.id;
+  // Every role named like "counselor" ("Counselor", "Senior Counselor"…).
+  // With none, anyone can be picked.
+  const counselorGroups = (groups.data?.results ?? [])
+    .filter((g) => /counsel/i.test(g.name))
+    .map((g) => g.id)
+    .join(",");
   return useQuery({
-    queryKey: ["users", "counselors", search, branchId ?? null, counselorGroupId ?? null],
+    queryKey: ["users", "counselors", search, branchId ?? null, counselorGroups],
     queryFn: () =>
       usersService.list({
         page: 1,
         page_size: 100,
         search: search || undefined,
         branch_id: branchId,
-        group: counselorGroupId,
+        group__in: counselorGroups || undefined,
         is_active: true,
       }),
     // Wait for groups so the role filter is applied on the first fetch.

@@ -1,9 +1,15 @@
 import { api } from "@/lib/api";
 import type {
+  BatchProfitParams,
+  BatchProfitReport,
   ConversionReport,
   CounselorPerformanceParams,
   CounselorPerformanceReport,
   DimensionReport,
+  DueInMonthParams,
+  DueInMonthReport,
+  EnquiryFunnelParams,
+  EnquiryFunnelReport,
   EnrollmentsReport,
   EnrollmentsReportParams,
   LeadTrendParams,
@@ -13,6 +19,8 @@ import type {
   OverviewReport,
   ReportBaseParams,
   RevenueReport,
+  WhoOwesParams,
+  WhoOwesReport,
 } from "@/types/reports-api";
 
 /** Serializes report params, dropping empty values. */
@@ -23,6 +31,32 @@ function clean(params: object) {
 }
 
 export const reportsService = {
+  /** Where enquiries die: how far enquiries got, and why the lost ones were lost. */
+  async enquiryFunnel(params: EnquiryFunnelParams) {
+    const { data } = await api.get<EnquiryFunnelReport>("/reports/enquiry-funnel/", {
+      params: clean(params),
+    });
+    return data;
+  },
+  /** Each batch's fees, collected, owed, costs and profit, newest first. */
+  async batchProfit(params: BatchProfitParams) {
+    const { data } = await api.get<BatchProfitReport>("/reports/batch-profit/", {
+      params: clean(params),
+    });
+    return data;
+  },
+  /** Every student who owes money, most late first. */
+  async whoOwes(params: WhoOwesParams) {
+    const { data } = await api.get<WhoOwesReport>("/reports/who-owes/", { params: clean(params) });
+    return data;
+  },
+  /** Unpaid parts due in a month (next month by default). */
+  async dueInMonth(params: DueInMonthParams) {
+    const { data } = await api.get<DueInMonthReport>("/reports/due-in-month/", {
+      params: clean(params),
+    });
+    return data;
+  },
   async names() {
     const { data } = await api.get<{ available_reports: string[] }>("/reports/");
     return data.available_reports;
@@ -41,14 +75,6 @@ export const reportsService = {
   bySource(params: ReportBaseParams = {}) {
     return api
       .get<DimensionReport<LeadsByNamedDimensionRow>>("/reports/leads-by-source/", {
-        params: clean(params),
-      })
-      .then((r) => r.data);
-  },
-
-  byType(params: ReportBaseParams = {}) {
-    return api
-      .get<DimensionReport<LeadsByNamedDimensionRow>>("/reports/leads-by-type/", {
         params: clean(params),
       })
       .then((r) => r.data);

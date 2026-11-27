@@ -61,6 +61,10 @@ export function InvoiceEmailConfigDialog({
   }
 
   function submit() {
+    if (!prefix.trim()) {
+      toast.error("Subject prefix is required.");
+      return;
+    }
     // A half-typed address in the box is almost always meant to be included.
     const pending = draft.trim().toLowerCase();
     if (pending && !EMAIL_RE.test(pending)) {
@@ -137,7 +141,7 @@ export function InvoiceEmailConfigDialog({
             </div>
 
             <div className="grid gap-2">
-              <Label>Subject prefix</Label>
+              <Label required>Subject prefix</Label>
               <Input
                 value={prefix}
                 onChange={(e) => setPrefix(e.target.value)}

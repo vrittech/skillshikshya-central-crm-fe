@@ -6,8 +6,10 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { useDataSource } from "@/context/data-source";
+import { useAuth } from "@/context/auth";
 import { apiErrorMessage } from "@/lib/api";
+import { phoneMatchOf } from "@/lib/phone-match";
+import { useDebouncedValue } from "@/lib/use-debounced-value";
 import {
   adaptApiCall,
   adaptApiActivity,
@@ -17,24 +19,31 @@ import {
   adaptApiLead,
   adaptApiLeadToListItem,
   adaptApiPayment,
-  uiLeadTypeToApi,
 } from "@/data/lead-adapters";
-import { getLeadById, LEAD_LIST } from "@/data/mock-leads";
-import { isOverdue } from "@/lib/leads-format";
+import { globalListsService } from "@/services/global-lists.service";
 import { leadsService, type LeadListParams } from "@/services/leads.service";
 import type {
+  ApiAdjustmentKind,
   ApiEnrollment,
+  ApiEnrollmentHistory,
   ApiEnrollmentPayload,
+  ApiEnrollmentStatus,
   ApiFollowup,
   ApiLeadCall,
   ApiLeadDocument,
   ApiLeadPayload,
   ApiPayment,
   ApiPaymentPayload,
+  ApiSeatAction,
+  ApiSeatActionBody,
+  ApiDuePart,
+  ApiFirstPayment,
+  ApiLeadImportOptions,
   EnrollmentListParams,
   PaymentListParams,
 } from "@/types/leads-api";
-import type { Lead, LeadListItem, LeadTypeCode } from "@/types/leads";
+import type { ApiInvoice } from "@/types/invoices";
+import type { Lead, LeadListItem } from "@/types/leads";
 import type { LeadFilterState } from "@/pages/leads/components/lead-filters";
 
 const EMPTY_PAGE = { count: 0, next: null, previous: null, results: [] };
@@ -53,11 +62,7 @@ export function buildApiParams(
   if (f.source !== "all") p.source = Number(f.source);
   if (f.priority !== "all") p.priority = Number(f.priority);
   if (f.course !== "all") p.primary_course = Number(f.course);
-  if (f.type !== "all") {
-    // Live backend: numeric lead-type FK id. Mock: legacy string enum.
-    p.lead_type = /^\d+$/.test(f.type) ? Number(f.type) : uiLeadTypeToApi(f.type as LeadTypeCode);
-  }
-  if (f.assignedTo !== "all" && f.assignedTo !== "unassigned") {
+  if (f.assignedTo !== "all") {
     p.assigned_counselor = Number(f.assignedTo);
   }
   if (f.overdueOnly) p.next_followup_at__lte = new Date().toISOString();
@@ -66,34 +71,8 @@ export function buildApiParams(
   if (f.createdDate) p.created_date = f.createdDate;
   if (f.dateFrom) p.from_date = f.dateFrom;
   if (f.dateTo) p.to_date = f.dateTo;
+  if (f.enrollment !== "all") p.enrollment_status = f.enrollment;
   return p;
-}
-
-/** Client-side matcher for the mock dataset (string codes). */
-export function mockMatch(l: LeadListItem, f: LeadFilterState): boolean {
-  if (l.isArchived) return false;
-  if (f.status !== "all" && l.status !== f.status) return false;
-  if (f.source !== "all" && l.source !== f.source) return false;
-  if (f.type !== "all" && l.leadType !== f.type) return false;
-  if (f.priority !== "all" && l.priority !== f.priority) return false;
-  if (f.assignedTo === "unassigned" && l.assignedTo !== null) return false;
-  if (f.assignedTo !== "all" && f.assignedTo !== "unassigned" && l.assignedTo !== f.assignedTo)
-    return false;
-  if (f.unassignedOnly && l.assignedTo !== null) return false;
-  if (f.overdueOnly && !(l.nextFollowUpAt && isOverdue(l.nextFollowUpAt) && l.status !== "enrolled"))
-    return false;
-  if (f.course !== "all" && l.primaryCourseId !== f.course) return false;
-  // createdAt is an ISO timestamp; compare on the date part so the range is inclusive.
-  const createdDay = l.createdAt.slice(0, 10);
-  if (f.createdDate && createdDay !== f.createdDate) return false;
-  if (f.dateFrom && createdDay < f.dateFrom) return false;
-  if (f.dateTo && createdDay > f.dateTo) return false;
-  if (f.search.trim()) {
-    const q = f.search.trim().toLowerCase();
-    const hay = `${l.fullName} ${l.primaryPhone} ${l.email ?? ""} ${l.referenceNumber}`.toLowerCase();
-    if (!hay.includes(q)) return false;
-  }
-  return true;
 }
 
 /* ------------------------------------------------------------- list hook */
@@ -105,39 +84,35 @@ export interface LeadsListResult {
   isFetching: boolean;
 }
 
+/** Counts for the lead list cards, over every lead the user can see. */
+export function useLeadSummary(params: { branch_id?: number } = {}, enabled = true) {
+  return useQuery({
+    queryKey: ["leads", "summary", params],
+    queryFn: () => leadsService.summary(params),
+    placeholderData: keepPreviousData,
+    enabled,
+  });
+}
+
 export function useLeadsList(
   filters: LeadFilterState,
   page: number,
   pageSize: number,
   ordering = "-created_at",
 ): LeadsListResult {
-  const { source } = useDataSource();
-  const isApi = source === "api";
   const apiParams = buildApiParams(filters, page, pageSize, ordering);
 
   const query = useQuery({
     queryKey: ["leads", "list", apiParams],
     queryFn: () => leadsService.list(apiParams),
-    enabled: isApi,
     placeholderData: keepPreviousData,
   });
 
-  if (isApi) {
-    return {
-      items: (query.data?.results ?? []).map(adaptApiLeadToListItem),
-      count: query.data?.count ?? 0,
-      isLoading: query.isLoading,
-      isFetching: query.isFetching,
-    };
-  }
-
-  const filtered = LEAD_LIST.filter((l) => mockMatch(l, filters));
-  const start = (page - 1) * pageSize;
   return {
-    items: filtered.slice(start, start + pageSize),
-    count: filtered.length,
-    isLoading: false,
-    isFetching: false,
+    items: (query.data?.results ?? []).map(adaptApiLeadToListItem),
+    count: query.data?.count ?? 0,
+    isLoading: query.isLoading,
+    isFetching: query.isFetching,
   };
 }
 
@@ -151,22 +126,24 @@ export interface LeadDetailResult {
 }
 
 export function useLead(routeId?: string): LeadDetailResult {
-  const { source } = useDataSource();
-  const isApi = source === "api";
   const numId = routeId && /^\d+$/.test(routeId) ? Number(routeId) : NaN;
+  const { hasPerm } = useAuth();
 
   const query = useQuery({
     queryKey: ["lead", "detail", routeId],
-    enabled: isApi && !Number.isNaN(numId),
+    enabled: !Number.isNaN(numId),
     queryFn: async () => {
+      // Each part loads only with its view right; without it the part is empty.
+      const part = <T,>(right: string, load: () => Promise<T>) =>
+        hasPerm(right) ? load().catch(() => EMPTY_PAGE) : Promise.resolve(EMPTY_PAGE);
       const [lead, calls, acts, fus, docs, interests, enrolls] = await Promise.all([
         leadsService.get(numId),
-        leadsService.calls(numId).catch(() => EMPTY_PAGE),
-        leadsService.activities(numId).catch(() => EMPTY_PAGE),
-        leadsService.followups(numId).catch(() => EMPTY_PAGE),
-        leadsService.documents(numId).catch(() => EMPTY_PAGE),
-        leadsService.courseInterests(numId).catch(() => EMPTY_PAGE),
-        leadsService.enrollments(numId, { ordering: "-id" }).catch(() => EMPTY_PAGE),
+        part("lead.view_leadcall", () => leadsService.calls(numId)),
+        part("lead.view_leadactivity", () => leadsService.activities(numId)),
+        part("lead.view_followup", () => leadsService.followups(numId)),
+        part("lead.view_leaddocument", () => leadsService.documents(numId)),
+        part("lead.view_leadcourseinterest", () => leadsService.courseInterests(numId)),
+        part("lead.view_enrollment", () => leadsService.enrollments(numId, { ordering: "-id" })),
       ]);
       const ui = adaptApiLead(lead);
       ui.activities = [
@@ -174,7 +151,9 @@ export function useLead(routeId?: string): LeadDetailResult {
         ...acts.results.map(adaptApiActivity),
       ].sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
       ui.followUps = fus.results.map(adaptApiFollowup);
-      if (interests.results.length) ui.courseInterests = interests.results.map(adaptApiCourseInterest);
+      // Enquiries without a course are not course interests.
+      const withCourse = interests.results.filter((ci) => ci.course != null);
+      if (withCourse.length) ui.courseInterests = withCourse.map(adaptApiCourseInterest);
 
       // `enrollments` is ordered newest-first, so results[0] is the latest one;
       // it feeds the hero/summary. The Enrollment tab lists them all via
@@ -182,65 +161,58 @@ export function useLead(routeId?: string): LeadDetailResult {
       const latestEnr = enrolls.results[0];
       if (latestEnr) {
         ui.enrollment = adaptApiEnrollment(latestEnr);
-        const pays = await leadsService
-          .payments(numId, latestEnr.id, { ordering: "-payment_date" })
-          .catch(() => EMPTY_PAGE);
+        const pays = await part("lead.view_payment", () =>
+          leadsService.payments(numId, latestEnr.id, { ordering: "-payment_date", page_size: 100 }),
+        );
         ui.payments = pays.results.map(adaptApiPayment);
       }
       return { lead: ui, documents: docs.results as ApiLeadDocument[] };
     },
   });
 
-  if (isApi) {
-    return {
-      lead: query.data?.lead,
-      documents: query.data?.documents ?? [],
-      isLoading: query.isLoading,
-      notFound: !query.isLoading && !query.data,
-    };
-  }
-
-  const lead = routeId ? getLeadById(routeId) : undefined;
-  return { lead, documents: [], isLoading: false, notFound: !lead };
+  return {
+    lead: query.data?.lead,
+    documents: query.data?.documents ?? [],
+    isLoading: query.isLoading,
+    notFound: !query.isLoading && !query.data,
+  };
 }
 
 /* ------------------------------------------------------------ mutations */
-// On the mock path these no-op with a toast (nothing to persist); on the API
-// path they hit the backend and invalidate the relevant queries.
 
 export function useCreateLead() {
-  const { isMock } = useDataSource();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (payload: ApiLeadPayload) => {
-      if (isMock) return null;
-      return leadsService.create(payload);
-    },
+    mutationFn: (payload: ApiLeadPayload) => leadsService.create(payload),
     onSuccess: (lead) => {
-      if (!lead) {
-        toast.success("Lead created", { description: "Mock preview — not saved to the backend." });
-        return;
-      }
       toast.success(`Lead "${lead.full_name}" created`);
       void qc.invalidateQueries({ queryKey: ["leads"] });
     },
-    onError: (e) => toast.error(apiErrorMessage(e, "Could not create lead")),
+    onError: (e) => {
+      // A phone match is shown on the form itself.
+      if (phoneMatchOf(e)) return;
+      toast.error(apiErrorMessage(e, "Could not create lead"));
+    },
+  });
+}
+
+/** Leads in any branch with the typed phone number (7 digits or more). */
+export function usePhoneMatch(phone: string, exclude?: number) {
+  const debounced = useDebouncedValue(phone.trim(), 400);
+  const digits = debounced.replace(/\D/g, "");
+  return useQuery({
+    queryKey: ["leads", "phone-match", debounced, exclude],
+    queryFn: () => leadsService.phoneMatch(debounced, exclude),
+    enabled: digits.length >= 7,
+    staleTime: 30_000,
   });
 }
 
 export function useUpdateLead() {
-  const { isMock } = useDataSource();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, payload }: { id: number; payload: ApiLeadPayload }) => {
-      if (isMock) return null;
-      return leadsService.update(id, payload);
-    },
-    onSuccess: (lead) => {
-      if (!lead) {
-        toast.success("Lead updated", { description: "Mock preview — not saved to the backend." });
-        return;
-      }
+    mutationFn: ({ id, payload }: { id: number; payload: ApiLeadPayload }) => leadsService.update(id, payload),
+    onSuccess: () => {
       toast.success("Lead updated");
       void qc.invalidateQueries({ queryKey: ["leads"] });
       void qc.invalidateQueries({ queryKey: ["lead"] });
@@ -255,12 +227,9 @@ export function useUpdateLead() {
 export type RecycleItem = LeadListItem & { deletedAt?: string | null };
 
 export function useRecycleBin(page: number, pageSize: number) {
-  const { source } = useDataSource();
-  const isApi = source === "api";
   const query = useQuery({
     queryKey: ["leads", "recycle-bin", page, pageSize],
     queryFn: () => leadsService.recycleBin({ page, page_size: pageSize }),
-    enabled: isApi,
     placeholderData: keepPreviousData,
   });
   const items: RecycleItem[] = (query.data?.results ?? []).map((l) => ({
@@ -271,7 +240,6 @@ export function useRecycleBin(page: number, pageSize: number) {
     items,
     count: query.data?.count ?? 0,
     isLoading: query.isLoading,
-    isApi,
   };
 }
 
@@ -303,11 +271,9 @@ export function usePurgeLead() {
 }
 
 export function useDeleteLead() {
-  const { isMock } = useDataSource();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: number) => {
-      if (isMock) return;
       await leadsService.remove(id);
     },
     onSuccess: () => {
@@ -324,22 +290,14 @@ export function useDeleteLead() {
  * from the recycle bin.
  */
 export function useBulkDeleteLeads() {
-  const { isMock } = useDataSource();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (ids: number[]) => {
-      if (isMock) return { ok: ids.length, failed: 0 };
       const results = await Promise.allSettled(ids.map((id) => leadsService.remove(id)));
       const failed = results.filter((r) => r.status === "rejected").length;
       return { ok: ids.length - failed, failed };
     },
     onSuccess: ({ ok, failed }) => {
-      if (isMock) {
-        toast.success(`${ok} lead${ok === 1 ? "" : "s"} removed`, {
-          description: "Mock preview — not saved.",
-        });
-        return;
-      }
       if (failed) {
         toast.warning(`Moved ${ok} to recycle bin — ${failed} could not be deleted`);
       } else {
@@ -356,11 +314,9 @@ export function useBulkDeleteLeads() {
  * `assigned_counselor` (same field the edit form writes) and report failures.
  */
 export function useBulkAssignLeads() {
-  const { isMock } = useDataSource();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ ids, counselorId }: { ids: number[]; counselorId: number }) => {
-      if (isMock) return { ok: ids.length, failed: 0 };
       const results = await Promise.allSettled(
         ids.map((id) => leadsService.update(id, { assigned_counselor: counselorId })),
       );
@@ -368,12 +324,6 @@ export function useBulkAssignLeads() {
       return { ok: ids.length - failed, failed };
     },
     onSuccess: ({ ok, failed }) => {
-      if (isMock) {
-        toast.success(`${ok} lead${ok === 1 ? "" : "s"} assigned`, {
-          description: "Mock preview — not saved.",
-        });
-        return;
-      }
       if (failed) {
         toast.warning(`Assigned ${ok} — ${failed} could not be updated`);
       } else {
@@ -387,15 +337,12 @@ export function useBulkAssignLeads() {
 
 /** Assign (or unassign) a lead's counselor — PATCH assigned_counselor. */
 export function useAssignLead() {
-  const { isMock } = useDataSource();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, counselorId }: { id: number; counselorId: number | null }) => {
-      if (isMock) return null;
-      return leadsService.update(id, { assigned_counselor: counselorId });
-    },
-    onSuccess: (lead) => {
-      toast.success("Lead assigned", lead ? undefined : { description: "Mock preview — not saved." });
+    mutationFn: ({ id, counselorId }: { id: number; counselorId: number | null }) =>
+      leadsService.update(id, { assigned_counselor: counselorId }),
+    onSuccess: () => {
+      toast.success("Lead assigned");
       void qc.invalidateQueries({ queryKey: ["lead"] });
       void qc.invalidateQueries({ queryKey: ["leads"] });
     },
@@ -450,8 +397,7 @@ export function useAddFollowup(leadId?: number) {
 
 /** All enrollments of one lead (newest first by default). */
 export function useLeadEnrollments(leadId?: number, params: EnrollmentListParams = {}) {
-  const { source } = useDataSource();
-  const enabled = source === "api" && leadId != null;
+  const enabled = leadId != null;
   const query = useQuery({
     queryKey: ["lead", "enrollments", leadId, params],
     enabled,
@@ -472,8 +418,7 @@ export function useEnrollmentPayments(
   enrollmentId?: number,
   params: PaymentListParams = {},
 ) {
-  const { source } = useDataSource();
-  const enabled = source === "api" && leadId != null && enrollmentId != null;
+  const enabled = leadId != null && enrollmentId != null;
   const query = useQuery({
     queryKey: ["lead", "payments", leadId, enrollmentId, params],
     enabled,
@@ -492,33 +437,16 @@ export function useEnrollmentPayments(
 }
 
 /**
- * One payment by id — used where only the flat `/api/payments/` row is at hand
- * (it omits `notes`), so corrections start from the full record.
- */
-export function usePayment(leadId?: number, enrollmentId?: number, id?: number) {
-  const { source } = useDataSource();
-  const enabled = source === "api" && leadId != null && enrollmentId != null && id != null;
-  const query = useQuery({
-    queryKey: ["lead", "payment", leadId, enrollmentId, id],
-    enabled,
-    queryFn: () => leadsService.payment(leadId as number, enrollmentId as number, id as number),
-  });
-  return { payment: query.data ?? null, isLoading: enabled && query.isLoading };
-}
-
-/**
  * Every payment of a lead, across all of its enrollments (newest first).
  * Shares the cache with `useEnrollmentPayments` (same query keys).
  */
 export function useLeadPayments(leadId?: number) {
-  const { source } = useDataSource();
-  const isApi = source === "api";
   const { enrollments, isLoading: enrLoading } = useLeadEnrollments(leadId);
 
   const queries = useQueries({
     queries: enrollments.map((e) => ({
       queryKey: ["lead", "payments", leadId, e.id, {}],
-      enabled: isApi && leadId != null,
+      enabled: leadId != null,
       queryFn: () =>
         leadsService.payments(leadId as number, e.id, {
           ordering: "-payment_date",
@@ -548,6 +476,7 @@ export function useAddEnrollment(leadId?: number) {
       void qc.invalidateQueries({ queryKey: ["lead"] });
       void qc.invalidateQueries({ queryKey: ["leads"] });
       void qc.invalidateQueries({ queryKey: ["enrollments"] });
+      void qc.invalidateQueries({ queryKey: ["course-batches"] });
     },
     onError: (e) => toast.error(apiErrorMessage(e, "Could not create enrollment")),
   });
@@ -563,23 +492,183 @@ export function useUpdateEnrollment(leadId?: number) {
       void qc.invalidateQueries({ queryKey: ["lead"] });
       void qc.invalidateQueries({ queryKey: ["leads"] });
       void qc.invalidateQueries({ queryKey: ["enrollments"] });
+      void qc.invalidateQueries({ queryKey: ["course-batches"] });
     },
     onError: (e) => toast.error(apiErrorMessage(e, "Could not update enrollment")),
   });
 }
 
-export function useDeleteEnrollment(leadId?: number) {
+/** Reason trail of one enrollment (who, when, what, from → to, why). */
+export function useEnrollmentReminders(leadId?: number, enrollmentId?: number, load = true) {
+  const enabled = leadId != null && enrollmentId != null && load;
+  const query = useQuery({
+    queryKey: ["lead", "reminders", leadId, enrollmentId],
+    enabled,
+    queryFn: () => leadsService.enrollmentReminders(leadId as number, enrollmentId as number),
+  });
+  return { reminders: query.data?.results ?? [], isLoading: enabled && query.isLoading };
+}
+
+export function useEnrollmentHistory(leadId?: number, enrollmentId?: number, load = true) {
+  const enabled = leadId != null && enrollmentId != null && load;
+  const query = useQuery({
+    queryKey: ["lead", "history", leadId, enrollmentId],
+    enabled,
+    queryFn: () => leadsService.enrollmentHistory(leadId as number, enrollmentId as number),
+  });
+  return {
+    history: (query.data?.results ?? []) as ApiEnrollmentHistory[],
+    isLoading: enabled && query.isLoading,
+  };
+}
+
+/** Add a money entry (extra charge, discount, write-off, refund) with a reason. */
+export function useAddAdjustment(leadId?: number, enrollmentId?: number) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (id: number) => leadsService.deleteEnrollment(leadId as number, id),
+    mutationFn: (payload: { kind: ApiAdjustmentKind; amount: string; reason: string }) =>
+      leadsService.addAdjustment(leadId as number, enrollmentId as number, payload),
+    onSuccess: (data) => {
+      toast.success(`${data.kind_display} added`);
+      void qc.invalidateQueries({ queryKey: ["lead"] });
+      void qc.invalidateQueries({ queryKey: ["enrollments"] });
+    },
+    onError: (e) => toast.error(apiErrorMessage(e, "Could not add the money entry")),
+  });
+}
+
+/** Confirm a pending enrollment: the lead becomes a student and gets the fee invoice. */
+export function useConfirmEnrollment() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      leadId,
+      id,
+      dueDates,
+      firstPayment,
+    }: {
+      leadId: number;
+      id: number;
+      dueDates?: ApiDuePart[];
+      firstPayment?: ApiFirstPayment;
+    }) => leadsService.confirmEnrollment(leadId, id, dueDates, firstPayment),
     onSuccess: () => {
-      toast.success("Enrollment deleted");
+      toast.success("Enrollment confirmed");
+      // Confirm also takes a seat and may record the first payment.
+      for (const key of [
+        "lead",
+        "leads",
+        "enrollments",
+        "invoices",
+        "students",
+        "course-batches",
+        "payments",
+      ]) {
+        void qc.invalidateQueries({ queryKey: [key] });
+      }
+    },
+    onError: (e) => toast.error(apiErrorMessage(e, "Could not confirm the enrollment")),
+  });
+}
+
+/** Change the due dates of an enrollment, with a reason. */
+export function useSetDueDates(leadId?: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, dueDates, reason }: { id: number; dueDates: ApiDuePart[]; reason: string }) =>
+      leadsService.setDueDates(leadId as number, id, dueDates, reason),
+    onSuccess: () => {
+      toast.success("Due dates changed");
+      for (const key of ["lead", "enrollments", "reports"]) {
+        void qc.invalidateQueries({ queryKey: [key] });
+      }
+    },
+    onError: (e) => toast.error(apiErrorMessage(e, "Could not change the due dates")),
+  });
+}
+
+/** Make a new fee invoice after the old one was cancelled. */
+export function useMakeFeeInvoice(leadId?: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => leadsService.makeFeeInvoice(leadId as number, id),
+    onSuccess: (invoice) => {
+      toast.success("Fee invoice created", { description: invoice.invoice_number });
+      for (const key of ["lead", "enrollments", "invoices"]) {
+        void qc.invalidateQueries({ queryKey: [key] });
+      }
+    },
+    onError: (e) => toast.error(apiErrorMessage(e, "Could not create the fee invoice")),
+  });
+}
+
+const SEAT_DONE: Record<ApiSeatAction, string> = {
+  join: "Added to batch",
+  move: "Batch changed",
+  pause: "Enrollment paused",
+  resume: "Enrollment resumed",
+};
+
+/** Join batch, Move, Pause or Resume. Each needs a reason and adds a seat history row. */
+export function useSeatAction(leadId?: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, action, body }: { id: number; action: ApiSeatAction; body: ApiSeatActionBody }) =>
+      leadsService.seatAction(leadId as number, id, action, body),
+    onSuccess: (data, vars) => {
+      toast.success(SEAT_DONE[vars.action], {
+        description: data.current_batch_name ?? undefined,
+      });
+      for (const key of ["lead", "enrollments", "course-batches", "teams"]) {
+        void qc.invalidateQueries({ queryKey: [key] });
+      }
+    },
+    onError: (e) => toast.error(apiErrorMessage(e, "Could not change the seat")),
+  });
+}
+
+/** Cancel or reinstate an enrollment. Both need a reason and add a history row. */
+export function useEnrollmentStatusAction(leadId?: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      id,
+      action,
+      reason,
+    }: {
+      id: number;
+      action: "cancel" | "reinstate";
+      reason: string;
+    }) =>
+      action === "cancel"
+        ? leadsService.cancelEnrollment(leadId as number, id, reason)
+        : leadsService.reinstateEnrollment(leadId as number, id, reason),
+    onSuccess: (_data, vars) => {
+      toast.success(vars.action === "cancel" ? "Enrollment cancelled" : "Enrollment reinstated");
       void qc.invalidateQueries({ queryKey: ["lead"] });
       void qc.invalidateQueries({ queryKey: ["leads"] });
       void qc.invalidateQueries({ queryKey: ["enrollments"] });
-      void qc.invalidateQueries({ queryKey: ["payments"] });
+      // Cancel frees the seat; the Teams licence then shows "Action required".
+      void qc.invalidateQueries({ queryKey: ["course-batches"] });
+      void qc.invalidateQueries({ queryKey: ["teams"] });
     },
-    onError: (e) => toast.error(apiErrorMessage(e, "Could not delete enrollment")),
+    onError: (e) => toast.error(apiErrorMessage(e, "Could not update the enrollment")),
+  });
+}
+
+/** Change status: active, completed, dropped out… Dropping out or transferring frees the seat. */
+export function useChangeEnrollmentStatus(leadId?: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, status, reason }: { id: number; status: ApiEnrollmentStatus; reason: string }) =>
+      leadsService.changeEnrollmentStatus(leadId as number, id, status, reason),
+    onSuccess: () => {
+      toast.success("Status changed");
+      for (const key of ["lead", "leads", "enrollments", "course-batches", "teams", "students"]) {
+        void qc.invalidateQueries({ queryKey: [key] });
+      }
+    },
+    onError: (e) => toast.error(apiErrorMessage(e, "Could not change the status")),
   });
 }
 
@@ -601,60 +690,98 @@ export function useAddPayment(leadId?: number, enrollmentId?: number) {
 }
 
 /**
- * Correct an existing payment. Marking a pending payment `successful` triggers
- * its receipt email, so invoices are invalidated alongside the billing caches.
+ * Confirm a pending payment (issues its receipt), void one with a reason, or
+ * make a new receipt after the old one was cancelled.
+ * Payments are never edited — a wrong one is voided and a new one recorded.
  */
-export function useUpdatePayment(leadId?: number, enrollmentId?: number) {
+export function usePaymentAction() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, payload }: { id: number; payload: ApiPaymentPayload }) =>
-      leadsService.updatePayment(leadId as number, enrollmentId as number, id, payload),
-    onSuccess: () => {
-      toast.success("Payment updated");
+    mutationFn: ({
+      leadId,
+      enrollmentId,
+      id,
+      action,
+      reason,
+    }: {
+      leadId: number;
+      enrollmentId: number;
+      id: number;
+      action: "confirm" | "void" | "receipt";
+      reason?: string;
+    }): Promise<ApiPayment | ApiInvoice> =>
+      action === "confirm"
+        ? leadsService.confirmPayment(leadId, enrollmentId, id)
+        : action === "receipt"
+          ? leadsService.makeReceipt(leadId, enrollmentId, id)
+          : leadsService.voidPayment(leadId, enrollmentId, id, reason ?? ""),
+    onSuccess: (data, vars) => {
+      if (vars.action === "receipt") {
+        toast.success("Receipt created", {
+          description: "invoice_number" in data ? data.invoice_number : undefined,
+        });
+      } else {
+        toast.success(vars.action === "confirm" ? "Payment confirmed" : "Payment voided");
+      }
       void qc.invalidateQueries({ queryKey: ["lead"] });
       void qc.invalidateQueries({ queryKey: ["enrollments"] });
       void qc.invalidateQueries({ queryKey: ["payments"] });
       void qc.invalidateQueries({ queryKey: ["invoices"] });
     },
-    onError: (e) => toast.error(apiErrorMessage(e, "Could not update payment")),
-  });
-}
-
-export function useDeletePayment(leadId?: number, enrollmentId?: number) {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (id: number) =>
-      leadsService.deletePayment(leadId as number, enrollmentId as number, id),
-    onSuccess: () => {
-      toast.success("Payment deleted");
-      void qc.invalidateQueries({ queryKey: ["lead"] });
-      void qc.invalidateQueries({ queryKey: ["enrollments"] });
-      void qc.invalidateQueries({ queryKey: ["payments"] });
-    },
-    onError: (e) => toast.error(apiErrorMessage(e, "Could not delete payment")),
+    onError: (e) => toast.error(apiErrorMessage(e, "Could not update the payment")),
   });
 }
 
 export function useArchiveLead() {
-  const { isMock } = useDataSource();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, restore }: { id: number; restore?: boolean }) => {
-      if (isMock) return { restore };
       await (restore ? leadsService.restore(id) : leadsService.archive(id));
       return { restore };
     },
     onSuccess: (r) => {
-      if (isMock) {
-        toast.success(r?.restore ? "Lead restored" : "Lead archived", {
-          description: "Mock preview — not saved.",
-        });
-        return;
-      }
       toast.success(r?.restore ? "Lead restored" : "Lead archived");
       void qc.invalidateQueries({ queryKey: ["leads"] });
       void qc.invalidateQueries({ queryKey: ["lead"] });
     },
     onError: (e) => toast.error(apiErrorMessage(e, "Could not update lead")),
+  });
+}
+
+/**
+ * One enrollment for its own page. The global endpoint gives the lead, then
+ * the lead's enrollment endpoint gives the full record the actions need.
+ * The key starts with "lead", so every enrollment action refreshes it.
+ */
+export function useEnrollmentPage(id?: number) {
+  return useQuery({
+    queryKey: ["lead", "enrollment-page", id],
+    enabled: id != null && Number.isFinite(id),
+    queryFn: async () => {
+      const row = await globalListsService.enrollment(id!);
+      const enrollment = await leadsService.enrollment(row.lead, id!);
+      return { leadId: row.lead, enrollment };
+    },
+    retry: false,
+  });
+}
+
+
+/** Checks an import file and says what would happen. Saves nothing. */
+export function useLeadImportPreview() {
+  return useMutation({
+    mutationFn: (options: ApiLeadImportOptions) => leadsService.importPreview(options),
+  });
+}
+
+/** Imports the rows that pass; the lead list and notifications refresh after. */
+export function useImportLeads() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (options: ApiLeadImportOptions) => leadsService.importLeads(options),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["leads"] });
+      void qc.invalidateQueries({ queryKey: ["notifications"] });
+    },
   });
 }

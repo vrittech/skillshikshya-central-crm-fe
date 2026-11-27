@@ -1,4 +1,5 @@
 import axios, { AxiosError, type AxiosRequestConfig } from "axios";
+import { withScopedBranch } from "@/lib/branch-scope";
 
 // Auth uses httpOnly cookies set by the backend; the browser attaches them
 // automatically. In dev, Vite proxies /api to the Django server; in Docker,
@@ -8,6 +9,9 @@ export const api = axios.create({
   withCredentials: true,
   headers: { "Content-Type": "application/json" },
 });
+
+// An admin's branch pick narrows every list and report (see branch-scope.ts).
+api.interceptors.request.use(withScopedBranch);
 
 let refreshPromise: Promise<void> | null = null;
 
@@ -113,4 +117,17 @@ export function apiErrorMessage(error: unknown, fallback = "Something went wrong
     if (status && status >= 500) return "Something went wrong on our end — please try again later";
   }
   return fallback;
+}
+
+/** DRF field errors ({field: ["message"]}) as {field: "message"}. */
+export function fieldErrorsOf(error: unknown): Record<string, string> {
+  if (!axios.isAxiosError(error)) return {};
+  const data = error.response?.data;
+  if (!data || typeof data !== "object" || Array.isArray(data)) return {};
+  const out: Record<string, string> = {};
+  for (const [key, value] of Object.entries(data as Record<string, unknown>)) {
+    if (key === "detail") continue;
+    out[key] = Array.isArray(value) ? String(value[0]) : String(value);
+  }
+  return out;
 }

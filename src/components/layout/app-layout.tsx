@@ -4,9 +4,11 @@ import { AppHeader } from "@/components/layout/app-header";
 import { AppSidebar } from "@/components/layout/app-sidebar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/context/auth";
+import { useBranchScope } from "@/context/branch-scope";
 
 export function AppLayout() {
   const { status } = useAuth();
+  const { branchId } = useBranchScope();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   if (status === "loading") {
@@ -31,7 +33,8 @@ export function AppLayout() {
       <div className="flex min-w-0 flex-1 flex-col">
         <AppHeader onMenuClick={() => setSidebarOpen(true)} />
         <main className="flex-1 overflow-y-auto">
-          <div className="mx-auto w-full max-w-[1440px] p-4 md:p-8">
+          {/* A new branch opens the page fresh: no rows, filters or pages of the last one. */}
+          <div key={branchId ?? "all"} className="mx-auto w-full max-w-[1440px] p-4 md:p-8">
             <Outlet />
           </div>
         </main>

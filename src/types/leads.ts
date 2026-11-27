@@ -1,18 +1,7 @@
 /**
- * Lead-management domain types for the static CRM prototype.
- *
- * These mirror the normalized model in the "CRM Lead Management System Plan":
- * a core lead record + controlled lookups + related tables (course interests,
- * activities, follow-ups, enrollment, payments, history). They are intentionally
- * frontend-shaped (camelCase, resolved lookup labels) so the UI can render mock
- * data today and swap in the real API later with minimal churn.
+ * Lead-management domain types: the UI shape of a lead (camelCase, resolved
+ * lookup labels). `data/lead-adapters.ts` maps the API rows into it.
  */
-
-export type LeadTypeCode =
-  | "course_inquiry"
-  | "master_class_inquiry"
-  | "general_inquiry"
-  | "corporate_inquiry";
 
 /** Lead lifecycle status (the plan's controlled `lead_statuses`). */
 export type LeadStatusCode =
@@ -226,7 +215,6 @@ export interface Lead {
   cityId?: number | null;
   cityName?: string;
 
-  leadType: LeadTypeCode;
   source: LeadSourceCode;
   campaign?: string;
   status: LeadStatusCode;
@@ -260,7 +248,6 @@ export interface Lead {
   campaignId?: number | null;
   branchId?: number | null;
   primaryCourseId?: number | null;
-  leadTypeId?: number | null;
   tagIds?: number[];
 
   /** Display overrides for the live API path (admin-defined names + hex colors). */
@@ -269,7 +256,6 @@ export interface Lead {
   priorityName?: string;
   priorityColor?: string;
   sourceName?: string;
-  leadTypeName?: string;
   assignedToName?: string;
   branchName?: string;
 
@@ -287,7 +273,6 @@ export interface LeadListItem {
   fullName: string;
   primaryPhone: string;
   email?: string;
-  leadType: LeadTypeCode;
   source: LeadSourceCode;
   campaign?: string;
   primaryCourse?: string;
@@ -310,6 +295,5 @@ export interface LeadListItem {
   priorityName?: string;
   priorityColor?: string;
   sourceName?: string;
-  leadTypeName?: string;
   assignedToName?: string;
 }

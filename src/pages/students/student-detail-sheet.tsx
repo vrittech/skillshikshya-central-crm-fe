@@ -1,5 +1,6 @@
-import { CalendarCheck, ExternalLink, FileText, Send, Trash2 } from "lucide-react";
+import { ArrowRightLeft, CalendarCheck, ExternalLink, FileText, History, Send, Trash2 } from "lucide-react";
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,19 +23,25 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/context/auth";
+import { useRole } from "@/context/role";
 import { useCourses } from "@/hooks/use-courses";
-import { useResendInvoice, useStudentInvoices } from "@/hooks/use-invoices";
+import { useTeamsLicences } from "@/hooks/use-teams";
+import { openInvoicePdf, useResendInvoice, useStudentInvoices } from "@/hooks/use-invoices";
 import {
   useAttendanceProfile,
   useDeleteAttendance,
   useMarkAttendance,
   useStudent,
   useStudentAttendance,
+  useStudentBranchMoves,
   useStudentDocuments,
 } from "@/hooks/use-students";
 import { formatDate, formatDateTime, formatNPR } from "@/lib/leads-format";
+import { localToday } from "@/lib/seats";
 import { cn } from "@/lib/utils";
 import type { ApiAttendanceStatus, ApiStudentStatus } from "@/types/leads-api";
+import { TeamsStateBadge } from "../leads/components/teams-licence";
+import { MoveBranchDialog } from "./move-branch-dialog";
 
 const STATUS_TONE: Record<ApiStudentStatus, string> = {
   active: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
@@ -51,6 +58,35 @@ function Stat({ label, value }: { label: string; value: string | number }) {
         {label}
       </p>
       <p className="font-headline mt-1 text-xl font-semibold tabular-nums">{value}</p>
+    </div>
+  );
+}
+
+/** The Teams accounts the student holds now, with their state. */
+function TeamsAccounts({ studentId }: { studentId: number }) {
+  const { data } = useTeamsLicences({ student: studentId, open: true, page_size: 10 });
+  const licences = data?.results ?? [];
+  if (licences.length === 0) return null;
+  return (
+    <div>
+      <p className="mb-1 text-sm font-semibold">Teams account</p>
+      <ul className="divide-border divide-y rounded-xl border">
+        {licences.map((l) => (
+          <li key={l.id} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2.5">
+            <div className="min-w-0">
+              <p className="font-mono text-sm">{l.account}</p>
+              <p className="text-muted-foreground text-xs">
+                {l.course_name}
+                {l.batch_name ? ` · ${l.batch_name}` : ""} · Given {formatDate(l.assigned_at)}
+                {l.details_sent_at ? ` · Details sent ${formatDate(l.details_sent_at)}` : ""}
+              </p>
+            </div>
+            {l.state && (
+              <TeamsStateBadge state={l.state.state} label={l.state.label} reason={l.state.reason} />
+            )}
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
@@ -75,7 +111,7 @@ function InvoicesTab({ studentId }: { studentId: number }) {
   if (!invoices.length)
     return (
       <p className="text-muted-foreground py-8 text-center text-sm">
-        No invoices yet — they are generated on enrollment and on each successful payment.
+        No invoices.
       </p>
     );
 
@@ -84,7 +120,15 @@ function InvoicesTab({ studentId }: { studentId: number }) {
       {invoices.map((i) => (
         <li key={i.id} className="flex items-center justify-between gap-3 py-3">
           <div className="min-w-0">
-            <p className="font-mono text-xs font-semibold">{i.invoice_number}</p>
+            <p className="font-mono text-xs font-semibold">
+              {i.invoice_number}
+              {i.status === "cancelled" && (
+                <span className="text-destructive ml-2 font-sans">Cancelled</span>
+              )}
+            </p>
+            {i.status === "cancelled" && i.cancel_reason && (
+              <p className="text-muted-foreground truncate text-xs">Reason: {i.cancel_reason}</p>
+            )}
             <p className="text-muted-foreground truncate text-xs">
               {i.type_display ?? i.type} · {i.course_name || "—"} · {formatDate(i.created_at)}
             </p>
@@ -93,19 +137,26 @@ function InvoicesTab({ studentId }: { studentId: number }) {
             </p>
           </div>
           <div className="flex shrink-0 items-center gap-1.5">
-            <span className="text-sm font-medium tabular-nums">{formatNPR(Number(i.amount))}</span>
-            {i.pdf_url && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="text-muted-foreground size-8"
-                title="Open PDF"
-                onClick={() => window.open(i.pdf_url as string, "_blank")}
-              >
-                <ExternalLink />
-              </Button>
-            )}
-            {user?.is_staff && (
+            <span
+              className={
+                i.status === "cancelled"
+                  ? "text-muted-foreground text-sm font-medium tabular-nums line-through"
+                  : "text-sm font-medium tabular-nums"
+              }
+            >
+              {formatNPR(Number(i.amount))}
+            </span>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="text-muted-foreground size-8"
+              title="Open PDF"
+              aria-label="Open PDF"
+              onClick={() => openInvoicePdf(i.id)}
+            >
+              <FileText />
+            </Button>
+            {user?.is_staff && i.status !== "cancelled" && (
               <Button
                 variant="ghost"
                 size="icon"
@@ -134,7 +185,7 @@ function AttendanceTab({ studentId }: { studentId: number }) {
   const mark = useMarkAttendance(studentId);
   const removeRecord = useDeleteAttendance(studentId);
 
-  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [date, setDate] = useState(localToday);
   const [status, setStatus] = useState<ApiAttendanceStatus>("present");
   const [remarks, setRemarks] = useState("");
 
@@ -197,11 +248,11 @@ function AttendanceTab({ studentId }: { studentId: number }) {
         <p className="text-sm font-semibold">Mark attendance</p>
         <div className="grid gap-2 sm:grid-cols-3">
           <div className="grid gap-1.5">
-            <Label className="text-xs">Date</Label>
+            <Label className="text-xs" required>Date</Label>
             <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
           </div>
           <div className="grid gap-1.5">
-            <Label className="text-xs">Status</Label>
+            <Label className="text-xs" required>Status</Label>
             <Select value={status} onValueChange={(v) => setStatus(v as ApiAttendanceStatus)}>
               <SelectTrigger>
                 <SelectValue />
@@ -315,6 +366,29 @@ function DocumentsTab({ studentId }: { studentId: number }) {
   );
 }
 
+function BranchMoves({ studentId }: { studentId: number }) {
+  const { data: moves } = useStudentBranchMoves(studentId);
+  if (!moves?.length) return null;
+  return (
+    <div>
+      <p className="mb-1 text-sm font-semibold">Branch moves</p>
+      <ul className="divide-border divide-y">
+        {moves.map((m) => (
+          <li key={m.id} className="py-2.5">
+            <p className="text-sm font-medium">
+              {m.from_branch_name ?? "No branch"} → {m.to_branch_name}
+            </p>
+            <p className="text-muted-foreground text-xs">
+              {formatDateTime(m.moved_at)} · {m.moved_by_name}
+            </p>
+            <p className="mt-0.5 text-sm [overflow-wrap:anywhere]">{m.reason}</p>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 /* ------------------------------------------------------------------ sheet */
 
 /** Student detail — profile, payment summary, invoices, attendance, documents. */
@@ -326,6 +400,16 @@ export function StudentDetailSheet({
   onClose: () => void;
 }) {
   const { data: student, isLoading } = useStudent(studentId);
+  const { user, hasPerm } = useAuth();
+  const { can } = useRole();
+  const sees = {
+    invoices: hasPerm("invoices.view_invoice"),
+    attendance: hasPerm("student.view_attendance"),
+    documents: hasPerm("student.view_studentdocument"),
+    teams: hasPerm("lead.view_teamslicence"),
+    payments: hasPerm("lead.view_payment"),
+  };
+  const [moving, setMoving] = useState(false);
 
   return (
     <Sheet open={studentId != null} onOpenChange={(o) => !o && onClose()}>
@@ -345,6 +429,27 @@ export function StudentDetailSheet({
                 <span className="font-mono">{student.student_id}</span> · {student.phone}
                 {student.branch_name ? ` · ${student.branch_name}` : ""}
               </SheetDescription>
+              <div className="flex flex-wrap gap-2">
+                {student.lead != null && can("leads.view") && (
+                  <Button size="sm" variant="outline" className="w-fit" asChild>
+                    <Link to={`/leads/${student.lead}?tab=history`}>
+                      <History /> Full history
+                    </Link>
+                  </Button>
+                )}
+                {can("students.move_branch") && (
+                  <Button size="sm" variant="outline" className="w-fit" onClick={() => setMoving(true)}>
+                    <ArrowRightLeft /> Move branch
+                  </Button>
+                )}
+              </div>
+              <MoveBranchDialog
+                student={student}
+                open={moving}
+                onOpenChange={setMoving}
+                // A branch user can't see a student once they leave the branch.
+                onMoved={() => !user?.is_staff && onClose()}
+              />
             </>
           )}
         </SheetHeader>
@@ -359,14 +464,16 @@ export function StudentDetailSheet({
             <Tabs defaultValue="overview" className="space-y-4">
               <TabsList className="w-full">
                 <TabsTrigger value="overview">Overview</TabsTrigger>
-                <TabsTrigger value="invoices">Invoices</TabsTrigger>
-                <TabsTrigger value="attendance">Attendance</TabsTrigger>
-                <TabsTrigger value="documents">Documents</TabsTrigger>
+                {sees.invoices && <TabsTrigger value="invoices">Invoices</TabsTrigger>}
+                {sees.attendance && <TabsTrigger value="attendance">Attendance</TabsTrigger>}
+                {sees.documents && <TabsTrigger value="documents">Documents</TabsTrigger>}
               </TabsList>
 
               <TabsContent value="overview" className="space-y-4">
-                <div className="grid grid-cols-3 gap-2">
-                  <Stat label="Total paid" value={formatNPR(Number(student.total_paid ?? 0))} />
+                <div className={cn("grid gap-2", student.total_paid != null ? "grid-cols-3" : "grid-cols-2")}>
+                  {student.total_paid != null && (
+                    <Stat label="Total paid" value={formatNPR(Number(student.total_paid))} />
+                  )}
                   <Stat label="Enrollments" value={student.enrollment_count ?? 0} />
                   <Stat label="Documents" value={student.document_count ?? 0} />
                 </div>
@@ -402,6 +509,11 @@ export function StudentDetailSheet({
                   <p className="text-muted-foreground rounded-xl border p-3 text-sm">{student.notes}</p>
                 )}
 
+                {sees.teams && <TeamsAccounts studentId={student.id} />}
+
+                <BranchMoves studentId={student.id} />
+
+                {sees.payments && (
                 <div>
                   <p className="mb-1 text-sm font-semibold">Recent payments</p>
                   {student.recent_payments?.length ? (
@@ -433,19 +545,26 @@ export function StudentDetailSheet({
                     <p className="text-muted-foreground py-4 text-sm">No payments recorded yet.</p>
                   )}
                 </div>
+                )}
               </TabsContent>
 
-              <TabsContent value="invoices">
-                <InvoicesTab studentId={student.id} />
-              </TabsContent>
+              {sees.invoices && (
+                <TabsContent value="invoices">
+                  <InvoicesTab studentId={student.id} />
+                </TabsContent>
+              )}
 
-              <TabsContent value="attendance">
-                <AttendanceTab studentId={student.id} />
-              </TabsContent>
+              {sees.attendance && (
+                <TabsContent value="attendance">
+                  <AttendanceTab studentId={student.id} />
+                </TabsContent>
+              )}
 
-              <TabsContent value="documents">
-                <DocumentsTab studentId={student.id} />
-              </TabsContent>
+              {sees.documents && (
+                <TabsContent value="documents">
+                  <DocumentsTab studentId={student.id} />
+                </TabsContent>
+              )}
             </Tabs>
           )}
         </SheetBody>

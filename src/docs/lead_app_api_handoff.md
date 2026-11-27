@@ -27,7 +27,12 @@ The UI needs the following permission semantics. These can map to Django permiss
 | `leads.archive` | Archive and restore leads. |
 | `leads.delete` | Permanently delete from the recycle bin only. |
 | `leads.import` | Upload/import lead files. |
-| `enrollment.manage`, `payment.manage` | Create/update enrollment and payment records. |
+| `followups.complete` | Mark a follow-up completed (`change_followup`). |
+| `enrollment.create` | Add an enrollment (`add_enrollment`). |
+| `enrollment.manage` | Edit, confirm, cancel, reinstate, change status, seat actions, due dates (`change_enrollment`). |
+| `payment.record` | Record a payment (`add_payment`). |
+| `payment.manage` | Confirm or void a payment (`change_payment`). |
+| `money.adjust` | Add a money entry: extra charge, discount, write-off, refund (`add_adjustment`). |
 
 ## Core data model
 

@@ -3,7 +3,6 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -11,12 +10,24 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { TimeSelect } from "@/components/time-select";
 import { useCreateBatch, useUpdateBatch } from "@/hooks/use-batches";
-import type { Batch, BatchPayload } from "@/types";
+import { durationText, fromMinutes, slotMinutes, toMinutes } from "@/lib/time-slots";
+import type { Batch } from "@/types";
 
-const EMPTY: BatchPayload = { name: "", description: "", is_active: true };
+interface FormState {
+  name: string;
+  start_time: string;
+  end_time: string;
+  is_active: boolean;
+}
 
-/** Create/edit a time slot (Morning, Day, Evening…). */
+const EMPTY: FormState = { name: "", start_time: "", end_time: "", is_active: true };
+/** Picking a start with no end yet (or an end that is now too early) sets the end an hour later. */
+const DEFAULT_LENGTH = 60;
+const LATEST = toMinutes("23:00");
+
+/** Create/edit a shift (Morning, Day, Evening…). */
 export function BatchDialog({
   open,
   onClose,
@@ -28,29 +39,59 @@ export function BatchDialog({
   batch: Batch | null; // null = create
   onCreated?: (batch: Batch) => void;
 }) {
-  const [form, setForm] = useState<BatchPayload>(EMPTY);
+  const [form, setForm] = useState<FormState>(EMPTY);
   const create = useCreateBatch();
   const update = useUpdateBatch();
   const saving = create.isPending || update.isPending;
+  /** Save was pressed: show what is missing. */
+  const [tried, setTried] = useState(false);
 
   useEffect(() => {
     if (!open) return;
+    setTried(false);
     setForm(
       batch
-        ? { name: batch.name, description: batch.description ?? "", is_active: batch.is_active }
+        ? {
+            name: batch.name,
+            start_time: batch.start_time?.slice(0, 5) ?? "",
+            end_time: batch.end_time?.slice(0, 5) ?? "",
+            is_active: batch.is_active,
+          }
         : EMPTY,
     );
   }, [open, batch]);
 
-  const set = <K extends keyof BatchPayload>(k: K, v: BatchPayload[K]) =>
+  const set = <K extends keyof FormState>(k: K, v: FormState[K]) =>
     setForm((f) => ({ ...f, [k]: v }));
+
+  function setStart(start: string) {
+    setForm((f) => {
+      const endOk = f.end_time && toMinutes(f.end_time) > toMinutes(start);
+      const end = endOk ? f.end_time : fromMinutes(Math.min(toMinutes(start) + DEFAULT_LENGTH, LATEST));
+      return { ...f, start_time: start, end_time: toMinutes(end) > toMinutes(start) ? end : "" };
+    });
+  }
+
+  const minutes = form.start_time && form.end_time ? slotMinutes(form.start_time, form.end_time) : 0;
+  const errors = {
+    name: tried && !form.name.trim() ? "Enter a name." : null,
+    start: tried && !form.start_time ? "Select a start time." : null,
+    end:
+      tried && !form.end_time
+        ? "Select an end time."
+        : minutes > 0 && minutes < 15
+          ? "A shift must be at least 15 minutes."
+          : null,
+  };
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!form.name?.trim()) return;
-    const payload: BatchPayload = {
+    setTried(true);
+    if (!form.name.trim() || !form.start_time || !form.end_time || minutes < 15) return;
+    const payload = {
       name: form.name.trim(),
-      description: form.description?.trim() || null,
+      start_time: form.start_time,
+      end_time: form.end_time,
       is_active: form.is_active,
     };
     if (batch) {
@@ -69,35 +110,46 @@ export function BatchDialog({
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{batch ? `Edit ${batch.name}` : "New time slot"}</DialogTitle>
-          <DialogDescription>
-            Time slots are shared across courses — a cohort picks one of these.
-          </DialogDescription>
+          <DialogTitle>{batch ? `Edit ${batch.name}` : "New shift"}</DialogTitle>
         </DialogHeader>
-        <form onSubmit={submit} className="space-y-4">
+        <form onSubmit={submit} noValidate className="space-y-4">
           <div className="grid gap-2">
             <Label htmlFor="batch-name" required>Name</Label>
             <Input
               id="batch-name"
               required
+              aria-invalid={!!errors.name}
               placeholder="Morning"
-              value={form.name ?? ""}
+              value={form.name}
               onChange={(e) => set("name", e.target.value)}
             />
+            <FieldError text={errors.name} />
           </div>
-          <div className="grid gap-2">
-            <Label htmlFor="batch-description">Description</Label>
-            <Input
-              id="batch-description"
-              placeholder="6:00 AM – 8:00 AM"
-              value={form.description ?? ""}
-              onChange={(e) => set("description", e.target.value)}
-            />
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-2">
+              <Label htmlFor="slot-start" required>Start time</Label>
+              <TimeSelect id="slot-start" value={form.start_time} onChange={setStart} />
+              <FieldError text={errors.start} />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="slot-end" required>End time</Label>
+              <TimeSelect
+                id="slot-end"
+                value={form.end_time}
+                after={form.start_time || undefined}
+                onChange={(v) => set("end_time", v)}
+              />
+              <FieldError text={errors.end} />
+            </div>
+          </div>
+          <div className="flex items-baseline justify-between rounded-lg border px-3 py-2 text-sm">
+            <span className="text-muted-foreground">Duration</span>
+            <span className="font-medium">{minutes > 0 ? durationText(minutes) : "—"}</span>
           </div>
           <div className="flex items-center gap-2">
             <Switch
               id="batch-active"
-              checked={form.is_active ?? true}
+              checked={form.is_active}
               onCheckedChange={(c) => set("is_active", c)}
             />
             <Label htmlFor="batch-active">Active</Label>
@@ -107,11 +159,15 @@ export function BatchDialog({
               Cancel
             </Button>
             <Button type="submit" variant="brand" disabled={saving}>
-              {saving ? "Saving…" : batch ? "Save changes" : "Create time slot"}
+              {saving ? "Saving…" : batch ? "Save changes" : "Create shift"}
             </Button>
           </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>
   );
+}
+
+function FieldError({ text }: { text: string | null }) {
+  return text ? <p className="text-destructive text-xs">{text}</p> : null;
 }

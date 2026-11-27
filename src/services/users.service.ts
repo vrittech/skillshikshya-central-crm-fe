@@ -7,6 +7,12 @@ export const usersService = {
     return data;
   },
 
+  /** The signed-in user with their current permissions. */
+  async me() {
+    const { data } = await api.get<User>("/users/me/");
+    return data;
+  },
+
   async get(id: number) {
     const { data } = await api.get<User>(`/users/${id}/`);
     return data;

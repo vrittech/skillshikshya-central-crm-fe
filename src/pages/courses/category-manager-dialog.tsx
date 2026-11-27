@@ -15,7 +15,6 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -77,9 +76,6 @@ export function CategoryManagerDialog({
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Course categories</DialogTitle>
-          <DialogDescription>
-            Groupings (e.g. Marketing, Engineering) attachable to course offerings.
-          </DialogDescription>
         </DialogHeader>
 
         <div className="max-h-80 space-y-2 overflow-y-auto pr-1">

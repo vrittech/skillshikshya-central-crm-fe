@@ -62,7 +62,7 @@ export function ChangePasswordDialog({
         </DialogHeader>
         <form onSubmit={submit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="old_password">Current password</Label>
+            <Label htmlFor="old_password" required>Current password</Label>
             <Input
               id="old_password"
               type="password"
@@ -72,7 +72,7 @@ export function ChangePasswordDialog({
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="new_password">New password</Label>
+            <Label htmlFor="new_password" required>New password</Label>
             <Input
               id="new_password"
               type="password"
@@ -83,7 +83,7 @@ export function ChangePasswordDialog({
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="confirm_password">Confirm new password</Label>
+            <Label htmlFor="confirm_password" required>Confirm new password</Label>
             <Input
               id="confirm_password"
               type="password"

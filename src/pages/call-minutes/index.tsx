@@ -65,7 +65,7 @@ export default function CallMinutesPage() {
             Every logged call deducts minutes from your balance. Admins top balances up.
           </p>
         </div>
-        {can("users.manage") && (
+        {can("minutes.top_up") && (
           <Button variant="brand" onClick={() => setTopUpOpen(true)}>
             <Coins /> Top up minutes
           </Button>
