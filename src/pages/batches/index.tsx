@@ -338,6 +338,8 @@ function SlotsTab({ canAdd, canChange, canDelete }: TabPerms) {
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Batch | null>(null);
   const [deleting, setDeleting] = useState<Batch | null>(null);
+  // A shift with no branch is shared by every branch: only staff change it.
+  const isStaff = !!useAuth().user?.is_staff;
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -419,7 +421,7 @@ function SlotsTab({ canAdd, canChange, canDelete }: TabPerms) {
                   </Badge>
                 </TableCell>
                 <TableCell>
-                  {(canChange || canDelete) && (
+                  {(canChange || canDelete) && (isStaff || b.branch != null) && (
                     <RowMenu
                       onEdit={
                         canChange
