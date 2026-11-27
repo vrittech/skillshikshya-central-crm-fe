@@ -41,6 +41,7 @@ import type {
   EnrollmentListParams,
   PaymentListParams,
 } from "@/types/leads-api";
+import type { ApiInvoice } from "@/types/invoices";
 import type { Lead, LeadListItem } from "@/types/leads";
 import type { LeadFilterState } from "@/pages/leads/components/lead-filters";
 
@@ -683,7 +684,8 @@ export function useAddPayment(leadId?: number, enrollmentId?: number) {
 }
 
 /**
- * Confirm a pending payment (issues its receipt) or void one with a reason.
+ * Confirm a pending payment (issues its receipt), void one with a reason, or
+ * make a new receipt after the old one was cancelled.
  * Payments are never edited — a wrong one is voided and a new one recorded.
  */
 export function usePaymentAction() {
@@ -699,14 +701,22 @@ export function usePaymentAction() {
       leadId: number;
       enrollmentId: number;
       id: number;
-      action: "confirm" | "void";
+      action: "confirm" | "void" | "receipt";
       reason?: string;
-    }) =>
+    }): Promise<ApiPayment | ApiInvoice> =>
       action === "confirm"
         ? leadsService.confirmPayment(leadId, enrollmentId, id)
-        : leadsService.voidPayment(leadId, enrollmentId, id, reason ?? ""),
-    onSuccess: (_data, vars) => {
-      toast.success(vars.action === "confirm" ? "Payment confirmed" : "Payment voided");
+        : action === "receipt"
+          ? leadsService.makeReceipt(leadId, enrollmentId, id)
+          : leadsService.voidPayment(leadId, enrollmentId, id, reason ?? ""),
+    onSuccess: (data, vars) => {
+      if (vars.action === "receipt") {
+        toast.success("Receipt created", {
+          description: "invoice_number" in data ? data.invoice_number : undefined,
+        });
+      } else {
+        toast.success(vars.action === "confirm" ? "Payment confirmed" : "Payment voided");
+      }
       void qc.invalidateQueries({ queryKey: ["lead"] });
       void qc.invalidateQueries({ queryKey: ["enrollments"] });
       void qc.invalidateQueries({ queryKey: ["payments"] });

@@ -204,6 +204,7 @@ export default function PaymentsPage() {
                             paymentId={Number(p.id)}
                             status={p.status}
                             amount={p.amount}
+                            receiptNumber={p.receiptNumber}
                           />
                         </div>
                       )}

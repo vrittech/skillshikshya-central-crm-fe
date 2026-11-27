@@ -509,6 +509,8 @@ export interface ApiPayment {
   voided_by?: number | null;
   voided_by_name?: string | null;
   voided_at?: string | null;
+  /** Number of the payment's active receipt; null when it has none (e.g. it was cancelled). */
+  receipt_number?: string | null;
   created_at?: string;
 }
 
@@ -686,6 +688,7 @@ export interface ApiPaymentListRow {
   received_by_name?: string;
   branch?: number | null;
   branch_name?: string;
+  receipt_number?: string | null;
 }
 
 /* ---------------------------------------------------------------- branches */

@@ -237,6 +237,7 @@ function EnrollmentPayments({ leadId, enrollment }: { leadId?: number; enrollmen
                 paymentId={p.id}
                 status={p.status}
                 amount={Number(p.amount)}
+                receiptNumber={p.receipt_number}
               />
             )}
           </div>
@@ -975,6 +976,7 @@ export function LeadPaymentsPanel({ leadId }: { leadId?: number }) {
                   paymentId={p.id}
                   status={p.status}
                   amount={Number(p.amount)}
+                  receiptNumber={p.receipt_number}
                 />
               )}
             </div>

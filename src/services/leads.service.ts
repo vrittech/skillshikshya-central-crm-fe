@@ -313,6 +313,14 @@ export const leadsService = {
     );
     return data;
   },
+  /** A new receipt for a successful payment whose receipt was cancelled. */
+  async makeReceipt(leadId: number, enrollmentId: number, id: number) {
+    const { data } = await api.post<ApiInvoice>(
+      `/leads/${leadId}/enrollments/${enrollmentId}/payments/${id}/receipt/`,
+      {},
+    );
+    return data;
+  },
   async calls(leadId: number, params: CallListParams = {}) {
     const { data } = await api.get<Paginated<ApiLeadCall>>(`/leads/${leadId}/calls/`, {
       params: { page_size: MAX_PAGE, ...params },

@@ -37,6 +37,8 @@ export interface PaymentRow {
   reference?: string;
   status: string;
   receivedBy?: string;
+  /** Active receipt number; null when the payment has none. */
+  receiptNumber?: string | null;
 }
 
 export interface EnrollmentListParams {
@@ -128,6 +130,7 @@ export function usePayments({ page, pageSize, search, status, method }: PaymentL
     reference: p.transaction_reference ?? undefined,
     status: p.status,
     receivedBy: p.received_by_name,
+    receiptNumber: p.receipt_number,
   }));
   const count = query.data?.count ?? 0;
   const successfulTotal = Number(summary.data?.successful_total ?? 0);
