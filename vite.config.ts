@@ -22,8 +22,9 @@ export default defineConfig(({ mode }) => {
         "/api": {
           target: env.VITE_API_URL || "http://localhost:8188",
           changeOrigin: true,
-          // The backend sets JWTs as httpOnly cookies but authenticates only via
-          // the Authorization header — mirror the nginx proxy and bridge the two.
+          // Mirrors nginx.conf: copy the access_token cookie into the
+          // Authorization header. The backend reads the cookie itself and looks
+          // at the header only when there is no cookie, so this is a fallback.
           // bypass() runs before the outgoing request is built, so mutating
           // req.headers here is reliable (proxyReq fires too late in Vite 8).
           bypass(req) {
