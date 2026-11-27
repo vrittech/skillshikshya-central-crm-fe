@@ -137,9 +137,11 @@ jobs:
             docker logout ghcr.io
             docker compose -f docker-compose.prod.yml up -d --remove-orphans
 
+            # 127.0.0.1, not localhost: localhost is IPv6 first in the container and nginx
+            # listens on IPv4 only.
             up=""
             for i in $(seq 1 12); do
-              if docker compose -f docker-compose.prod.yml exec -T web wget -q -O /dev/null http://localhost/ 2> /dev/null; then
+              if docker compose -f docker-compose.prod.yml exec -T web wget -q -O /dev/null http://127.0.0.1/ 2> /dev/null; then
                 up=1; break
               fi
               sleep 5
