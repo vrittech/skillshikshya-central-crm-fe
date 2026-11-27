@@ -14,10 +14,12 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/context/auth";
+import { useRole } from "@/context/role";
 import { useTheme } from "@/lib/use-theme";
 
 export function AppHeader({ onMenuClick }: { onMenuClick: () => void }) {
   const { user, logout } = useAuth();
+  const { can } = useRole();
   const navigate = useNavigate();
   const { theme, toggle } = useTheme();
   const [changePwOpen, setChangePwOpen] = useState(false);
@@ -59,9 +61,11 @@ export function AppHeader({ onMenuClick }: { onMenuClick: () => void }) {
         <BranchSwitcher />
 
         {/* Quick Create */}
-        <Button variant="brand" size="sm" className="hidden sm:inline-flex" onClick={() => navigate("/leads/new")}>
-          <Plus /> Quick Create
-        </Button>
+        {can("leads.create") && (
+          <Button variant="brand" size="sm" className="hidden sm:inline-flex" onClick={() => navigate("/leads/new")}>
+            <Plus /> Quick Create
+          </Button>
+        )}
 
         {/* Notifications */}
         <NotificationBell />

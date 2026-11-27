@@ -58,7 +58,8 @@ const ALL_STATUSES = "all";
 export default function BatchesPage({ defaultTab = "course-batches" }: { defaultTab?: "course-batches" | "slots" }) {
   const { hasPerm } = useAuth();
   const navigate = useNavigate();
-  const tab = defaultTab;
+  const seesBatches = hasPerm("course.view_coursebatch");
+  const tab = seesBatches ? defaultTab : "slots";
   const setTab = (next: "course-batches" | "slots") =>
     navigate(next === "slots" ? "/batches/shifts" : "/batches");
 
@@ -67,16 +68,18 @@ export default function BatchesPage({ defaultTab = "course-batches" }: { default
       <PageHeading />
       <Tabs value={tab} onValueChange={(v) => setTab(v as "course-batches" | "slots")}>
         <TabsList>
-          <TabsTrigger value="course-batches">Batches</TabsTrigger>
+          {seesBatches && <TabsTrigger value="course-batches">Batches</TabsTrigger>}
           <TabsTrigger value="slots">Shifts</TabsTrigger>
         </TabsList>
-        <TabsContent value="course-batches" className="mt-6">
-          <CourseBatchesTab
-            canAdd={hasPerm("course.add_coursebatch")}
-            canChange={hasPerm("course.change_coursebatch")}
-            canDelete={hasPerm("course.delete_coursebatch")}
-          />
-        </TabsContent>
+        {seesBatches && (
+          <TabsContent value="course-batches" className="mt-6">
+            <CourseBatchesTab
+              canAdd={hasPerm("course.add_coursebatch")}
+              canChange={hasPerm("course.change_coursebatch")}
+              canDelete={hasPerm("course.delete_coursebatch")}
+            />
+          </TabsContent>
+        )}
         <TabsContent value="slots" className="mt-6">
           <SlotsTab
             canAdd={hasPerm("course.add_batch")}

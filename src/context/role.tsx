@@ -8,6 +8,7 @@ import { useAuth } from "@/context/auth";
 
 /** Capabilities the UI checks against. */
 export type Capability =
+  | "leads.view"
   | "leads.view.all" // see every lead vs. only assigned
   | "leads.create"
   | "leads.edit"
@@ -29,13 +30,25 @@ export type Capability =
   | "minutes.top_up"
   | "settings.view"
   | "recycle_bin.view"
-  | "students.move_branch";
+  | "students.move_branch"
+  // Reading a page or a part of a record.
+  | "followups.view"
+  | "enquiries.view"
+  | "calls.view"
+  | "enrollment.view"
+  | "payment.view"
+  | "invoices.view"
+  | "students.view"
+  | "batches.view"
+  | "teams.view"
+  | "roles.view";
 
 /**
  * The server permission each capability follows. "staff" means staff
  * only; a list means any one of them. Keep in step with the backend's checks.
  */
 const LIVE_PERMS: Record<Capability, string | string[]> = {
+  "leads.view": "lead.view_lead",
   "leads.view.all": "lead.view_lead",
   "leads.create": "lead.add_lead",
   "leads.edit": "lead.change_lead",
@@ -58,10 +71,22 @@ const LIVE_PERMS: Record<Capability, string | string[]> = {
   "settings.view": "staff",
   "recycle_bin.view": "lead.delete_lead",
   "students.move_branch": "student.move_branch",
+  "followups.view": "lead.view_followup",
+  "enquiries.view": "lead.view_leadcourseinterest",
+  "calls.view": "lead.view_leadcall",
+  "enrollment.view": "lead.view_enrollment",
+  "payment.view": "lead.view_payment",
+  "invoices.view": "invoices.view_invoice",
+  "students.view": "student.view_student",
+  "batches.view": "course.view_coursebatch",
+  "teams.view": "lead.view_teamsaccount",
+  "roles.view": "staff",
 };
 
 interface RoleState {
   can: (cap: Capability) => boolean;
+  /** True when the user has every capability given. */
+  canAll: (caps: Capability | Capability[]) => boolean;
 }
 
 const RoleContext = createContext<RoleState | null>(null);
@@ -78,7 +103,12 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
     [user, hasPerm],
   );
 
-  const value = useMemo<RoleState>(() => ({ can }), [can]);
+  const canAll = useCallback(
+    (caps: Capability | Capability[]) => (Array.isArray(caps) ? caps : [caps]).every(can),
+    [can],
+  );
+
+  const value = useMemo<RoleState>(() => ({ can, canAll }), [can, canAll]);
 
   return <RoleContext.Provider value={value}>{children}</RoleContext.Provider>;
 }

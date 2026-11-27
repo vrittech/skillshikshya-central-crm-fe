@@ -138,6 +138,7 @@ function Checklist({ check }: { check: BatchCloseCheck }) {
         />
       </Section>
 
+      {owing && (
       <Section
         title="Who owes"
         done={!owing.count}
@@ -157,6 +158,7 @@ function Checklist({ check }: { check: BatchCloseCheck }) {
           }))}
         />
       </Section>
+      )}
 
     </div>
   );

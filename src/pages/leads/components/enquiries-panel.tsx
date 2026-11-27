@@ -440,7 +440,7 @@ export function EnquiriesPanel({ leadId }: { leadId: number }) {
   const [losing, setLosing] = useState<ApiCourseInterest | null>(null);
   const [reopening, setReopening] = useState<ApiCourseInterest | null>(null);
   const [recording, setRecording] = useState<ApiCourseInterest | null>(null);
-  const voiceQ = useVoiceNotes(leadId);
+  const voiceQ = useVoiceNotes(leadId, hasPerm("lead.view_voicenote"));
   const voiceNotes = voiceQ.data?.results ?? [];
   const rows = data?.results ?? [];
 

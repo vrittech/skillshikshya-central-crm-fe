@@ -562,7 +562,7 @@ export default function TeamsPage() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Tabs value={tab} onValueChange={(v) => setTab(v as Tab)}>
           <TabsList className="h-auto flex-wrap">
-            {TABS.map((t) => (
+            {TABS.filter((t) => t.value !== "taken_back" || hasPerm("lead.view_teamslicence")).map((t) => (
               <TabsTrigger key={t.value} value={t.value}>
                 {t.label}
               </TabsTrigger>

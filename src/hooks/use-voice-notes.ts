@@ -4,11 +4,11 @@ import { apiErrorMessage } from "@/lib/api";
 import { type NewVoiceNote, voiceNotesService } from "@/services/voice-notes.service";
 
 /** All voice notes on the lead; each enquiry card picks its own. */
-export function useVoiceNotes(leadId?: number) {
+export function useVoiceNotes(leadId?: number, enabled = true) {
   return useQuery({
     queryKey: ["lead", "voice-notes", leadId],
     queryFn: () => voiceNotesService.list(leadId!),
-    enabled: leadId != null,
+    enabled: leadId != null && enabled,
   });
 }
 

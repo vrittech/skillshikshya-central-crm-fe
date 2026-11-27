@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useAuth } from "@/context/auth";
 import { useBatchPending, useBatchStudents } from "@/hooks/use-batches";
 import { formatDate, formatNPR } from "@/lib/leads-format";
 import type { BatchStudentRow } from "@/types";
@@ -106,7 +107,8 @@ function Section({ title, count, children }: { title: string; count: number; chi
  */
 export function BatchStudentsPanel({ batchId }: { batchId: number }) {
   const { data, isLoading } = useBatchStudents(batchId);
-  const pendingQ = useBatchPending(batchId);
+  const { hasPerm } = useAuth();
+  const pendingQ = useBatchPending(batchId, hasPerm("lead.view_enrollment"));
   const seated = data?.seated ?? [];
   const paused = data?.paused ?? [];
   const movedOut = data?.moved_out ?? [];

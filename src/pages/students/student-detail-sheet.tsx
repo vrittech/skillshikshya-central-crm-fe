@@ -400,8 +400,15 @@ export function StudentDetailSheet({
   onClose: () => void;
 }) {
   const { data: student, isLoading } = useStudent(studentId);
-  const { user } = useAuth();
+  const { user, hasPerm } = useAuth();
   const { can } = useRole();
+  const sees = {
+    invoices: hasPerm("invoices.view_invoice"),
+    attendance: hasPerm("student.view_attendance"),
+    documents: hasPerm("student.view_studentdocument"),
+    teams: hasPerm("lead.view_teamslicence"),
+    payments: hasPerm("lead.view_payment"),
+  };
   const [moving, setMoving] = useState(false);
 
   return (
@@ -423,7 +430,7 @@ export function StudentDetailSheet({
                 {student.branch_name ? ` · ${student.branch_name}` : ""}
               </SheetDescription>
               <div className="flex flex-wrap gap-2">
-                {student.lead != null && (
+                {student.lead != null && can("leads.view") && (
                   <Button size="sm" variant="outline" className="w-fit" asChild>
                     <Link to={`/leads/${student.lead}?tab=history`}>
                       <History /> Full history
@@ -457,14 +464,16 @@ export function StudentDetailSheet({
             <Tabs defaultValue="overview" className="space-y-4">
               <TabsList className="w-full">
                 <TabsTrigger value="overview">Overview</TabsTrigger>
-                <TabsTrigger value="invoices">Invoices</TabsTrigger>
-                <TabsTrigger value="attendance">Attendance</TabsTrigger>
-                <TabsTrigger value="documents">Documents</TabsTrigger>
+                {sees.invoices && <TabsTrigger value="invoices">Invoices</TabsTrigger>}
+                {sees.attendance && <TabsTrigger value="attendance">Attendance</TabsTrigger>}
+                {sees.documents && <TabsTrigger value="documents">Documents</TabsTrigger>}
               </TabsList>
 
               <TabsContent value="overview" className="space-y-4">
-                <div className="grid grid-cols-3 gap-2">
-                  <Stat label="Total paid" value={formatNPR(Number(student.total_paid ?? 0))} />
+                <div className={cn("grid gap-2", student.total_paid != null ? "grid-cols-3" : "grid-cols-2")}>
+                  {student.total_paid != null && (
+                    <Stat label="Total paid" value={formatNPR(Number(student.total_paid))} />
+                  )}
                   <Stat label="Enrollments" value={student.enrollment_count ?? 0} />
                   <Stat label="Documents" value={student.document_count ?? 0} />
                 </div>
@@ -500,10 +509,11 @@ export function StudentDetailSheet({
                   <p className="text-muted-foreground rounded-xl border p-3 text-sm">{student.notes}</p>
                 )}
 
-                <TeamsAccounts studentId={student.id} />
+                {sees.teams && <TeamsAccounts studentId={student.id} />}
 
                 <BranchMoves studentId={student.id} />
 
+                {sees.payments && (
                 <div>
                   <p className="mb-1 text-sm font-semibold">Recent payments</p>
                   {student.recent_payments?.length ? (
@@ -535,19 +545,26 @@ export function StudentDetailSheet({
                     <p className="text-muted-foreground py-4 text-sm">No payments recorded yet.</p>
                   )}
                 </div>
+                )}
               </TabsContent>
 
-              <TabsContent value="invoices">
-                <InvoicesTab studentId={student.id} />
-              </TabsContent>
+              {sees.invoices && (
+                <TabsContent value="invoices">
+                  <InvoicesTab studentId={student.id} />
+                </TabsContent>
+              )}
 
-              <TabsContent value="attendance">
-                <AttendanceTab studentId={student.id} />
-              </TabsContent>
+              {sees.attendance && (
+                <TabsContent value="attendance">
+                  <AttendanceTab studentId={student.id} />
+                </TabsContent>
+              )}
 
-              <TabsContent value="documents">
-                <DocumentsTab studentId={student.id} />
-              </TabsContent>
+              {sees.documents && (
+                <TabsContent value="documents">
+                  <DocumentsTab studentId={student.id} />
+                </TabsContent>
+              )}
             </Tabs>
           )}
         </SheetBody>

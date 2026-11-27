@@ -374,7 +374,7 @@ export function EnrollmentCard({
   const [payOpen, setPayOpen] = useState(false);
   const sections: Section[] = [
     "fee",
-    "payments",
+    ...(can("payment.view") ? (["payments"] as const) : []),
     ...(canSit(enrollment) ? (["due", "reminders"] as const) : []),
     ...(canSit(enrollment) || !!enrollment.placements?.length ? (["seats"] as const) : []),
     "history",

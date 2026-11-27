@@ -6,6 +6,7 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { useAuth } from "@/context/auth";
 import { apiErrorMessage } from "@/lib/api";
 import { phoneMatchOf } from "@/lib/phone-match";
 import { useDebouncedValue } from "@/lib/use-debounced-value";
@@ -84,11 +85,12 @@ export interface LeadsListResult {
 }
 
 /** Counts for the lead list cards, over every lead the user can see. */
-export function useLeadSummary(params: { branch_id?: number } = {}) {
+export function useLeadSummary(params: { branch_id?: number } = {}, enabled = true) {
   return useQuery({
     queryKey: ["leads", "summary", params],
     queryFn: () => leadsService.summary(params),
     placeholderData: keepPreviousData,
+    enabled,
   });
 }
 
@@ -125,19 +127,23 @@ export interface LeadDetailResult {
 
 export function useLead(routeId?: string): LeadDetailResult {
   const numId = routeId && /^\d+$/.test(routeId) ? Number(routeId) : NaN;
+  const { hasPerm } = useAuth();
 
   const query = useQuery({
     queryKey: ["lead", "detail", routeId],
     enabled: !Number.isNaN(numId),
     queryFn: async () => {
+      // Each part loads only with its view right; without it the part is empty.
+      const part = <T,>(right: string, load: () => Promise<T>) =>
+        hasPerm(right) ? load().catch(() => EMPTY_PAGE) : Promise.resolve(EMPTY_PAGE);
       const [lead, calls, acts, fus, docs, interests, enrolls] = await Promise.all([
         leadsService.get(numId),
-        leadsService.calls(numId).catch(() => EMPTY_PAGE),
-        leadsService.activities(numId).catch(() => EMPTY_PAGE),
-        leadsService.followups(numId).catch(() => EMPTY_PAGE),
-        leadsService.documents(numId).catch(() => EMPTY_PAGE),
-        leadsService.courseInterests(numId).catch(() => EMPTY_PAGE),
-        leadsService.enrollments(numId, { ordering: "-id" }).catch(() => EMPTY_PAGE),
+        part("lead.view_leadcall", () => leadsService.calls(numId)),
+        part("lead.view_leadactivity", () => leadsService.activities(numId)),
+        part("lead.view_followup", () => leadsService.followups(numId)),
+        part("lead.view_leaddocument", () => leadsService.documents(numId)),
+        part("lead.view_leadcourseinterest", () => leadsService.courseInterests(numId)),
+        part("lead.view_enrollment", () => leadsService.enrollments(numId, { ordering: "-id" })),
       ]);
       const ui = adaptApiLead(lead);
       ui.activities = [
@@ -155,9 +161,9 @@ export function useLead(routeId?: string): LeadDetailResult {
       const latestEnr = enrolls.results[0];
       if (latestEnr) {
         ui.enrollment = adaptApiEnrollment(latestEnr);
-        const pays = await leadsService
-          .payments(numId, latestEnr.id, { ordering: "-payment_date", page_size: 100 })
-          .catch(() => EMPTY_PAGE);
+        const pays = await part("lead.view_payment", () =>
+          leadsService.payments(numId, latestEnr.id, { ordering: "-payment_date", page_size: 100 }),
+        );
         ui.payments = pays.results.map(adaptApiPayment);
       }
       return { lead: ui, documents: docs.results as ApiLeadDocument[] };

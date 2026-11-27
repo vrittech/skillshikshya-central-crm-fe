@@ -46,6 +46,8 @@ export default function BatchDetailPage() {
   const { data: batch, isLoading, isError } = useCourseBatch(id ? Number(id) : null);
   const [editing, setEditing] = useState(false);
   const canChange = hasPerm("course.change_coursebatch");
+  const seesAttendance = hasPerm("student.view_attendance");
+  const seesMoney = hasPerm("course.view_batchcost");
   const back = (
     <Link
       to="/batches"
@@ -120,28 +122,32 @@ export default function BatchDetailPage() {
         <Tabs defaultValue="students">
           <TabsList className="h-auto w-full justify-start gap-1 rounded-none border-b bg-transparent p-2">
             <TabsTrigger value="students">Students</TabsTrigger>
-            <TabsTrigger value="attendance">Attendance</TabsTrigger>
-            <TabsTrigger value="money">Money</TabsTrigger>
+            {seesAttendance && <TabsTrigger value="attendance">Attendance</TabsTrigger>}
+            {seesMoney && <TabsTrigger value="money">Money</TabsTrigger>}
           </TabsList>
           <div className="p-5">
             <TabsContent value="students">
               <BatchStudentsPanel batchId={batch.id} />
             </TabsContent>
-            <TabsContent value="attendance">
-              <BatchAttendancePanel
-                batch={batch}
-                canMark={hasPerm("student.add_attendance")}
-                canChange={hasPerm("student.change_attendance")}
-              />
-            </TabsContent>
-            <TabsContent value="money">
-              <BatchMoneyPanel
-                batch={batch}
-                canAddCost={hasPerm("course.add_batchcost")}
-                canVoidCost={hasPerm("course.change_batchcost")}
-                canClose={canChange}
-              />
-            </TabsContent>
+            {seesAttendance && (
+              <TabsContent value="attendance">
+                <BatchAttendancePanel
+                  batch={batch}
+                  canMark={hasPerm("student.add_attendance")}
+                  canChange={hasPerm("student.change_attendance")}
+                />
+              </TabsContent>
+            )}
+            {seesMoney && (
+              <TabsContent value="money">
+                <BatchMoneyPanel
+                  batch={batch}
+                  canAddCost={hasPerm("course.add_batchcost")}
+                  canVoidCost={hasPerm("course.change_batchcost")}
+                  canClose={canChange}
+                />
+              </TabsContent>
+            )}
           </div>
         </Tabs>
       </Card>

@@ -159,12 +159,26 @@ function RowsSkeleton({ rows = 4 }: { rows?: number }) {
   );
 }
 
+/** Wide-screen columns for the KPI row, by how many cards show. */
+const KPI_COLUMNS: Record<number, string> = {
+  0: "hidden",
+  1: "xl:grid-cols-1",
+  2: "xl:grid-cols-2",
+  3: "xl:grid-cols-3",
+  4: "xl:grid-cols-4",
+  5: "xl:grid-cols-5",
+};
+
 /* -------------------------------------------------------------------- page */
 
 export default function DashboardPage() {
   const { user } = useAuth();
   const { can } = useRole();
-  const seesReports = can("reports.view");
+  // Each card loads only with its view right.
+  const seesLeads = can("leads.view");
+  const seesFollowups = can("followups.view");
+  const seesMoney = can("reports.view");
+  const seesReports = seesMoney && seesLeads;
   const firstName = user?.name?.split(" ")[0] ?? "there";
 
   const scope = useBranchScope();
@@ -179,30 +193,33 @@ export default function DashboardPage() {
   }, [branchId]);
 
   // Everyone: lead counts, today's follow-ups, newest leads.
-  const summary = useLeadSummary({ branch_id: branchId });
+  const summary = useLeadSummary({ branch_id: branchId }, seesLeads);
   const fuParams = { open: true, branch_id: branchId };
   const fuCounts = useQuery({
     queryKey: ["followups", "summary", fuParams],
     queryFn: () => globalListsService.followupsSummary(fuParams),
     placeholderData: keepPreviousData,
+    enabled: seesFollowups,
   });
   const fuToday = useQuery({
     queryKey: ["followups", "dashboard-today", fuParams],
     queryFn: () =>
       globalListsService.followups({ ...fuParams, due: "today", ordering: "scheduled_at", page_size: 6 }),
     placeholderData: keepPreviousData,
+    enabled: seesFollowups,
   });
   const recent = useQuery({
     queryKey: ["leads", "recent", branchId ?? null],
     queryFn: () => leadsService.list({ page: 1, page_size: 6, ordering: "-created_at", branch_id: branchId }),
     placeholderData: keepPreviousData,
+    enabled: seesLeads,
   });
 
   // Reports: charts, money and counselors, this month.
   const trend = useLeadTrend({ ...range, group_by: "day" }, seesReports);
   const conversion = useConversionReport(range, seesReports);
   const sources = useLeadsBySource(range, seesReports);
-  const revenue = useRevenueReport(range, seesReports);
+  const revenue = useRevenueReport(range, seesMoney);
   const counselors = useCounselorPerformance({ ...range, sort_by: "converted" }, seesReports);
 
   const s = summary.data;
@@ -241,6 +258,7 @@ export default function DashboardPage() {
     .filter((r) => r.leads_assigned > 0 || r.converted > 0 || Number(r.revenue_collected) > 0)
     .slice(0, 6);
 
+  const kpiCount = (seesLeads ? 3 : 0) + (seesFollowups ? 1 : 0) + (seesMoney ? 1 : 0);
   const fuRows = fuToday.data?.results ?? [];
   const leadRows = recent.data?.results ?? [];
   const overdue = fuCounts.data?.overdue ?? 0;
@@ -262,7 +280,8 @@ export default function DashboardPage() {
       </div>
 
       {/* KPI row */}
-      <div className={cn("grid gap-4 sm:grid-cols-2 lg:grid-cols-3", seesReports ? "xl:grid-cols-5" : "xl:grid-cols-4")}>
+      <div className={cn("grid gap-4 sm:grid-cols-2 lg:grid-cols-3", KPI_COLUMNS[kpiCount])}>
+        {seesLeads && (
         <Stat
           to="/leads"
           label="New leads · 7 days"
@@ -271,6 +290,8 @@ export default function DashboardPage() {
         >
           {s?.new_this_week ?? 0}
         </Stat>
+        )}
+        {seesFollowups && (
         <Stat
           to="/follow-ups"
           label="Follow-ups today"
@@ -285,18 +306,23 @@ export default function DashboardPage() {
         >
           {fuCounts.data?.today ?? 0}
         </Stat>
-        <Stat to="/enrollments" label="Pending enrollment" loading={summary.isLoading}>
-          {s?.pending_enrollment ?? 0}
-        </Stat>
-        <Stat
-          to="/students"
-          label="Enrolled this month"
-          loading={summary.isLoading}
-          foot={s && <Delta now={s.enrolled_this_month} before={s.enrolled_last_month} period="last month" />}
-        >
-          {s?.enrolled_this_month ?? 0}
-        </Stat>
-        {seesReports && (
+        )}
+        {seesLeads && (
+          <>
+            <Stat to="/enrollments" label="Pending enrollment" loading={summary.isLoading}>
+              {s?.pending_enrollment ?? 0}
+            </Stat>
+            <Stat
+              to="/students"
+              label="Enrolled this month"
+              loading={summary.isLoading}
+              foot={s && <Delta now={s.enrolled_this_month} before={s.enrolled_last_month} period="last month" />}
+            >
+              {s?.enrolled_this_month ?? 0}
+            </Stat>
+          </>
+        )}
+        {seesMoney && (
           <Stat
             to="/payments"
             label="Collected this month"
@@ -348,7 +374,9 @@ export default function DashboardPage() {
       )}
 
       {/* Today's work */}
-      <div className="grid gap-4 lg:grid-cols-2">
+      {(seesFollowups || seesLeads) && (
+      <div className={cn("grid gap-4", seesFollowups && seesLeads && "lg:grid-cols-2")}>
+        {seesFollowups && (
         <Panel
           title="Today's follow-ups"
           sub={fuCounts.data ? `${fuCounts.data.today} due` : undefined}
@@ -386,7 +414,9 @@ export default function DashboardPage() {
             </ul>
           )}
         </Panel>
+        )}
 
+        {seesLeads && (
         <Panel title="Recent leads" action={<ViewAll to="/leads" />}>
           {recent.isLoading ? (
             <RowsSkeleton />
@@ -418,7 +448,9 @@ export default function DashboardPage() {
             </ul>
           )}
         </Panel>
+        )}
       </div>
+      )}
 
       {/* Sources + counselors */}
       {seesReports && (

@@ -31,25 +31,25 @@ interface NavItem {
   label: string;
   icon: React.ComponentType<{ className?: string }>;
   end?: boolean;
-  /** When set, the item is hidden unless the previewed role has this capability. */
-  cap?: Capability;
+  /** When set, the item is hidden unless the user has this capability (or all of a list). */
+  cap?: Capability | Capability[];
 }
 
 const navItems: NavItem[] = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, end: true },
-  { to: "/leads", label: "Leads", icon: UserRound },
-  { to: "/follow-ups", label: "Follow-ups", icon: CalendarClock },
-  { to: "/enrollments", label: "Enrollments", icon: GraduationCap, cap: "enrollment.manage" },
+  { to: "/leads", label: "Leads", icon: UserRound, cap: "leads.view" },
+  { to: "/follow-ups", label: "Follow-ups", icon: CalendarClock, cap: "followups.view" },
+  { to: "/enrollments", label: "Enrollments", icon: GraduationCap, cap: ["enrollment.manage", "enrollment.view"] },
   { to: "/batches", label: "Batches", icon: Layers },
-  { to: "/payments", label: "Payments", icon: CreditCard, cap: "payment.record" },
-  { to: "/invoices", label: "Invoices", icon: FileText, cap: "payment.record" },
+  { to: "/payments", label: "Payments", icon: CreditCard, cap: ["payment.record", "payment.view"] },
+  { to: "/invoices", label: "Invoices", icon: FileText, cap: ["payment.record", "invoices.view"] },
   { to: "/dues", label: "Dues", icon: Wallet, cap: "reports.view" },
   { to: "/batch-profit", label: "Batch profit", icon: PiggyBank, cap: "reports.view" },
-  { to: "/enquiries", label: "Enquiries", icon: Funnel, cap: "reports.view" },
-  { to: "/students", label: "Students", icon: GraduationCap },
-  { to: "/teams", label: "Teams licences", icon: Laptop, cap: "enrollment.manage" },
-  { to: "/reports", label: "Reports", icon: TrendingUp, cap: "reports.view" },
-  { to: "/calls", label: "Calls", icon: PhoneCall },
+  { to: "/enquiries", label: "Enquiries", icon: Funnel, cap: ["reports.view", "leads.view"] },
+  { to: "/students", label: "Students", icon: GraduationCap, cap: "students.view" },
+  { to: "/teams", label: "Teams licences", icon: Laptop, cap: "teams.view" },
+  { to: "/reports", label: "Reports", icon: TrendingUp, cap: ["reports.view", "leads.view"] },
+  { to: "/calls", label: "Calls", icon: PhoneCall, cap: "calls.view" },
   { to: "/call-minutes", label: "Call Minutes", icon: Timer },
   { to: "/courses", label: "Courses", icon: BookOpen },
   { to: "/branches", label: "Branches", icon: Building2 },
@@ -67,7 +67,7 @@ const COLLAPSE_KEY = "scc.sidebar.collapsed";
 
 export function AppSidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { user } = useAuth();
-  const { can } = useRole();
+  const { canAll } = useRole();
   const [collapsed, setCollapsed] = useState<boolean>(
     () => typeof window !== "undefined" && window.localStorage.getItem(COLLAPSE_KEY) === "1",
   );
@@ -77,7 +77,7 @@ export function AppSidebar({ open, onClose }: { open: boolean; onClose: () => vo
   }, [collapsed]);
 
   // Nav items follow the user's permissions; the admin section is staff only.
-  const visible = (item: NavItem) => !item.cap || can(item.cap);
+  const visible = (item: NavItem) => !item.cap || canAll(item.cap);
   const items = [...navItems, ...(user?.is_staff ? adminItems : [])].filter(visible);
   const showSettings = !!user?.is_staff && visible(settingsItem);
 

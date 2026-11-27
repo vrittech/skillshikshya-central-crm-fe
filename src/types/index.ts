@@ -377,7 +377,8 @@ export interface BatchCloseCheck {
     state_display: string;
     reason: string;
   })[];
-  owing: { count: number; total: string; people: (BatchCheckPerson & { owed: string })[] };
+  /** Null without the payment right. */
+  owing: { count: number; total: string; people: (BatchCheckPerson & { owed: string })[] } | null;
 }
 
 export type AttendanceMark = "present" | "absent";
@@ -404,6 +405,7 @@ export interface BatchRegister {
 }
 
 /** GET /course-batches/{id}/money/ */
+/** Without the batch cost right a close or reopen reply has only batch and status. */
 export interface BatchMoney {
   batch: number;
   status: CourseBatchStatus;

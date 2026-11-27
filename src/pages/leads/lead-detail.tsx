@@ -290,6 +290,18 @@ export default function LeadDetailPage() {
     .filter((f) => f.status === "pending" || f.status === "overdue")
     .sort((a, b) => new Date(a.dueAt).getTime() - new Date(b.dueAt).getTime())[0];
   const calls = lead.activities.filter((a) => a.type === "call");
+  // Tabs follow the user's view rights.
+  const tabs = {
+    overview: true,
+    enquiries: lead.apiId != null && can("enquiries.view"),
+    history: true,
+    calls: can("calls.view"),
+    followups: can("followups.view"),
+    enrollment: can("enrollment.view"),
+    payments: can("payment.view"),
+  };
+  const askedTab = searchParams.get("tab") as keyof typeof tabs | null;
+  const firstTab = askedTab && tabs[askedTab] ? askedTab : "overview";
 
   return (
     <div className="space-y-6">
@@ -402,17 +414,23 @@ export default function LeadDetailPage() {
 
       {/* Unified record card: tab bar + all panels in one frame */}
       <Card className="gap-0 overflow-hidden py-0">
-        <Tabs defaultValue={searchParams.get("tab") ?? "overview"}>
+        <Tabs defaultValue={firstTab}>
           <TabsList className="h-auto w-full flex-wrap justify-start gap-1 rounded-none border-b bg-transparent p-2">
             <TabsTrigger value="overview" className={TAB_ACTIVE}>Overview</TabsTrigger>
-            {lead.apiId != null && (
+            {tabs.enquiries && (
               <TabsTrigger value="enquiries" className={TAB_ACTIVE}>Enquiries</TabsTrigger>
             )}
             <TabsTrigger value="history" className={TAB_ACTIVE}>History</TabsTrigger>
-            <TabsTrigger value="calls" className={TAB_ACTIVE}>Calls</TabsTrigger>
-            <TabsTrigger value="followups" className={TAB_ACTIVE}>Follow-ups</TabsTrigger>
-            <TabsTrigger value="enrollment" className={TAB_ACTIVE}>Enrollment</TabsTrigger>
-            <TabsTrigger value="payments" className={TAB_ACTIVE}>Payments</TabsTrigger>
+            {tabs.calls && <TabsTrigger value="calls" className={TAB_ACTIVE}>Calls</TabsTrigger>}
+            {tabs.followups && (
+              <TabsTrigger value="followups" className={TAB_ACTIVE}>Follow-ups</TabsTrigger>
+            )}
+            {tabs.enrollment && (
+              <TabsTrigger value="enrollment" className={TAB_ACTIVE}>Enrollment</TabsTrigger>
+            )}
+            {tabs.payments && (
+              <TabsTrigger value="payments" className={TAB_ACTIVE}>Payments</TabsTrigger>
+            )}
           </TabsList>
 
           <div className="p-5">
@@ -510,6 +528,7 @@ export default function LeadDetailPage() {
                   </div>
                 </Section>
 
+                {tabs.followups && (
                 <Section title="Follow-up">
                   {nextFollowUp ? (
                     <div className="bg-surface-container-low rounded-lg border p-4">
@@ -551,6 +570,7 @@ export default function LeadDetailPage() {
                     <p className="text-muted-foreground text-sm">No follow-up scheduled.</p>
                   )}
                 </Section>
+                )}
 
                 <Section title="General notes">
                   <p className="text-sm whitespace-pre-wrap">{lead.generalNotes || "No notes recorded."}</p>
@@ -565,6 +585,7 @@ export default function LeadDetailPage() {
             </TabsContent>
 
             {/* Calls */}
+            {tabs.calls && (
             <TabsContent value="calls">
               <Section
                 title="Call history"
@@ -584,8 +605,10 @@ export default function LeadDetailPage() {
                 />
               </Section>
             </TabsContent>
+            )}
 
             {/* Follow-ups */}
+            {tabs.followups && (
             <TabsContent value="followups">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="text-muted-foreground text-sm">
@@ -624,27 +647,32 @@ export default function LeadDetailPage() {
                 <p className="text-muted-foreground py-8 text-center text-sm">No follow-ups scheduled.</p>
               )}
             </TabsContent>
+            )}
 
             {/* Enquiries */}
-            {lead.apiId != null && (
+            {tabs.enquiries && lead.apiId != null && (
               <TabsContent value="enquiries">
                 <EnquiriesPanel leadId={lead.apiId} />
               </TabsContent>
             )}
 
             {/* Enrollment */}
-            <TabsContent value="enrollment">
-              <EnrollmentsPanel
-                leadId={lead.apiId}
-                primaryCourseId={lead.primaryCourseId}
-                canManage={can("enrollment.manage")}
-              />
-            </TabsContent>
+            {tabs.enrollment && (
+              <TabsContent value="enrollment">
+                <EnrollmentsPanel
+                  leadId={lead.apiId}
+                  primaryCourseId={lead.primaryCourseId}
+                  canManage={can("enrollment.manage")}
+                />
+              </TabsContent>
+            )}
 
             {/* Payments */}
-            <TabsContent value="payments">
-              <LeadPaymentsPanel leadId={lead.apiId} />
-            </TabsContent>
+            {tabs.payments && (
+              <TabsContent value="payments">
+                <LeadPaymentsPanel leadId={lead.apiId} />
+              </TabsContent>
+            )}
           </div>
         </Tabs>
       </Card>

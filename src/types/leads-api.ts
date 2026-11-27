@@ -781,8 +781,8 @@ export interface ApiStudent {
   document_count?: number;
 
   /* Payment summary — detail response only (GET /api/students/{id}/). */
-  /** Sum of successful payments across every enrollment. */
-  total_paid?: string;
+  /** Sum of successful payments across every enrollment; null without the enrollment right. */
+  total_paid?: string | null;
   enrollment_count?: number;
   recent_payments?: ApiStudentRecentPayment[];
 }

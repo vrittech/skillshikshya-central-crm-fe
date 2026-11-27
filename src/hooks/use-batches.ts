@@ -133,12 +133,12 @@ export function useCourseBatch(id: number | null) {
 }
 
 /** Pending enrollments that picked this batch; they take a seat when confirmed. */
-export function useBatchPending(id: number | null) {
+export function useBatchPending(id: number | null, enabled = true) {
   return useQuery({
     queryKey: ["course-batches", "pending", id],
     queryFn: () =>
       globalListsService.enrollments({ batch: id, status: "pending", page_size: 100 }),
-    enabled: id != null,
+    enabled: id != null && enabled,
   });
 }
 
@@ -163,7 +163,7 @@ function useBatchMoneyAction<V>(
     mutationFn: run,
     onSuccess: (money) => {
       toast.success(done);
-      qc.setQueryData(["course-batches", "money", money.batch], money);
+      if ("figures" in money) qc.setQueryData(["course-batches", "money", money.batch], money);
       // Closing changes the state of the students' Teams licences.
       for (const key of ["course-batches", "reports", "teams", "lead", "enrollments"]) {
         void qc.invalidateQueries({ queryKey: [key] });
